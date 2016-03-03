@@ -3,6 +3,7 @@ package tnt
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ type Box struct {
 	Root     string
 	Port     uint
 	cmd      *exec.Cmd
+	stderr   io.ReadCloser
 	stopOnce sync.Once
 	stopped  chan bool
 }
@@ -101,6 +103,7 @@ START_LOOP:
 			Port:    port,
 			cmd:     cmd,
 			stopped: make(chan bool),
+			stderr:  boxStderr,
 		}
 
 	WAIT_LOOP:
@@ -130,6 +133,19 @@ START_LOOP:
 	if box == nil {
 		return nil, fmt.Errorf("Can't bind any port from %d to %d", options.PortMin, options.PortMax)
 	}
+
+	// print logs
+	go func() {
+		p := make([]byte, 1024)
+
+		for {
+			n, err := box.stderr.Read(p)
+			if err != nil {
+				return
+			}
+			fmt.Println(string(p[:n]))
+		}
+	}()
 
 	return box, nil
 }

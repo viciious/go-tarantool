@@ -2,6 +2,7 @@ package tnt
 
 import (
 	"testing"
+	"time"
 
 	"github.com/k0kubun/pp"
 	"github.com/stretchr/testify/assert"
@@ -34,5 +35,7 @@ func TestSelect(t *testing.T) {
 		Space: "tester",
 		Key:   Uint32(3),
 	}))
+
+	time.Sleep(time.Second)
 
 }
