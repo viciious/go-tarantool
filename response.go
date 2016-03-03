@@ -5,14 +5,13 @@ import (
 	"errors"
 	"io"
 
-	"github.com/k0kubun/pp"
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type Response struct {
 	Code      uint32
 	Error     error
-	Data      []Tuple
+	Data      []interface{}
 	requestID uint32
 }
 
@@ -83,7 +82,7 @@ func (resp *Response) decodeBody(r *bytes.Buffer) (err error) {
 			return err
 		}
 		if body[KeyData] != nil {
-			pp.Println(body)
+			resp.Data = body[KeyData].([]interface{})
 		}
 		if body[KeyError] != nil {
 			resp.Error = errors.New(body[KeyError].(string))

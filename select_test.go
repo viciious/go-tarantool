@@ -12,7 +12,7 @@ func TestSelect(t *testing.T) {
 	assert := assert.New(t)
 
 	tarantoolConfig := `
-    s = box.schema.space.create('tester')
+    s = box.schema.space.create('tester', {id = 42})
     s:create_index('primary', {
         type = 'hash',
         parts = {1, 'NUM'}
@@ -33,9 +33,9 @@ func TestSelect(t *testing.T) {
 	assert.NoError(err)
 	assert.NotNil(conn)
 
-	pp.Println(conn.Execute(&Select{
-		Space: "tester",
-		Key:   Uint32(3),
+	pp.Println(conn.Execute(&SelectNo{
+		SpaceNo: 42,
+		Key:     3,
 	}))
 
 	time.Sleep(time.Second)
