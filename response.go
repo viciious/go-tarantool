@@ -8,9 +8,9 @@ import (
 )
 
 type Response struct {
-	// Data      []Tuple
 	Code      uint32
 	Error     error
+	Data      []Tuple
 	requestID uint32
 }
 
