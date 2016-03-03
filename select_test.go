@@ -31,9 +31,9 @@ func TestSelect(t *testing.T) {
 	assert.NoError(err)
 	assert.NotNil(conn)
 
-	data, err := conn.Execute(&SelectNo{
-		SpaceNo: 42,
-		Key:     3,
+	data, err := conn.Execute(&Select{
+		Space: 42,
+		Key:   3,
 	})
 
 	assert.NoError(err)
@@ -48,10 +48,11 @@ func TestSelect(t *testing.T) {
 }
 
 func BenchmarkSelectNoPack(b *testing.B) {
+	cache := &packCache{}
+
 	for i := 0; i < b.N; i += 1 {
-		(&SelectNo{
-			SpaceNo: 42,
-			Key:     3,
-		}).Pack(0, "")
+		(&Select{
+			Key: 3,
+		}).Pack(0, 42, cache)
 	}
 }

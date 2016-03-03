@@ -6,18 +6,18 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
-type SelectNo struct {
-	SpaceNo  interface{}
-	IndexNo  interface{}
+type Select struct {
+	Space    interface{}
+	Index    interface{}
 	Offset   uint32
 	Limit    uint32
 	Iterator uint8
 	Key      interface{}
 }
 
-var _ Query = (*SelectNo)(nil)
+var _ Query = (*Select)(nil)
 
-func (s *SelectNo) Pack(requestID uint32, defaultSpace string) ([]byte, error) {
+func (s *Select) Pack(requestID uint32, defaultSpace interface{}, cache *packCache) ([]byte, error) {
 	var bodyBuffer bytes.Buffer
 	var err error
 
@@ -25,19 +25,18 @@ func (s *SelectNo) Pack(requestID uint32, defaultSpace string) ([]byte, error) {
 
 	encoder.EncodeMapLen(6) // Space, Index, Offset, Limit, Iterator, Key
 
-	space := interface{}(defaultSpace)
-	if s.SpaceNo != nil {
-		space = s.SpaceNo
-	}
-
 	index := interface{}(uint32(0))
-	if s.IndexNo != nil {
-		index = s.IndexNo
+	if s.Index != nil {
+		index = s.Index
 	}
 
 	// Space
-	encoder.EncodeUint32(KeySpaceNo)
-	encoder.Encode(space)
+	if s.Space != nil {
+		encoder.EncodeUint32(KeySpaceNo)
+		encoder.Encode(s.Space)
+	} else {
+		bodyBuffer.Write(cache.SelectDefaultSpace(defaultSpace))
+	}
 
 	// Index
 	encoder.EncodeUint32(KeyIndexNo)

@@ -37,6 +37,7 @@ type Connection struct {
 	queryTimeout time.Duration
 	defaultSpace string
 	Greeting     *Greeting
+	packCache    *packCache
 }
 
 func Connect(addr string, options *Options) (conn *Connection, err error) {
@@ -55,6 +56,7 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 		requestChan: make(chan *request, 16),
 		exit:        make(chan bool),
 		closed:      make(chan bool),
+		packCache:   &packCache{},
 	}
 
 	if options == nil {
@@ -116,7 +118,7 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 			User:         options.User,
 			Password:     options.Password,
 			GreetingAuth: conn.Greeting.Auth,
-		}).Pack(authRequestID, "")
+		}).Pack(authRequestID, "", conn.packCache)
 
 		_, err = conn.tcpConn.Write(authRaw)
 		if err != nil {
@@ -169,7 +171,7 @@ func (conn *Connection) newRequest(r *request) error {
 	// pp.Println(r)
 	var err error
 
-	r.raw, err = r.query.Pack(requestID, conn.defaultSpace)
+	r.raw, err = r.query.Pack(requestID, conn.defaultSpace, conn.packCache)
 	if err != nil {
 		r.replyChan <- &Response{
 			Error: &QueryError{
