@@ -14,6 +14,8 @@ type Options struct {
 	ConnectTimeout time.Duration
 	QueryTimeout   time.Duration
 	DefaultSpace   string
+	User           string
+	Password       string
 }
 
 type Response struct {

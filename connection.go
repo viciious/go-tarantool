@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func Connect(addr string, opts *Options) (conn *Connection, err error) {
+func Connect(addr string, options *Options) (conn *Connection, err error) {
 	conn = &Connection{
 		addr:        addr,
 		requests:    make(map[uint64]*request),
@@ -19,9 +19,11 @@ func Connect(addr string, opts *Options) (conn *Connection, err error) {
 		closed:      make(chan bool),
 	}
 
-	if opts == nil {
-		opts = &Options{}
+	if options == nil {
+		options = &Options{}
 	}
+
+	opts := *options // copy to new object
 
 	if opts.ConnectTimeout.Nanoseconds() == 0 {
 		opts.ConnectTimeout = time.Duration(time.Second)
