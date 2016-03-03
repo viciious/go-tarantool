@@ -2,9 +2,7 @@ package tnt
 
 import (
 	"testing"
-	"time"
 
-	"github.com/k0kubun/pp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,11 +31,18 @@ func TestSelect(t *testing.T) {
 	assert.NoError(err)
 	assert.NotNil(conn)
 
-	pp.Println(conn.Execute(&SelectNo{
+	data, err := conn.Execute(&SelectNo{
 		SpaceNo: 42,
 		Key:     3,
-	}))
+	})
 
-	time.Sleep(time.Second)
+	assert.NoError(err)
+	assert.Equal([]interface{}{
+		[]interface{}{
+			uint32(0x3),
+			"Length",
+			uint32(0x5d),
+		},
+	}, data)
 
 }
