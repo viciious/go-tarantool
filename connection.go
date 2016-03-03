@@ -61,12 +61,17 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 		conn.Close()
 		return
 	}
-	conn.tcpConn.SetDeadline(time.Time{})
 
 	conn.Greeting = &Greeting{
 		Version: greeting[:64],
 		Auth:    greeting[64:108],
 	}
+
+	if options.User != "" {
+
+	}
+
+	conn.tcpConn.SetDeadline(time.Time{})
 
 	go conn.worker(conn.tcpConn)
 
@@ -81,7 +86,7 @@ func (conn *Connection) nextID() uint64 {
 	return conn.requestID
 }
 
-func (conn *Connection) newRequest(r *request) {
+func (conn *Connection) newRequest(r *request) error {
 	requestID := conn.nextID()
 	old, exists := conn.requests[requestID]
 	if exists {
@@ -93,8 +98,20 @@ func (conn *Connection) newRequest(r *request) {
 	}
 
 	// pp.Println(r)
-	r.raw = r.query.Pack(requestID, conn.defaultSpace)
+	var err error
+	r.raw, err = r.query.Pack(requestID, conn.defaultSpace)
+	if err != nil {
+		r.replyChan <- &Response{
+			Error: &QueryError{
+				error: err,
+			},
+		}
+		return err
+	}
+
 	conn.requests[requestID] = r
+
+	return nil
 }
 
 func (conn *Connection) handleReply(res *Response) {
@@ -196,13 +213,13 @@ ROUTER_LOOP:
 				break ROUTER_LOOP
 			}
 
-			conn.newRequest(r)
-
-			select {
-			case writeChan <- r:
-				// pass
-			case <-stopChan:
-				break ROUTER_LOOP
+			if conn.newRequest(r) == nil { // already replied to errored requests
+				select {
+				case writeChan <- r:
+					// pass
+				case <-stopChan:
+					break ROUTER_LOOP
+				}
 			}
 		case <-stopChan:
 			break ROUTER_LOOP

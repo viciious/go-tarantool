@@ -7,7 +7,7 @@ import (
 )
 
 type Query interface {
-	Pack(requestID uint64, defaultSpace string) []byte
+	Pack(requestID uint64, defaultSpace string) ([]byte, error)
 }
 
 type Options struct {
