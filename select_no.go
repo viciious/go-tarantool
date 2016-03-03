@@ -7,8 +7,8 @@ import (
 )
 
 type SelectNo struct {
-	SpaceNo  uint32
-	IndexNo  uint32
+	SpaceNo  interface{}
+	IndexNo  interface{}
 	Offset   uint32
 	Limit    uint32
 	Iterator uint8
@@ -25,13 +25,23 @@ func (s *SelectNo) Pack(requestID uint32, defaultSpace string) ([]byte, error) {
 
 	encoder.EncodeMapLen(6) // Space, Index, Offset, Limit, Iterator, Key
 
+	space := interface{}(defaultSpace)
+	if s.SpaceNo != nil {
+		space = s.SpaceNo
+	}
+
+	index := interface{}(uint32(0))
+	if s.IndexNo != nil {
+		index = s.IndexNo
+	}
+
 	// Space
 	encoder.EncodeUint32(KeySpaceNo)
-	encoder.EncodeUint32(s.SpaceNo)
+	encoder.Encode(space)
 
 	// Index
 	encoder.EncodeUint32(KeyIndexNo)
-	encoder.EncodeUint32(s.IndexNo)
+	encoder.Encode(index)
 
 	// Offset
 	encoder.EncodeUint32(KeyOffset)
@@ -55,19 +65,6 @@ func (s *SelectNo) Pack(requestID uint32, defaultSpace string) ([]byte, error) {
 	if err = encoder.Encode(s.Key); err != nil {
 		return nil, err
 	}
-
-	data := make(map[uint32]interface{})
-	data[KeySpaceNo] = SpaceIndex
-	data[KeyIndexNo] = 0
-	data[KeyOffset] = 0
-	data[KeyLimit] = 100
-	data[KeyIterator] = IterGt
-	data[KeyKey] = []interface{}{uint(0)}
-
-	// body, err := msgpack.Marshal(data)
-	// if err != nil {
-	// return nil, err
-	// }
 
 	return packIproto(SelectRequest, requestID, bodyBuffer.Bytes()), nil
 }

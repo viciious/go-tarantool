@@ -46,3 +46,12 @@ func TestSelect(t *testing.T) {
 	}, data)
 
 }
+
+func BenchmarkSelectNoPack(b *testing.B) {
+	for i := 0; i < b.N; i += 1 {
+		(&SelectNo{
+			SpaceNo: 42,
+			Key:     3,
+		}).Pack(0, "")
+	}
+}
