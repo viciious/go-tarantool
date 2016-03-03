@@ -3,6 +3,7 @@ package tnt
 import (
 	"bytes"
 	"errors"
+	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -12,6 +13,36 @@ type Response struct {
 	Error     error
 	Data      []Tuple
 	requestID uint32
+}
+
+func readMessage(r io.Reader) ([]byte, error) {
+	var err error
+	header := make([]byte, PacketLengthBytes)
+
+	if _, err = io.ReadAtLeast(r, header, PacketLengthBytes); err != nil {
+		return nil, err
+	}
+
+	if header[0] != 0xce {
+		return nil, errors.New("Wrong reponse header")
+	}
+
+	bodyLength := (int(header[1]) << 24) +
+		(int(header[2]) << 16) +
+		(int(header[3]) << 8) +
+		int(header[4])
+
+	if bodyLength == 0 {
+		return nil, errors.New("Response should not be 0 length")
+	}
+
+	body := make([]byte, bodyLength)
+	_, err = io.ReadAtLeast(r, body, bodyLength)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
 }
 
 func (resp *Response) decodeHeader(r *bytes.Buffer) (err error) {
@@ -72,4 +103,18 @@ func decodeResponse(r *bytes.Buffer) (*Response, error) {
 		return nil, err
 	}
 	return resp, nil
+}
+
+func read(r io.Reader) (*Response, error) {
+	body, err := readMessage(r)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := decodeResponse(bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }

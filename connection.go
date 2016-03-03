@@ -1,7 +1,6 @@
 package tnt
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -109,7 +108,6 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 
 	if options.User != "" {
 		var authRaw []byte
-		var authReplyBody []byte
 		var authResponse *Response
 
 		authRequestID := conn.nextID()
@@ -125,12 +123,7 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 			return
 		}
 
-		authReplyBody, err = readMessage(conn.tcpConn)
-		if err != nil {
-			return
-		}
-
-		authResponse, err = decodeResponse(bytes.NewBuffer(authReplyBody))
+		authResponse, err = read(conn.tcpConn)
 		if err != nil {
 			return
 		}
@@ -237,7 +230,7 @@ func (conn *Connection) worker(tcpConn net.Conn) {
 	}()
 
 	go func() {
-		reader(tcpConn, readChan)
+		reader(tcpConn, readChan, conn.exit)
 		conn.stop()
 		wg.Done()
 		// pp.Println("reader")
@@ -338,76 +331,23 @@ WRITER_LOOP:
 	}
 }
 
-func readMessage(r io.Reader) ([]byte, error) {
-	var err error
-	header := make([]byte, PacketLengthBytes)
-
-	if _, err = io.ReadAtLeast(r, header, PacketLengthBytes); err != nil {
-		return nil, err
-	}
-
-	if header[0] != 0xce {
-		return nil, errors.New("Wrong reponse header")
-	}
-
-	bodyLength := (int(header[1]) << 24) +
-		(int(header[2]) << 16) +
-		(int(header[3]) << 8) +
-		int(header[4])
-
-	if bodyLength == 0 {
-		return nil, errors.New("Response should not be 0 length")
-	}
-
-	body := make([]byte, bodyLength)
-	_, err = io.ReadAtLeast(r, body, bodyLength)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
-}
-
-func reader(tcpConn net.Conn, readChan chan *Response) {
-	// var msgLen uint32
-	// var err error
-	header := make([]byte, 12)
-	headerLen := len(header)
-
-	var bodyLen uint32
-	var requestID uint32
+func reader(tcpConn net.Conn, readChan chan *Response, stopChan chan bool) {
 	var response *Response
-
 	var err error
 
 READER_LOOP:
 	for {
-		_, err = io.ReadAtLeast(tcpConn, header, headerLen)
-		// @TODO: log error
+		response, err = read(tcpConn)
 		if err != nil {
 			break READER_LOOP
 		}
 
-		// bodyLen = UnpackInt(header[4:8])
-		// requestID = UnpackInt(header[8:12])
-
-		body := make([]byte, bodyLen)
-
-		_, err = io.ReadAtLeast(tcpConn, body, int(bodyLen))
-		// @TODO: log error
-		if err != nil {
+		select {
+		case readChan <- response:
+			// pass
+		case <-stopChan:
 			break READER_LOOP
 		}
-
-		// response, err = UnpackBody(body)
-		response = nil
-		// @TODO: log error
-		if err != nil {
-			break READER_LOOP
-		}
-		response.requestID = requestID
-
-		readChan <- response
 	}
 }
 
