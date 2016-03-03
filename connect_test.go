@@ -1,7 +1,6 @@
 package tnt
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +13,7 @@ func TestConnect(t *testing.T) {
 	assert.NoError(err)
 	defer box.Close()
 
-	conn, err := Connect(fmt.Sprintf("127.0.0.1:%d", box.Port), nil)
+	conn, err := Connect(box.Addr(), nil)
 	if !assert.NoError(err) {
 		return
 	}
