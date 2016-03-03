@@ -42,26 +42,35 @@ func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 	}
 
 	// Offset
-	encoder.EncodeUint32(KeyOffset)
-	encoder.EncodeUint32(s.Offset)
+	if s.Offset == 0 {
+		bodyBuffer.Write(data.packedDefaultOffset)
+	} else {
+		encoder.EncodeUint32(KeyOffset)
+		encoder.EncodeUint32(s.Offset)
+	}
 
 	// Limit
-	encoder.EncodeUint32(KeyLimit)
-	if s.Limit != 0 {
-		encoder.EncodeUint32(s.Limit)
+	if s.Limit == 0 {
+		bodyBuffer.Write(data.packedDefaultLimit)
 	} else {
-		encoder.EncodeUint32(DefaultLimit)
+		encoder.EncodeUint32(KeyLimit)
+		encoder.EncodeUint32(s.Limit)
 	}
 
 	// Iterator
-	encoder.EncodeUint32(KeyIterator)
-	encoder.EncodeUint8(s.Iterator)
+	if s.Iterator == IterEq {
+		bodyBuffer.Write(data.packedIterEq)
+	} else {
+		encoder.EncodeUint32(KeyIterator)
+		encoder.EncodeUint8(s.Iterator)
+	}
 
 	// Key
-	encoder.EncodeUint32(KeyKey)
-	encoder.EncodeArrayLen(1)
-	if err = encoder.Encode(s.Key); err != nil {
-		return nil, err
+	if s.Key != nil {
+		bodyBuffer.Write(data.packedSingleKey)
+		if err = encoder.Encode(s.Key); err != nil {
+			return nil, err
+		}
 	}
 
 	return packIproto(SelectRequest, requestID, bodyBuffer.Bytes()), nil
