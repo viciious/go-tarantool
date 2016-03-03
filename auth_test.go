@@ -1,13 +1,12 @@
 package tnt
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConnectAuth(t *testing.T) {
+func TestAuth(t *testing.T) {
 	assert := assert.New(t)
 
 	tarantoolConfig := `
@@ -19,7 +18,7 @@ func TestConnectAuth(t *testing.T) {
 	defer box.Close()
 
 	// unkwnown user
-	conn, err := Connect(fmt.Sprintf("127.0.0.1:%d", box.Port), &Options{
+	conn, err := box.Connect(&Options{
 		User:     "user_not_found",
 		Password: "qwerty",
 	})
@@ -28,7 +27,7 @@ func TestConnectAuth(t *testing.T) {
 	}
 
 	// bad password
-	conn, err = Connect(fmt.Sprintf("127.0.0.1:%d", box.Port), &Options{
+	conn, err = box.Connect(&Options{
 		User:     "tester",
 		Password: "qwerty",
 	})
@@ -37,7 +36,7 @@ func TestConnectAuth(t *testing.T) {
 	}
 
 	// ok user password
-	conn, err = Connect(fmt.Sprintf("127.0.0.1:%d", box.Port), &Options{
+	conn, err = box.Connect(&Options{
 		User:     "tester",
 		Password: "12345678",
 	})
