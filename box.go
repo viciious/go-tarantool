@@ -63,7 +63,7 @@ START_LOOP:
         }
         `
 
-		initLua = strings.Replace(initLua, "{port}", fmt.Sprintf("%d", options.Listen), -1)
+		initLua = strings.Replace(initLua, "{port}", fmt.Sprintf("%d", port), -1)
 		initLua = strings.Replace(initLua, "{root}", tmpDir, -1)
 
 		initLua = fmt.Sprintf("%s\n%s", initLua, config)
