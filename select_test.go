@@ -47,7 +47,7 @@ func TestSelect(t *testing.T) {
 
 }
 
-func BenchmarkSelectNoPack(b *testing.B) {
+func BenchmarkSelectPack(b *testing.B) {
 	cache := &packCache{}
 
 	for i := 0; i < b.N; i += 1 {
