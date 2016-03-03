@@ -9,6 +9,7 @@ import (
 // cache precompiled
 type packData struct {
 	packedDefaultSpace []byte
+	packedDefaultIndex []byte
 }
 
 func encodeValues2(v1, v2 interface{}) []byte {
@@ -22,6 +23,7 @@ func encodeValues2(v1, v2 interface{}) []byte {
 func newPackData(defaultSpace interface{}) (*packData, error) {
 	d := &packData{
 		packedDefaultSpace: encodeValues2(KeySpaceNo, defaultSpace),
+		packedDefaultIndex: encodeValues2(KeyIndexNo, uint32(0)),
 	}
 
 	return d, nil

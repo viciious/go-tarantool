@@ -25,11 +25,6 @@ func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	encoder.EncodeMapLen(6) // Space, Index, Offset, Limit, Iterator, Key
 
-	index := interface{}(uint32(0))
-	if s.Index != nil {
-		index = s.Index
-	}
-
 	// Space
 	if s.Space != nil {
 		encoder.EncodeUint32(KeySpaceNo)
@@ -39,8 +34,12 @@ func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 	}
 
 	// Index
-	encoder.EncodeUint32(KeyIndexNo)
-	encoder.Encode(index)
+	if s.Index != nil {
+		encoder.EncodeUint32(KeyIndexNo)
+		encoder.Encode(s.Index)
+	} else {
+		bodyBuffer.Write(data.packedDefaultIndex)
+	}
 
 	// Offset
 	encoder.EncodeUint32(KeyOffset)
