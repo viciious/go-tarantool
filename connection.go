@@ -33,19 +33,20 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 		opts.QueryTimeout = time.Duration(time.Second)
 	}
 
-	var defaultSpace string
-
 	splittedAddr := strings.Split(addr, "/")
 	remoteAddr := splittedAddr[0]
-	if len(splittedAddr) > 1 {
-		if splittedAddr[1] == "" {
-			return nil, fmt.Errorf("Wrong space: %s", splittedAddr[1])
+
+	if opts.DefaultSpace == "" {
+		if len(splittedAddr) > 1 {
+			if splittedAddr[1] == "" {
+				return nil, fmt.Errorf("Wrong space: %s", splittedAddr[1])
+			}
+			options.DefaultSpace = splittedAddr[1]
 		}
-		defaultSpace = splittedAddr[1]
 	}
 
 	conn.queryTimeout = opts.QueryTimeout
-	conn.defaultSpace = defaultSpace
+	conn.defaultSpace = opts.DefaultSpace
 
 	conn.tcpConn, err = net.DialTimeout("tcp", remoteAddr, opts.ConnectTimeout)
 	if err != nil {
