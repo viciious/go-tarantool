@@ -1,9 +1,12 @@
 package tnt
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type Auth struct {
@@ -52,12 +55,23 @@ func xor(left, right []byte, size int) []byte {
 }
 
 func (auth *Auth) Pack(requestID uint32, defaultSpace string) ([]byte, error) {
-	_, err := scramble(auth.GreetingAuth, auth.Password)
+	scr, err := scramble(auth.GreetingAuth, auth.Password)
 	if err != nil {
 		return nil, fmt.Errorf("auth: scrambling failure: %s", err.Error())
 	}
 
-	body := []byte{}
+	var bodyBuffer bytes.Buffer
 
-	return packIproto(AuthRequest, requestID, body), nil
+	encoder := msgpack.NewEncoder(&bodyBuffer)
+
+	encoder.EncodeMapLen(2) // User, Password
+	encoder.EncodeUint64(KeyUserName)
+	encoder.EncodeString(auth.User)
+
+	encoder.EncodeUint64(KeyTuple)
+	encoder.EncodeArrayLen(2)
+	encoder.EncodeString("chap-sha1")
+	encoder.EncodeBytes(scr)
+
+	return packIproto(AuthRequest, requestID, bodyBuffer.Bytes()), nil
 }

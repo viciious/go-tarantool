@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/k0kubun/pp"
 )
 
 func Connect(addr string, options *Options) (conn *Connection, err error) {
@@ -68,6 +70,22 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 	}
 
 	if options.User != "" {
+		var authRaw []byte
+		authRequestID := conn.nextID()
+
+		authRaw, err = (&Auth{
+			User:         options.User,
+			Password:     options.Password,
+			GreetingAuth: conn.Greeting.Auth,
+		}).Pack(authRequestID, "")
+
+		_, err = conn.tcpConn.Write(authRaw)
+		if err != nil {
+			conn.Close()
+			return
+		}
+
+		pp.Println(authRaw)
 
 	}
 
