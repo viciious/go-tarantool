@@ -144,6 +144,10 @@ func (box *Box) Close() {
 	<-box.stopped
 }
 
+func (box *Box) Addr() string {
+	return fmt.Sprintf("127.0.0.1:%d", box.Port)
+}
+
 func (box *Box) Connect(options *Options) (*Connection, error) {
-	return Connect(fmt.Sprintf("127.0.0.1:%d", box.Port), options)
+	return Connect(box.Addr(), options)
 }
