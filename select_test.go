@@ -23,7 +23,9 @@ func TestSelect(t *testing.T) {
     `
 
 	box, err := NewBox(tarantoolConfig, nil)
-	assert.NoError(err)
+	if !assert.NoError(err) {
+		return
+	}
 	defer box.Close()
 
 	// unkwnown user

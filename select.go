@@ -22,7 +22,7 @@ func (s *Select) Pack(requestID uint32, defaultSpace string) ([]byte, error) {
 
 	encoder := msgpack.NewEncoder(&bodyBuffer)
 
-	encoder.EncodeMapLen(6) // Space, Index, Offset, Limit, Iterator, Key
+	encoder.EncodeMapLen(5) // Space, Index, Offset, Limit, Iterator, Key
 
 	// Space
 	encoder.EncodeUint32(KeySpaceNo)
@@ -57,9 +57,22 @@ func (s *Select) Pack(requestID uint32, defaultSpace string) ([]byte, error) {
 	encoder.EncodeUint8(s.Iterator)
 
 	// Key
-	encoder.EncodeUint32(KeyKey)
-	encoder.EncodeArrayLen(1)
-	encoder.EncodeBytes(s.Key)
+	// encoder.EncodeUint32(KeyKey)
+	// encoder.EncodeArrayLen(1)
+	// encoder.EncodeBytes(s.Key)
 
-	return packIproto(SelectRequest, requestID, bodyBuffer.Bytes()), nil
+	data := make(map[uint32]interface{})
+	data[KeySpaceNo] = SpaceSchema
+	data[KeyIndexNo] = 0
+	data[KeyOffset] = 0
+	data[KeyLimit] = 100
+	data[KeyIterator] = s.Iterator
+	data[KeyKey] = []interface{}{uint(15)}
+
+	body, err := msgpack.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return packIproto(SelectRequest, requestID, body), nil
 }

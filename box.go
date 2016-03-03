@@ -63,6 +63,7 @@ START_LOOP:
             sophia_dir = "{root}/sophia/",
             wal_dir = "{root}/wal/"
         }
+        box.schema.user.grant('guest', 'read', 'universe')
         `
 
 		initLua = strings.Replace(initLua, "{port}", fmt.Sprintf("%d", port), -1)
@@ -119,11 +120,13 @@ START_LOOP:
 			}
 
 			n, err := boxStderr.Read(p)
+			if n > 0 {
+				boxStderrBuffer.Write(p[:n])
+			}
 			if err != nil {
+				fmt.Println(boxStderrBuffer.String())
 				return nil, err
 			}
-
-			boxStderrBuffer.Write(p[:n])
 		}
 
 		os.RemoveAll(box.Root)

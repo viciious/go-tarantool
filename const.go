@@ -49,6 +49,16 @@ const (
 	PacketLengthBytes = 5
 )
 
+const (
+	SpaceSchema  = 272
+	SpaceSpace   = 280
+	SpaceIndex   = 288
+	SpaceFunc    = 296
+	SpaceUser    = 304
+	SpacePriv    = 312
+	SpaceCluster = 320
+)
+
 // Tarantool server error codes
 const (
 	ErrUnknown                       = 0x8000 + iota // Unknown error

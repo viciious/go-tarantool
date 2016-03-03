@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/k0kubun/pp"
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
@@ -82,7 +83,7 @@ func (resp *Response) decodeBody(r *bytes.Buffer) (err error) {
 			return err
 		}
 		if body[KeyData] != nil {
-			// resp.Data = body[KeyData].([]interface{})
+			pp.Println(body)
 		}
 		if body[KeyError] != nil {
 			resp.Error = errors.New(body[KeyError].(string))
