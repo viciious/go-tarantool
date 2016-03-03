@@ -20,4 +20,5 @@ func TestConnect(t *testing.T) {
 	}
 	defer conn.Close()
 
+	assert.Contains(string(conn.Greeting.Version), "Tarantool")
 }
