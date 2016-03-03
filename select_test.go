@@ -51,8 +51,6 @@ func BenchmarkSelectPack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
-		(&Select{
-			Key: 3,
-		}).Pack(0, d)
+		(&Select{Key: 3}).Pack(0, d)
 	}
 }
