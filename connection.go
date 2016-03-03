@@ -1,6 +1,8 @@
 package tnt
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -8,11 +10,46 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/k0kubun/pp"
 )
 
+type Options struct {
+	ConnectTimeout time.Duration
+	QueryTimeout   time.Duration
+	DefaultSpace   string
+	User           string
+	Password       string
+}
+
+type Greeting struct {
+	Version []byte
+	Auth    []byte
+}
+
+type Connection struct {
+	addr        string
+	requestID   uint32
+	requests    map[uint32]*request
+	requestChan chan *request
+	closeOnce   sync.Once
+	exit        chan bool
+	closed      chan bool
+	tcpConn     net.Conn
+	// options
+	queryTimeout time.Duration
+	defaultSpace string
+	Greeting     *Greeting
+}
+
 func Connect(addr string, options *Options) (conn *Connection, err error) {
+	defer func() { // close opened connection if error
+		if err != nil && conn != nil {
+			if conn.tcpConn != nil {
+				conn.tcpConn.Close()
+			}
+			conn = nil
+		}
+	}()
+
 	conn = &Connection{
 		addr:        addr,
 		requests:    make(map[uint32]*request),
@@ -50,6 +87,8 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 	conn.queryTimeout = opts.QueryTimeout
 	conn.defaultSpace = opts.DefaultSpace
 
+	connectDeadline := time.Now().Add(opts.ConnectTimeout)
+
 	conn.tcpConn, err = net.DialTimeout("tcp", remoteAddr, opts.ConnectTimeout)
 	if err != nil {
 		return nil, err
@@ -57,10 +96,9 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 
 	greeting := make([]byte, 128)
 
-	conn.tcpConn.SetDeadline(time.Now().Add(opts.ConnectTimeout))
+	conn.tcpConn.SetDeadline(connectDeadline)
 	_, err = io.ReadFull(conn.tcpConn, greeting)
 	if err != nil {
-		conn.Close()
 		return
 	}
 
@@ -71,6 +109,9 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 
 	if options.User != "" {
 		var authRaw []byte
+		var authReplyBody []byte
+		var authResponse *Response
+
 		authRequestID := conn.nextID()
 
 		authRaw, err = (&Auth{
@@ -81,11 +122,28 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 
 		_, err = conn.tcpConn.Write(authRaw)
 		if err != nil {
-			conn.Close()
 			return
 		}
 
-		pp.Println(authRaw)
+		authReplyBody, err = readMessage(conn.tcpConn)
+		if err != nil {
+			return
+		}
+
+		authResponse, err = decodeResponse(bytes.NewBuffer(authReplyBody))
+		if err != nil {
+			return
+		}
+
+		if authResponse.requestID != authRequestID {
+			err = errors.New("Bad auth responseID")
+			return
+		}
+
+		if authResponse.Error != nil {
+			err = authResponse.Error
+			return
+		}
 
 	}
 
@@ -148,6 +206,11 @@ func (conn *Connection) stop() {
 		close(conn.exit)
 		conn.tcpConn.Close()
 	})
+}
+
+func (conn *Connection) Close() {
+	conn.stop()
+	<-conn.closed
 }
 
 func (conn *Connection) worker(tcpConn net.Conn) {
@@ -275,6 +338,36 @@ WRITER_LOOP:
 	}
 }
 
+func readMessage(r io.Reader) ([]byte, error) {
+	var err error
+	header := make([]byte, PacketLengthBytes)
+
+	if _, err = io.ReadAtLeast(r, header, PacketLengthBytes); err != nil {
+		return nil, err
+	}
+
+	if header[0] != 0xce {
+		return nil, errors.New("Wrong reponse header")
+	}
+
+	bodyLength := (int(header[1]) << 24) +
+		(int(header[2]) << 16) +
+		(int(header[3]) << 8) +
+		int(header[4])
+
+	if bodyLength == 0 {
+		return nil, errors.New("Response should not be 0 length")
+	}
+
+	body := make([]byte, bodyLength)
+	_, err = io.ReadAtLeast(r, body, bodyLength)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
+}
+
 func reader(tcpConn net.Conn, readChan chan *Response) {
 	// var msgLen uint32
 	// var err error
@@ -335,7 +428,4 @@ func packIproto(requestCode byte, requestID uint32, body []byte) []byte {
 	h[4] = byte(l)
 
 	return append(h[:], body...)
-}
-
-func (conn *Connection) Close() {
 }
