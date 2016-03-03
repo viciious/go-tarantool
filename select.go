@@ -17,7 +17,7 @@ type Select struct {
 
 var _ Query = (*Select)(nil)
 
-func (s *Select) Pack(requestID uint32, defaultSpace interface{}, cache *packCache) ([]byte, error) {
+func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 	var bodyBuffer bytes.Buffer
 	var err error
 
@@ -35,7 +35,7 @@ func (s *Select) Pack(requestID uint32, defaultSpace interface{}, cache *packCac
 		encoder.EncodeUint32(KeySpaceNo)
 		encoder.Encode(s.Space)
 	} else {
-		bodyBuffer.Write(cache.SelectDefaultSpace(defaultSpace))
+		bodyBuffer.Write(data.packedDefaultSpace)
 	}
 
 	// Index

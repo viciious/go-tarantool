@@ -48,11 +48,11 @@ func TestSelect(t *testing.T) {
 }
 
 func BenchmarkSelectPack(b *testing.B) {
-	cache := &packCache{}
+	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
 		(&Select{
 			Key: 3,
-		}).Pack(0, 42, cache)
+		}).Pack(0, d)
 	}
 }

@@ -35,9 +35,8 @@ type Connection struct {
 	tcpConn     net.Conn
 	// options
 	queryTimeout time.Duration
-	defaultSpace string
 	Greeting     *Greeting
-	packCache    *packCache
+	packData     *packData
 }
 
 func Connect(addr string, options *Options) (conn *Connection, err error) {
@@ -56,7 +55,6 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 		requestChan: make(chan *request, 16),
 		exit:        make(chan bool),
 		closed:      make(chan bool),
-		packCache:   &packCache{},
 	}
 
 	if options == nil {
@@ -81,12 +79,17 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 			if splittedAddr[1] == "" {
 				return nil, fmt.Errorf("Wrong space: %s", splittedAddr[1])
 			}
-			options.DefaultSpace = splittedAddr[1]
+			opts.DefaultSpace = splittedAddr[1]
 		}
 	}
 
+	d, err := newPackData(opts.DefaultSpace)
+	if err != nil {
+		return nil, err
+	}
+	conn.packData = d
+
 	conn.queryTimeout = opts.QueryTimeout
-	conn.defaultSpace = opts.DefaultSpace
 
 	connectDeadline := time.Now().Add(opts.ConnectTimeout)
 
@@ -118,7 +121,7 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 			User:         options.User,
 			Password:     options.Password,
 			GreetingAuth: conn.Greeting.Auth,
-		}).Pack(authRequestID, "", conn.packCache)
+		}).Pack(authRequestID, nil)
 
 		_, err = conn.tcpConn.Write(authRaw)
 		if err != nil {
@@ -171,7 +174,7 @@ func (conn *Connection) newRequest(r *request) error {
 	// pp.Println(r)
 	var err error
 
-	r.raw, err = r.query.Pack(requestID, conn.defaultSpace, conn.packCache)
+	r.raw, err = r.query.Pack(requestID, conn.packData)
 	if err != nil {
 		r.replyChan <- &Response{
 			Error: &QueryError{

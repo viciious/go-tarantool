@@ -1,7 +1,7 @@
 package tnt
 
 type Query interface {
-	Pack(requestID uint32, defaultSpace interface{}, cache *packCache) ([]byte, error)
+	Pack(requestID uint32, data *packData) ([]byte, error)
 }
 
 type request struct {
