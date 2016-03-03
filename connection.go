@@ -13,7 +13,7 @@ import (
 func Connect(addr string, options *Options) (conn *Connection, err error) {
 	conn = &Connection{
 		addr:        addr,
-		requests:    make(map[uint64]*request),
+		requests:    make(map[uint32]*request),
 		requestChan: make(chan *request, 16),
 		exit:        make(chan bool),
 		closed:      make(chan bool),
@@ -78,8 +78,8 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 	return
 }
 
-func (conn *Connection) nextID() uint64 {
-	if conn.requestID == math.MaxUint64 {
+func (conn *Connection) nextID() uint32 {
+	if conn.requestID == math.MaxUint32 {
 		conn.requestID = 0
 	}
 	conn.requestID++
@@ -99,6 +99,7 @@ func (conn *Connection) newRequest(r *request) error {
 
 	// pp.Println(r)
 	var err error
+
 	r.raw, err = r.query.Pack(requestID, conn.defaultSpace)
 	if err != nil {
 		r.replyChan <- &Response{
@@ -263,7 +264,7 @@ func reader(tcpConn net.Conn, readChan chan *Response) {
 	headerLen := len(header)
 
 	var bodyLen uint32
-	var requestID uint64
+	var requestID uint32
 	var response *Response
 
 	var err error
@@ -297,6 +298,25 @@ READER_LOOP:
 
 		readChan <- response
 	}
+}
+
+func packIproto(requestCode byte, requestID uint32, body []byte) []byte {
+	h := [...]byte{
+		0xce, 0, 0, 0, 0, // length
+		0x82,                       // 2 element map
+		KeyCode, byte(requestCode), // request code
+		KeySync, 0xce,
+		byte(requestID >> 24), byte(requestID >> 16),
+		byte(requestID >> 8), byte(requestID),
+	}
+
+	l := uint32(len(h) - 5 + len(body))
+	h[1] = byte(l >> 24)
+	h[2] = byte(l >> 16)
+	h[3] = byte(l >> 8)
+	h[4] = byte(l)
+
+	return append(h[:], body...)
 }
 
 func (conn *Connection) Close() {

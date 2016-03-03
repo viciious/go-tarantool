@@ -7,7 +7,7 @@ import (
 )
 
 type Query interface {
-	Pack(requestID uint64, defaultSpace string) ([]byte, error)
+	Pack(requestID uint32, defaultSpace string) ([]byte, error)
 }
 
 type Options struct {
@@ -22,7 +22,7 @@ type Response struct {
 	// Data      []Tuple
 	Code      uint64
 	Error     error
-	requestID uint64
+	requestID uint32
 }
 
 type request struct {
@@ -38,8 +38,8 @@ type Greeting struct {
 
 type Connection struct {
 	addr        string
-	requestID   uint64
-	requests    map[uint64]*request
+	requestID   uint32
+	requests    map[uint32]*request
 	requestChan chan *request
 	closeOnce   sync.Once
 	exit        chan bool

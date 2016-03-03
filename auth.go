@@ -51,11 +51,13 @@ func xor(left, right []byte, size int) []byte {
 	return result
 }
 
-func (auth *Auth) Pack(requestID uint64, defaultSpace string) ([]byte, error) {
+func (auth *Auth) Pack(requestID uint32, defaultSpace string) ([]byte, error) {
 	_, err := scramble(auth.GreetingAuth, auth.Password)
 	if err != nil {
 		return nil, fmt.Errorf("auth: scrambling failure: %s", err.Error())
 	}
 
-	return nil, nil
+	body := []byte{}
+
+	return packIproto(AuthRequest, requestID, body), nil
 }
