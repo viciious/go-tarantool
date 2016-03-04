@@ -16,6 +16,16 @@ type Select struct {
 }
 
 var _ Query = (*Select)(nil)
+var _ hasSpace = (*Select)(nil)
+var _ hasIndex = (*Select)(nil)
+
+func (s *Select) getSpace() interface{} {
+	return s.Space
+}
+
+func (s *Select) getIndex() interface{} {
+	return s.Index
+}
 
 func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 	var bodyBuffer bytes.Buffer
