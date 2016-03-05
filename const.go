@@ -52,7 +52,9 @@ const (
 const (
 	SpaceSchema  = 272
 	SpaceSpace   = 280
+	ViewSpace    = 281
 	SpaceIndex   = 288
+	ViewIndex    = 289
 	SpaceFunc    = 296
 	SpaceUser    = 304
 	SpacePriv    = 312

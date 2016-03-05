@@ -1,4 +1,4 @@
 package tnt
 
 type Bytes []byte
-type Tuple []Bytes
+type Tuple []interface{}
