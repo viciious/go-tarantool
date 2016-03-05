@@ -23,8 +23,16 @@ func (s *Select) getSpace() interface{} {
 	return s.Space
 }
 
+func (s *Select) setSpace(space interface{}) {
+	s.Space = space
+}
+
 func (s *Select) getIndex() interface{} {
 	return s.Index
+}
+
+func (s *Select) setIndex(index interface{}) {
+	s.Index = index
 }
 
 func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {

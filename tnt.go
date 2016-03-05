@@ -12,8 +12,10 @@ type request struct {
 
 type hasSpace interface {
 	getSpace() interface{}
+	setSpace(interface{})
 }
 
 type hasIndex interface {
 	getIndex() interface{}
+	setIndex(interface{})
 }
