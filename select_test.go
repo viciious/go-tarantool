@@ -36,15 +36,31 @@ func TestSelect(t *testing.T) {
 		Key:   3,
 	})
 
-	assert.NoError(err)
-	assert.Equal([]interface{}{
-		[]interface{}{
-			uint32(0x3),
-			"Length",
-			uint32(0x5d),
-		},
-	}, data)
+	if assert.NoError(err) {
+		assert.Equal([]interface{}{
+			[]interface{}{
+				uint32(0x3),
+				"Length",
+				uint32(0x5d),
+			},
+		}, data)
+	}
 
+	// select with string space
+	data, err = conn.Execute(&Select{
+		Space: "tester",
+		Key:   3,
+	})
+
+	if assert.NoError(err) {
+		assert.Equal([]interface{}{
+			[]interface{}{
+				uint32(0x3),
+				"Length",
+				uint32(0x5d),
+			},
+		}, data)
+	}
 }
 
 func BenchmarkSelectPack(b *testing.B) {

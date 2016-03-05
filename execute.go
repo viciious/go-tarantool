@@ -1,6 +1,10 @@
 package tnt
 
-import "time"
+import (
+	"time"
+
+	"github.com/k0kubun/pp"
+)
 
 type QueryOptions struct {
 	Timeout time.Duration
@@ -50,6 +54,13 @@ func (conn *Connection) ExecuteOptions(q Query, opts *QueryOptions) ([]interface
 
 	// set execute deadline
 	deadline := time.After(opts.Timeout)
+
+	if g, ok := q.(hasSpace); ok {
+		space := g.getSpace()
+		if spaceStr, ok := space.(string); ok {
+			pp.Println(spaceStr)
+		}
+	}
 
 	return conn.doExecute(q, deadline, nil)
 }
