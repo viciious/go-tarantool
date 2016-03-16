@@ -30,57 +30,65 @@ func TestSelect(t *testing.T) {
 	}
 	defer box.Close()
 
-	// unkwnown user
-	conn, err := box.Connect(nil)
-	assert.NoError(err)
-	assert.NotNil(conn)
+	do := func(connectOptions *Options, query *Select, expected []interface{}) {
+		conn, err := box.Connect(connectOptions)
+		assert.NoError(err)
+		assert.NotNil(conn)
 
-	data, err := conn.Execute(&Select{
-		Space: 42,
-		Key:   3,
-	})
+		defer conn.Close()
 
-	if assert.NoError(err) {
-		assert.Equal([]interface{}{
+		data, err := conn.Execute(query)
+
+		if assert.NoError(err) {
+			assert.Equal(expected, data)
+		}
+	}
+
+	// simple select
+	do(nil,
+		&Select{
+			Space: 42,
+			Key:   3,
+		},
+		[]interface{}{
 			[]interface{}{
 				uint32(0x3),
 				"Length",
 				uint32(0x5d),
 			},
-		}, data)
-	}
+		},
+	)
 
-	// select with string space
-	data, err = conn.Execute(&Select{
-		Space: "tester",
-		Key:   3,
-	})
-
-	if assert.NoError(err) {
-		assert.Equal([]interface{}{
+	// select with space name
+	do(nil,
+		&Select{
+			Space: "tester",
+			Key:   3,
+		},
+		[]interface{}{
 			[]interface{}{
 				uint32(0x3),
 				"Length",
 				uint32(0x5d),
 			},
-		}, data)
-	}
+		},
+	)
 
-	// select with string space
-	data, err = conn.Execute(&Select{
-		Space: "tester",
-		Index: "tester_name",
-		Key:   "Music",
-	})
-
-	if assert.NoError(err) {
-		assert.Equal([]interface{}{
+	// select with index name
+	do(nil,
+		&Select{
+			Space: "tester",
+			Index: "tester_name",
+			Key:   "Music",
+		},
+		[]interface{}{
 			[]interface{}{
 				uint32(0x2),
 				"Music",
 			},
-		}, data)
-	}
+		},
+	)
+
 }
 
 func BenchmarkSelectPack(b *testing.B) {
