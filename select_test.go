@@ -109,7 +109,7 @@ func TestSelect(t *testing.T) {
 		},
 	)
 
-	// composite key empty resonse
+	// composite key empty response
 	do(nil,
 		&Select{
 			Space: 42,
