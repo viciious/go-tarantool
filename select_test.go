@@ -97,9 +97,9 @@ func TestSelect(t *testing.T) {
 	// composite key
 	do(nil,
 		&Select{
-			Space: 42,
-			Index: "id_name",
-			Tuple: []interface{}{2, "Music"},
+			Space:    42,
+			Index:    "id_name",
+			KeyTuple: []interface{}{2, "Music"},
 		},
 		[]interface{}{
 			[]interface{}{
@@ -112,9 +112,9 @@ func TestSelect(t *testing.T) {
 	// composite key empty response
 	do(nil,
 		&Select{
-			Space: 42,
-			Index: "id_name",
-			Tuple: []interface{}{2, "Length"},
+			Space:    42,
+			Index:    "id_name",
+			KeyTuple: []interface{}{2, "Length"},
 		},
 		[]interface{}{},
 	)
