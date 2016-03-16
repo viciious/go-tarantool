@@ -40,7 +40,7 @@ func TestUpdate(t *testing.T) {
 		Space: "tester",
 		Index: "primary",
 		Key:   1,
-		Update: []Operator{
+		Set: []Operator{
 			&OpAdd{
 				Field:    2,
 				Argument: 17,
@@ -72,7 +72,7 @@ func BenchmarkUpdatePack(b *testing.B) {
 			Space: 1,
 			Index: 0,
 			Key:   1,
-			Update: []Operator{
+			Set: []Operator{
 				&OpAdd{
 					Field:    2,
 					Argument: 17,

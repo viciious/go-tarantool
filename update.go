@@ -11,7 +11,7 @@ type Update struct {
 	Index    interface{}
 	Key      interface{}
 	KeyTuple []interface{}
-	Update   []Operator
+	Set      []Operator
 }
 
 var _ Query = (*Update)(nil)
@@ -52,8 +52,8 @@ func (s *Update) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	// Update
 	encoder.EncodeUint32(KeyTuple)
-	encoder.EncodeArrayLen(len(s.Update))
-	for _, op := range s.Update {
+	encoder.EncodeArrayLen(len(s.Set))
+	for _, op := range s.Set {
 		t := op.AsTuple()
 		encoder.EncodeArrayLen(len(t))
 		for _, value := range t {
