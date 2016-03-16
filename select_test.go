@@ -19,6 +19,11 @@ func TestSelect(t *testing.T) {
         type = 'hash',
         parts = {2, 'STR'}
     })
+	s:create_index('id_name', {
+        type = 'hash',
+        parts = {1, 'NUM', 2, 'STR'},
+        unique = true
+    })
     t = s:insert({1, 'First record'})
     t = s:insert({2, 'Music'})
     t = s:insert({3, 'Length', 93})
@@ -87,6 +92,31 @@ func TestSelect(t *testing.T) {
 				"Music",
 			},
 		},
+	)
+
+	// composite key
+	do(nil,
+		&Select{
+			Space: 42,
+			Index: "id_name",
+			Tuple: []interface{}{2, "Music"},
+		},
+		[]interface{}{
+			[]interface{}{
+				uint32(0x2),
+				"Music",
+			},
+		},
+	)
+
+	// composite key empty resonse
+	do(nil,
+		&Select{
+			Space: 42,
+			Index: "id_name",
+			Tuple: []interface{}{2, "Length"},
+		},
+		[]interface{}{},
 	)
 
 }

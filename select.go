@@ -13,6 +13,7 @@ type Select struct {
 	Limit    uint32
 	Iterator uint8
 	Key      interface{}
+	Tuple    []interface{}
 }
 
 var _ Query = (*Select)(nil)
@@ -64,6 +65,14 @@ func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 		bodyBuffer.Write(data.packedSingleKey)
 		if err = encoder.Encode(s.Key); err != nil {
 			return nil, err
+		}
+	} else if s.Tuple != nil {
+		encoder.EncodeUint32(KeyKey)
+		encoder.EncodeArrayLen(len(s.Tuple))
+		for _, key := range s.Tuple {
+			if err = encoder.Encode(key); err != nil {
+				return nil, err
+			}
 		}
 	}
 
