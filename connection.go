@@ -174,8 +174,7 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 	res, err := request(&Select{
 		Space:    ViewSpace,
 		Key:      0,
-		Iterator: IterGt,
-		Limit:    1000000,
+		Iterator: IterAll,
 	})
 	if err != nil {
 		return
@@ -188,8 +187,7 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 	res, err = request(&Select{
 		Space:    ViewIndex,
 		Key:      0,
-		Iterator: IterGt,
-		Limit:    1000000,
+		Iterator: IterAll,
 	})
 	if err != nil {
 		return
