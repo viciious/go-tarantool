@@ -11,22 +11,10 @@ func TestInsert(t *testing.T) {
 
 	tarantoolConfig := `
     s = box.schema.space.create('tester', {id = 42})
-    s:create_index('tester_id', {
+    s:create_index('primary', {
         type = 'hash',
         parts = {1, 'NUM'}
     })
-	s:create_index('tester_name', {
-        type = 'hash',
-        parts = {2, 'STR'}
-    })
-	s:create_index('id_name', {
-        type = 'hash',
-        parts = {1, 'NUM', 2, 'STR'},
-        unique = true
-    })
-    t = s:insert({1, 'First record'})
-    t = s:insert({2, 'Music'})
-    t = s:insert({3, 'Length', 93})
 
     box.schema.user.create('writer', {password = 'writer'})
 	box.schema.user.grant('writer', 'write', 'space', 'tester')
@@ -63,7 +51,7 @@ func TestInsert(t *testing.T) {
 
 	data, err = conn.Execute(&Insert{
 		Space: "tester",
-		Tuple: []interface{}{4, "Hello"},
+		Tuple: []interface{}{4, "World"},
 	})
 
 	if assert.Error(err) {
