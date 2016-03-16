@@ -121,7 +121,7 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 			User:         options.User,
 			Password:     options.Password,
 			GreetingAuth: conn.Greeting.Auth,
-		}).Pack(authRequestID, nil)
+		}).Pack(authRequestID, conn.packData)
 
 		_, err = conn.tcpConn.Write(authRaw)
 		if err != nil {
@@ -142,9 +142,70 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 			err = authResponse.Error
 			return
 		}
-
 	}
 
+	// select space and index schema
+	request := func(req Query) (*Response, error) {
+		var err error
+		requestID := conn.nextID()
+		packedReq, _ := (req).Pack(requestID, conn.packData)
+
+		_, err = conn.tcpConn.Write(packedReq)
+		if err != nil {
+			return nil, err
+		}
+
+		res, err := read(conn.tcpConn)
+		if err != nil {
+			return nil, err
+		}
+
+		if res.requestID != requestID {
+			return nil, errors.New("Bad auth responseID")
+		}
+
+		if res.Error != nil {
+			return nil, res.Error
+		}
+
+		return res, nil
+	}
+
+	res, err := request(&Select{
+		Space:    ViewSpace,
+		Key:      0,
+		Iterator: IterGt,
+		Limit:    1000000,
+	})
+	if err != nil {
+		return
+	}
+
+	for _, space := range res.Data {
+		conn.packData.spaceMap[space.([]interface{})[2].(string)] = space.([]interface{})[0].(uint64)
+	}
+
+	res, err = request(&Select{
+		Space:    ViewIndex,
+		Key:      0,
+		Iterator: IterGt,
+		Limit:    1000000,
+	})
+	if err != nil {
+		return
+	}
+
+	for _, index := range res.Data {
+		spaceID := index.([]interface{})[0].(uint64)
+		indexSpaceMap, exists := conn.packData.indexMap[spaceID]
+		if !exists {
+			indexSpaceMap = make(map[string]uint64)
+			conn.packData.indexMap[spaceID] = indexSpaceMap
+		}
+		indexSpaceMap[index.([]interface{})[2].(string)] = index.([]interface{})[1].(uint64)
+	}
+
+	// remove deadline
 	conn.tcpConn.SetDeadline(time.Time{})
 
 	go conn.worker(conn.tcpConn)

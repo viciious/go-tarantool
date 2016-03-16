@@ -9,13 +9,3 @@ type request struct {
 	raw       []byte
 	replyChan chan *Response
 }
-
-type hasSpace interface {
-	getSpace() interface{}
-	setSpace(interface{})
-}
-
-type hasIndex interface {
-	getIndex() interface{}
-	setIndex(interface{})
-}

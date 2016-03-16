@@ -3,7 +3,6 @@ package tnt
 import (
 	"testing"
 
-	"github.com/k0kubun/pp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,11 +11,15 @@ func TestSelect(t *testing.T) {
 
 	tarantoolConfig := `
     s = box.schema.space.create('tester', {id = 42})
-    s:create_index('primary', {
+    s:create_index('tester_id', {
         type = 'hash',
         parts = {1, 'NUM'}
     })
-    t = s:insert({1})
+	s:create_index('tester_name', {
+        type = 'hash',
+        parts = {2, 'STR'}
+    })
+    t = s:insert({1, 'First record'})
     t = s:insert({2, 'Music'})
     t = s:insert({3, 'Length', 93})
     `
@@ -62,44 +65,22 @@ func TestSelect(t *testing.T) {
 			},
 		}, data)
 	}
-}
 
-func TestSelectSpaceSchema(t *testing.T) {
-	assert := assert.New(t)
+	// select with string space
+	data, err = conn.Execute(&Select{
+		Space: "tester",
+		Index: "tester_name",
+		Key:   "Music",
+	})
 
-	tarantoolConfig := `
-    s = box.schema.space.create('tester', {id = 42})
-    s:create_index('primary', {
-        type = 'hash',
-        parts = {1, 'NUM'}
-    })
-    t = s:insert({1})
-    t = s:insert({2, 'Music'})
-    t = s:insert({3, 'Length', 93})
-
-    box.schema.user.create("tester", {password = "12345678"})
-    box.schema.user.grant('tester', 'read', 'space', 'tester')
-    `
-	box, err := NewBox(tarantoolConfig, nil)
-	if !assert.NoError(err) {
-		return
+	if assert.NoError(err) {
+		assert.Equal([]interface{}{
+			[]interface{}{
+				uint32(0x2),
+				"Music",
+			},
+		}, data)
 	}
-	defer box.Close()
-
-	conn, err := box.Connect(&Options{
-		User:     "tester",
-		Password: "12345678",
-	})
-	assert.NoError(err)
-	assert.NotNil(conn)
-
-	data, err := conn.Execute(&Select{
-		Space:    ViewSpace,
-		Key:      0,
-		Iterator: IterGt,
-		Limit:    1000000,
-	})
-	pp.Println(data, err)
 }
 
 func BenchmarkSelectPack(b *testing.B) {

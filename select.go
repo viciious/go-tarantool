@@ -16,24 +16,6 @@ type Select struct {
 }
 
 var _ Query = (*Select)(nil)
-var _ hasSpace = (*Select)(nil)
-var _ hasIndex = (*Select)(nil)
-
-func (s *Select) getSpace() interface{} {
-	return s.Space
-}
-
-func (s *Select) setSpace(space interface{}) {
-	s.Space = space
-}
-
-func (s *Select) getIndex() interface{} {
-	return s.Index
-}
-
-func (s *Select) setIndex(index interface{}) {
-	s.Index = index
-}
 
 func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 	var bodyBuffer bytes.Buffer
@@ -44,19 +26,13 @@ func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 	encoder.EncodeMapLen(6) // Space, Index, Offset, Limit, Iterator, Key
 
 	// Space
-	if s.Space != nil {
-		encoder.EncodeUint32(KeySpaceNo)
-		encoder.Encode(s.Space)
-	} else {
-		bodyBuffer.Write(data.packedDefaultSpace)
+	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+		return nil, err
 	}
 
 	// Index
-	if s.Index != nil {
-		encoder.EncodeUint32(KeyIndexNo)
-		encoder.Encode(s.Index)
-	} else {
-		bodyBuffer.Write(data.packedDefaultIndex)
+	if err = data.writeIndex(s.Space, s.Index, bodyBuffer, encoder); err != nil {
+		return nil, err
 	}
 
 	// Offset
