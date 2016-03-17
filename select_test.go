@@ -57,9 +57,9 @@ func TestSelect(t *testing.T) {
 		},
 		[]interface{}{
 			[]interface{}{
-				uint32(0x3),
+				uint64(0x3),
 				"Length",
-				uint32(0x5d),
+				uint64(0x5d),
 			},
 		},
 	)
@@ -72,9 +72,9 @@ func TestSelect(t *testing.T) {
 		},
 		[]interface{}{
 			[]interface{}{
-				uint32(0x3),
+				uint64(0x3),
 				"Length",
-				uint32(0x5d),
+				uint64(0x5d),
 			},
 		},
 	)
@@ -88,7 +88,7 @@ func TestSelect(t *testing.T) {
 		},
 		[]interface{}{
 			[]interface{}{
-				uint32(0x2),
+				uint64(0x2),
 				"Music",
 			},
 		},
@@ -103,7 +103,7 @@ func TestSelect(t *testing.T) {
 		},
 		[]interface{}{
 			[]interface{}{
-				uint32(0x2),
+				uint64(0x2),
 				"Music",
 			},
 		},

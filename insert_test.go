@@ -37,13 +37,13 @@ func TestInsert(t *testing.T) {
 
 	data, err := conn.Execute(&Insert{
 		Space: "tester",
-		Tuple: []interface{}{4, "Hello"},
+		Tuple: []interface{}{uint64(4), "Hello"},
 	})
 
 	if assert.NoError(err) {
 		assert.Equal([]interface{}{
 			[]interface{}{
-				uint32(4),
+				uint64(4),
 				"Hello",
 			},
 		}, data)
