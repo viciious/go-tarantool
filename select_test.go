@@ -118,6 +118,67 @@ func TestSelect(t *testing.T) {
 		},
 		[]interface{}{},
 	)
+	// iterate all using NUM index
+	do(nil,
+		&Select{
+			Space:    42,
+			Iterator: IterAll,
+		},
+		[]interface{}{
+			[]interface{}{
+				uint64(1),
+				"First record",
+			},
+			[]interface{}{
+				uint64(2),
+				"Music",
+			},
+			[]interface{}{
+				uint64(3),
+				"Length",
+				uint64(93),
+			},
+		},
+	)
+	// iterate all using STR index
+	do(nil,
+		&Select{
+			Space:    42,
+			Index:    "tester_name",
+			Iterator: IterAll,
+		},
+		[]interface{}{
+			[]interface{}{
+				uint64(2),
+				"Music",
+			},
+			[]interface{}{
+				uint64(3),
+				"Length",
+				uint64(93),
+			},
+			[]interface{}{
+				uint64(1),
+				"First record",
+			},
+		},
+	)
+	// iterate Eq using STR index
+	do(nil,
+		&Select{
+			Space:    42,
+			Index:    "tester_name",
+			Key:      "Length",
+			Iterator: IterEq,
+		},
+		[]interface{}{
+			[]interface{}{
+				uint64(3),
+				"Length",
+				uint64(93),
+			},
+		},
+	)
 
 }
 

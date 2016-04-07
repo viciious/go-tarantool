@@ -7,9 +7,9 @@ import (
 )
 
 type Upsert struct {
-	Space    interface{}
-	Tuple    []interface{}
-	Set      []Operator
+	Space interface{}
+	Tuple []interface{}
+	Set   []Operator
 }
 
 var _ Query = (*Upsert)(nil)
