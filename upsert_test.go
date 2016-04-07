@@ -36,6 +36,20 @@ func TestUpsert(t *testing.T) {
 
 	defer conn.Close()
 
+	do := func(connectOptions *Options, query *Select, expected []interface{}) {
+		conn, err := box.Connect(connectOptions)
+		assert.NoError(err)
+		assert.NotNil(conn)
+
+		defer conn.Close()
+
+		data, err := conn.Execute(query)
+
+		if assert.NoError(err) {
+			assert.Equal(expected, data)
+		}
+	}
+
 	// test update
 	data, err := conn.Execute(&Upsert{
 		Space: "tester",
@@ -56,6 +70,21 @@ func TestUpsert(t *testing.T) {
 		assert.Equal([]interface{}{}, data)
 	}
 
+	// check update
+	do(nil,
+		&Select{
+			Space: "tester",
+			Key:   1,
+		},
+		[]interface{}{
+			[]interface{}{
+				uint64(1),
+				"Hello World",
+				uint64(32),
+			},
+		},
+	)
+
 	// test insert
 	data, err = conn.Execute(&Upsert{
 		Space: "tester",
@@ -75,6 +104,21 @@ func TestUpsert(t *testing.T) {
 	if assert.NoError(err) {
 		assert.Equal([]interface{}{}, data)
 	}
+
+	// check insert
+	do(nil,
+		&Select{
+			Space: "tester",
+			Key:   2,
+		},
+		[]interface{}{
+			[]interface{}{
+				uint64(2),
+				"Second",
+				uint64(16),
+			},
+		},
+	)
 
 }
 
