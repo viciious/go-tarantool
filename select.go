@@ -74,6 +74,9 @@ func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 				return nil, err
 			}
 		}
+	} else {
+		encoder.EncodeUint32(KeyKey)
+		encoder.EncodeArrayLen(0)
 	}
 
 	return packIproto(SelectRequest, requestID, bodyBuffer.Bytes()), nil
