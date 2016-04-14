@@ -290,6 +290,15 @@ func (conn *Connection) Close() {
 	<-conn.closed
 }
 
+func (conn *Connection) IsClosed() bool {
+        select {
+        case <-conn.exit:
+                return true
+        default:
+                return false
+        }
+}
+
 func (conn *Connection) worker(tcpConn net.Conn) {
 
 	var wg sync.WaitGroup
