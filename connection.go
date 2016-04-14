@@ -90,8 +90,6 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 	}
 	remoteAddr := dsn.Host()
 	path := dsn.Path()
-	splittedAddr := strings.Split(addr, "/")
-	//remoteAddr := splittedAddr[0]
 
 	if opts.DefaultSpace == "" {
 		if len(path) > 0 {
