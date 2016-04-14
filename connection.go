@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/phonkee/godsn"
 )
 
 type Options struct {
@@ -71,15 +73,35 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 		opts.QueryTimeout = time.Duration(time.Second)
 	}
 
+	dsn, err := godsn.Parse("//" + addr)
+	if err != nil {
+		return nil, err
+	}
+
+	if options.User == "" {
+		user := dsn.User()
+		if user != nil {
+			username := user.Username()
+			pass, _ := user.Password()
+			options.User = username
+			options.Password = pass
+		}
+
+	}
+	remoteAddr := dsn.Host()
+	path := dsn.Path()
 	splittedAddr := strings.Split(addr, "/")
-	remoteAddr := splittedAddr[0]
+	//remoteAddr := splittedAddr[0]
 
 	if opts.DefaultSpace == "" {
-		if len(splittedAddr) > 1 {
-			if splittedAddr[1] == "" {
-				return nil, fmt.Errorf("Wrong space: %s", splittedAddr[1])
+		if len(path) > 0 {
+			splittedPath := strings.Split(path, "/")
+			if len(splittedPath) > 1 {
+				if splittedPath[1] == "" {
+					return nil, fmt.Errorf("Wrong space: %s", splittedPath[1])
+				}
+				opts.DefaultSpace = splittedPath[1]
 			}
-			opts.DefaultSpace = splittedAddr[1]
 		}
 	}
 
