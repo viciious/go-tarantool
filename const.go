@@ -1,4 +1,4 @@
-package tnt
+package tarantool
 
 /*
 Copy-Paste from https://github.com/tarantool/go-tarantool/blob/master/const.go

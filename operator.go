@@ -1,4 +1,4 @@
-package tnt
+package tarantool
 
 type Operator interface {
 	AsTuple() []interface{}

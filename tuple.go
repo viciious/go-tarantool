@@ -1,4 +1,4 @@
-package tnt
+package tarantool
 
 type Bytes []byte
 type Tuple []interface{}

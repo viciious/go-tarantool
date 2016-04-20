@@ -1,4 +1,4 @@
-package tnt
+package tarantool
 
 var packedInt0 = Uint32(0)
 var packedInt1 = Uint32(1)

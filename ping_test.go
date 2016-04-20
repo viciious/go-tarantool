@@ -1,4 +1,4 @@
-package tnt
+package tarantool
 
 import (
 	"testing"
