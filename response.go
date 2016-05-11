@@ -13,6 +13,7 @@ type Response struct {
 	Error     error
 	Data      []interface{}
 	requestID uint32
+	buf       *bytes.Buffer // read buffer. For delayer unpack
 }
 
 func readMessage(r io.Reader) ([]byte, error) {

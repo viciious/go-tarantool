@@ -2,13 +2,14 @@ package tarantool
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/phonkee/godsn"
@@ -28,14 +29,14 @@ type Greeting struct {
 }
 
 type Connection struct {
-	addr        string
-	requestID   uint32
-	requests    map[uint32]*request
-	requestChan chan *request
-	closeOnce   sync.Once
-	exit        chan bool
-	closed      chan bool
-	tcpConn     net.Conn
+	addr      string
+	requestID uint32
+	requests  *requestMap
+	writeChan chan []byte // packed messages with header
+	closeOnce sync.Once
+	exit      chan bool
+	closed    chan bool
+	tcpConn   net.Conn
 	// options
 	queryTimeout time.Duration
 	Greeting     *Greeting
@@ -53,11 +54,11 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 	}()
 
 	conn = &Connection{
-		addr:        addr,
-		requests:    make(map[uint32]*request),
-		requestChan: make(chan *request, 16),
-		exit:        make(chan bool),
-		closed:      make(chan bool),
+		addr:      addr,
+		requests:  newRequestMap(),
+		writeChan: make(chan []byte, 256),
+		exit:      make(chan bool),
+		closed:    make(chan bool),
 	}
 
 	if options == nil {
@@ -233,49 +234,7 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 }
 
 func (conn *Connection) nextID() uint32 {
-	if conn.requestID == math.MaxUint32 {
-		conn.requestID = 0
-	}
-	conn.requestID++
-	return conn.requestID
-}
-
-func (conn *Connection) newRequest(r *request) error {
-	requestID := conn.nextID()
-	old, exists := conn.requests[requestID]
-	if exists {
-		old.replyChan <- &Response{
-			Error: NewConnectionError("Shred old requests"), // wtf?
-		}
-		close(old.replyChan)
-		delete(conn.requests, requestID)
-	}
-
-	// pp.Println(r)
-	var err error
-
-	r.raw, err = r.query.Pack(requestID, conn.packData)
-	if err != nil {
-		r.replyChan <- &Response{
-			Error: &QueryError{
-				error: err,
-			},
-		}
-		return err
-	}
-
-	conn.requests[requestID] = r
-
-	return nil
-}
-
-func (conn *Connection) handleReply(res *Response) {
-	request, exists := conn.requests[res.requestID]
-	if exists {
-		request.replyChan <- res
-		close(request.replyChan)
-		delete(conn.requests, res.requestID)
-	}
+	return atomic.AddUint32(&conn.requestID, 1)
 }
 
 func (conn *Connection) stop() {
@@ -304,104 +263,34 @@ func (conn *Connection) worker(tcpConn net.Conn) {
 
 	var wg sync.WaitGroup
 
-	readChan := make(chan *Response, 256)
-	writeChan := make(chan *request, 256)
-
-	wg.Add(3)
+	wg.Add(2)
 
 	go func() {
-		conn.router(readChan, writeChan, conn.exit)
+		writer(tcpConn, conn.writeChan, conn.exit)
 		conn.stop()
 		wg.Done()
-		// pp.Println("router")
 	}()
 
 	go func() {
-		writer(tcpConn, writeChan, conn.exit)
+		conn.reader(tcpConn)
 		conn.stop()
 		wg.Done()
-		// pp.Println("writer")
-	}()
-
-	go func() {
-		reader(tcpConn, readChan, conn.exit)
-		conn.stop()
-		wg.Done()
-		// pp.Println("reader")
 	}()
 
 	wg.Wait()
 
 	// send error reply to all pending requests
-	for requestID, req := range conn.requests {
+	conn.requests.CleanUp(func(req *request) {
 		req.replyChan <- &Response{
 			Error: ConnectionClosedError(),
 		}
 		close(req.replyChan)
-		delete(conn.requests, requestID)
-	}
-
-	var req *request
-
-FETCH_INPUT:
-	// and to all requests in input queue
-	for {
-		select {
-		case req = <-conn.requestChan:
-			// pass
-		default: // all fetched
-			break FETCH_INPUT
-		}
-		req.replyChan <- &Response{
-			Error: ConnectionClosedError(),
-		}
-		close(req.replyChan)
-	}
+	})
 
 	close(conn.closed)
 }
 
-func (conn *Connection) router(readChan chan *Response, writeChan chan *request, stopChan chan bool) {
-	// close(readChan) for stop router
-	requestChan := conn.requestChan
-
-	readChanThreshold := cap(readChan) / 10
-
-ROUTER_LOOP:
-	for {
-		// force read reply
-		if len(readChan) > readChanThreshold {
-			requestChan = nil
-		} else {
-			requestChan = conn.requestChan
-		}
-
-		select {
-		case r, ok := <-requestChan:
-			if !ok {
-				break ROUTER_LOOP
-			}
-
-			if conn.newRequest(r) == nil { // already replied to errored requests
-				select {
-				case writeChan <- r:
-					// pass
-				case <-stopChan:
-					break ROUTER_LOOP
-				}
-			}
-		case <-stopChan:
-			break ROUTER_LOOP
-		case res, ok := <-readChan:
-			if !ok {
-				break ROUTER_LOOP
-			}
-			conn.handleReply(res)
-		}
-	}
-}
-
-func writer(tcpConn net.Conn, writeChan chan *request, stopChan chan bool) {
+func writer(tcpConn net.Conn, writeChan chan []byte, stopChan chan bool) {
 	var err error
 	var n int
 
@@ -410,12 +299,12 @@ func writer(tcpConn net.Conn, writeChan chan *request, stopChan chan bool) {
 WRITER_LOOP:
 	for {
 		select {
-		case request, ok := <-writeChan:
+		case messageBody, ok := <-writeChan:
 			if !ok {
 				break WRITER_LOOP
 			}
-			n, err = w.Write(request.raw)
-			if err != nil || n != len(request.raw) {
+			n, err = w.Write(messageBody)
+			if err != nil || n != len(messageBody) {
 				break WRITER_LOOP
 			}
 		case <-stopChan:
@@ -427,12 +316,12 @@ WRITER_LOOP:
 
 			// same without flush
 			select {
-			case request, ok := <-writeChan:
+			case messageBody, ok := <-writeChan:
 				if !ok {
 					break WRITER_LOOP
 				}
-				n, err = w.Write(request.raw)
-				if err != nil || n != len(request.raw) {
+				n, err = w.Write(messageBody)
+				if err != nil || n != len(messageBody) {
 					break WRITER_LOOP
 				}
 			case <-stopChan:
@@ -447,24 +336,36 @@ WRITER_LOOP:
 	}
 }
 
-func reader(tcpConn net.Conn, readChan chan *Response, stopChan chan bool) {
+func (conn *Connection) reader(tcpConn net.Conn) {
 	var response *Response
 	var err error
+	var body []byte
+	var req *request
 
 	r := bufio.NewReaderSize(tcpConn, 128*1024)
 
 READER_LOOP:
 	for {
-		response, err = read(r)
+		// read raw bytes
+		body, err = readMessage(r)
 		if err != nil {
 			break READER_LOOP
 		}
 
-		select {
-		case readChan <- response:
-			// pass
-		case <-stopChan:
+		response = &Response{
+			buf: bytes.NewBuffer(body),
+		}
+
+		// decode response header. for requestID
+		err = response.decodeHeader(response.buf)
+		if err != nil {
 			break READER_LOOP
+		}
+
+		req = conn.requests.Pop(response.requestID)
+		if req != nil {
+			req.replyChan <- response
+			close(req.replyChan)
 		}
 	}
 }

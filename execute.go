@@ -12,8 +12,28 @@ func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan
 		replyChan: make(chan *Response, 1),
 	}
 
+	requestID := conn.nextID()
+
+	packed, err := request.query.Pack(requestID, conn.packData)
+	if err != nil {
+		request.replyChan <- &Response{
+			Error: &QueryError{
+				error: err,
+			},
+		}
+		return nil, err
+	}
+
+	oldRequest := conn.requests.Put(requestID, request)
+	if oldRequest != nil {
+		oldRequest.replyChan <- &Response{
+			Error: NewConnectionError("Shred old requests"), // wtf?
+		}
+		close(oldRequest.replyChan)
+	}
+
 	select {
-	case conn.requestChan <- request:
+	case conn.writeChan <- packed:
 		// pass
 	case <-deadline:
 		return nil, NewConnectionError("Request send timeout")
@@ -33,6 +53,14 @@ func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan
 		return nil, NewConnectionError("Request aborted")
 	case <-conn.exit:
 		return nil, ConnectionClosedError()
+	}
+
+	if response.Error == nil {
+		// finish decode message body
+		err = response.decodeBody(response.buf)
+		if err != nil {
+			response.Error = err
+		}
 	}
 
 	return response.Data, response.Error
