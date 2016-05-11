@@ -79,6 +79,28 @@ func readMessageToBuffer(r io.Reader, buffer []byte) ([]byte, error) {
 	return body, nil
 }
 
+func msgpackDecodeBody(d *msgpack.Decoder) ([][]interface{}, error) {
+	n, err := d.DecodeSliceLen()
+	if err != nil {
+		return nil, err
+	}
+
+	if n == -1 {
+		return nil, nil
+	}
+
+	s := make([][]interface{}, n)
+	for i := 0; i < n; i++ {
+		v, err := d.DecodeSlice()
+		if err != nil {
+			return nil, err
+		}
+		s[i] = v
+	}
+
+	return s, nil
+}
+
 func (resp *Response) decodeHeader(r *bytes.Buffer) (err error) {
 	var l int
 	d := msgpack.NewDecoder(r)
@@ -110,21 +132,40 @@ func (resp *Response) decodeHeader(r *bytes.Buffer) (err error) {
 
 func (resp *Response) decodeBody(r *bytes.Buffer) (err error) {
 	if r.Len() > 2 {
-		var body map[int]interface{}
-		d := msgpack.NewDecoder(r)
-		if err = d.Decode(&body); err != nil {
-			return err
-		}
-		if body[KeyData] != nil {
-			v := body[KeyData].([]interface{})
 
-			resp.Data = make([]([]interface{}), len(v))
-			for i := 0; i < len(v); i++ {
-				resp.Data[i] = v[i].([]interface{})
-			}
+		var l int
+		d := msgpack.NewDecoder(r)
+		if l, err = d.DecodeMapLen(); err != nil {
+			return
 		}
-		if body[KeyError] != nil {
-			resp.Error = errors.New(body[KeyError].(string))
+		for ; l > 0; l-- {
+			var cd int
+			if cd, err = d.DecodeInt(); err != nil {
+				return
+			}
+			switch cd {
+			case KeyData:
+				value, err := d.DecodeInterface()
+				if err != nil {
+					return err
+				}
+				v := value.([]interface{})
+
+				resp.Data = make([]([]interface{}), len(v))
+				for i := 0; i < len(v); i++ {
+					resp.Data[i] = v[i].([]interface{})
+				}
+			case KeyError:
+				errorMessage, err := d.DecodeString()
+				if err != nil {
+					return err
+				}
+				resp.Error = errors.New(errorMessage)
+			default:
+				if _, err = d.DecodeInterface(); err != nil {
+					return
+				}
+			}
 		}
 	}
 	return
