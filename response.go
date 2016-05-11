@@ -9,11 +9,11 @@ import (
 )
 
 type Response struct {
-	Code       uint32
-	Error      error
-	Data       []([]interface{})
-	requestID  uint32
-	poolRecord *PoolRecord // read buffer. For delayer unpack
+	Code      uint32
+	Error     error
+	Data      [][]interface{}
+	requestID uint32
+	buf       *bytes.Buffer // read buffer. For delayer unpack
 }
 
 func readMessage(r io.Reader) ([]byte, error) {

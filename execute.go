@@ -57,12 +57,10 @@ func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan
 
 	if response.Error == nil {
 		// finish decode message body
-		err = response.decodeBody(response.poolRecord.Buffer)
+		err = response.decodeBody(response.buf)
 		if err != nil {
 			response.Error = err
 		}
-		response.poolRecord.Release()
-		response.poolRecord = nil
 	}
 
 	return response.Data, response.Error

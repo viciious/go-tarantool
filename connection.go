@@ -341,27 +341,23 @@ func (conn *Connection) reader(tcpConn net.Conn) {
 	var err error
 	var body []byte
 	var req *request
-	bytesPool := NewPool(128, 64*1024)
 
 	r := bufio.NewReaderSize(tcpConn, 128*1024)
 
 READER_LOOP:
 	for {
 		// read raw bytes
-		v := bytesPool.Get()
-
-		body, err = readMessageToBuffer(r, v.Body)
+		body, err = readMessage(r)
 		if err != nil {
 			break READER_LOOP
 		}
 
-		v.Buffer = bytes.NewBuffer(body)
 		response = &Response{
-			poolRecord: v,
+			buf: bytes.NewBuffer(body),
 		}
 
 		// decode response header. for requestID
-		err = response.decodeHeader(v.Buffer)
+		err = response.decodeHeader(response.buf)
 		if err != nil {
 			break READER_LOOP
 		}
