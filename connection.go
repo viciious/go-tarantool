@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -291,12 +292,12 @@ func (conn *Connection) Close() {
 }
 
 func (conn *Connection) IsClosed() bool {
-        select {
-        case <-conn.exit:
-                return true
-        default:
-                return false
-        }
+	select {
+	case <-conn.exit:
+		return true
+	default:
+		return false
+	}
 }
 
 func (conn *Connection) worker(tcpConn net.Conn) {
@@ -402,6 +403,10 @@ ROUTER_LOOP:
 
 func writer(tcpConn net.Conn, writeChan chan *request, stopChan chan bool) {
 	var err error
+	var n int
+
+	w := bufio.NewWriter(tcpConn)
+
 WRITER_LOOP:
 	for {
 		select {
@@ -409,13 +414,31 @@ WRITER_LOOP:
 			if !ok {
 				break WRITER_LOOP
 			}
-			_, err = tcpConn.Write(request.raw)
-			// @TODO: handle error
-			if err != nil {
+			n, err = w.Write(request.raw)
+			if err != nil || n != len(request.raw) {
 				break WRITER_LOOP
 			}
 		case <-stopChan:
 			break WRITER_LOOP
+		default:
+			if err = w.Flush(); err != nil {
+				break WRITER_LOOP
+			}
+
+			// same without flush
+			select {
+			case request, ok := <-writeChan:
+				if !ok {
+					break WRITER_LOOP
+				}
+				n, err = w.Write(request.raw)
+				if err != nil || n != len(request.raw) {
+					break WRITER_LOOP
+				}
+			case <-stopChan:
+				break WRITER_LOOP
+			}
+
 		}
 	}
 	if err != nil {
@@ -428,9 +451,11 @@ func reader(tcpConn net.Conn, readChan chan *Response, stopChan chan bool) {
 	var response *Response
 	var err error
 
+	r := bufio.NewReaderSize(tcpConn, 128*1024)
+
 READER_LOOP:
 	for {
-		response, err = read(tcpConn)
+		response, err = read(r)
 		if err != nil {
 			break READER_LOOP
 		}
