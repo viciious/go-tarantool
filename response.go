@@ -9,11 +9,11 @@ import (
 )
 
 type Response struct {
-	Code      uint32
-	Error     error
-	Data      []interface{}
-	requestID uint32
-	buf       *bytes.Buffer // read buffer. For delayer unpack
+	Code       uint32
+	Error      error
+	Data       []interface{}
+	requestID  uint32
+	poolRecord *PoolRecord // read buffer. For delayer unpack
 }
 
 func readMessage(r io.Reader) ([]byte, error) {
@@ -38,6 +38,39 @@ func readMessage(r io.Reader) ([]byte, error) {
 	}
 
 	body := make([]byte, bodyLength)
+	_, err = io.ReadAtLeast(r, body, bodyLength)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
+}
+
+func readMessageToBuffer(r io.Reader, buffer []byte) ([]byte, error) {
+	var err error
+	if _, err = io.ReadAtLeast(r, buffer[:PacketLengthBytes], PacketLengthBytes); err != nil {
+		return nil, err
+	}
+
+	if buffer[0] != 0xce {
+		return nil, errors.New("Wrong reponse header")
+	}
+
+	bodyLength := (int(buffer[1]) << 24) +
+		(int(buffer[2]) << 16) +
+		(int(buffer[3]) << 8) +
+		int(buffer[4])
+
+	if bodyLength == 0 {
+		return nil, errors.New("Response should not be 0 length")
+	}
+
+	var body []byte
+	if bodyLength <= len(buffer)-PacketLengthBytes {
+		body = buffer[PacketLengthBytes : bodyLength+PacketLengthBytes]
+	} else {
+		body = make([]byte, bodyLength)
+	}
 	_, err = io.ReadAtLeast(r, body, bodyLength)
 	if err != nil {
 		return nil, err
