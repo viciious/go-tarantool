@@ -39,7 +39,7 @@ func TestSelect(t *testing.T) {
 	}
 	defer box.Close()
 
-	do := func(connectOptions *Options, query *Select, expected []interface{}) {
+	do := func(connectOptions *Options, query *Select, expected [][]interface{}) {
 		conn, err := box.Connect(connectOptions)
 		assert.NoError(err)
 		assert.NotNil(conn)
@@ -59,7 +59,7 @@ func TestSelect(t *testing.T) {
 			Space: 42,
 			Key:   3,
 		},
-		[]interface{}{
+		[][]interface{}{
 			[]interface{}{
 				uint64(0x3),
 				"Length",
@@ -74,7 +74,7 @@ func TestSelect(t *testing.T) {
 			Space: "tester",
 			Key:   3,
 		},
-		[]interface{}{
+		[][]interface{}{
 			[]interface{}{
 				uint64(0x3),
 				"Length",
@@ -90,7 +90,7 @@ func TestSelect(t *testing.T) {
 			Index: "tester_name",
 			Key:   "Music",
 		},
-		[]interface{}{
+		[][]interface{}{
 			[]interface{}{
 				uint64(0x2),
 				"Music",
@@ -105,7 +105,7 @@ func TestSelect(t *testing.T) {
 			Index:    "id_name",
 			KeyTuple: []interface{}{2, "Music"},
 		},
-		[]interface{}{
+		[][]interface{}{
 			[]interface{}{
 				uint64(0x2),
 				"Music",
@@ -120,7 +120,7 @@ func TestSelect(t *testing.T) {
 			Index:    "id_name",
 			KeyTuple: []interface{}{2, "Length"},
 		},
-		[]interface{}{},
+		[][]interface{}{},
 	)
 	// iterate all using NUM index
 	do(nil,
@@ -128,7 +128,7 @@ func TestSelect(t *testing.T) {
 			Space:    42,
 			Iterator: IterAll,
 		},
-		[]interface{}{
+		[][]interface{}{
 			[]interface{}{
 				uint64(1),
 				"First record",
@@ -151,7 +151,7 @@ func TestSelect(t *testing.T) {
 			Index:    "tester_name",
 			Iterator: IterAll,
 		},
-		[]interface{}{
+		[][]interface{}{
 			[]interface{}{
 				uint64(2),
 				"Music",
@@ -175,7 +175,7 @@ func TestSelect(t *testing.T) {
 			Key:      "Length",
 			Iterator: IterEq,
 		},
-		[]interface{}{
+		[][]interface{}{
 			[]interface{}{
 				uint64(3),
 				"Length",

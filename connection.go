@@ -203,7 +203,7 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 	}
 
 	for _, space := range res.Data {
-		conn.packData.spaceMap[space.([]interface{})[2].(string)] = space.([]interface{})[0].(uint64)
+		conn.packData.spaceMap[space[2].(string)] = space[0].(uint64)
 	}
 
 	res, err = request(&Select{
@@ -216,13 +216,13 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 	}
 
 	for _, index := range res.Data {
-		spaceID := index.([]interface{})[0].(uint64)
+		spaceID := index[0].(uint64)
 		indexSpaceMap, exists := conn.packData.indexMap[spaceID]
 		if !exists {
 			indexSpaceMap = make(map[string]uint64)
 			conn.packData.indexMap[spaceID] = indexSpaceMap
 		}
-		indexSpaceMap[index.([]interface{})[2].(string)] = index.([]interface{})[1].(uint64)
+		indexSpaceMap[index[2].(string)] = index[1].(uint64)
 	}
 
 	// remove deadline

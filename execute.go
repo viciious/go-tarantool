@@ -6,7 +6,7 @@ type QueryOptions struct {
 	Timeout time.Duration
 }
 
-func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan bool) ([]interface{}, error) {
+func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan bool) ([][]interface{}, error) {
 	request := &request{
 		query:     q,
 		replyChan: make(chan *Response, 1),
@@ -68,7 +68,7 @@ func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan
 	return response.Data, response.Error
 }
 
-func (conn *Connection) ExecuteOptions(q Query, opts *QueryOptions) ([]interface{}, error) {
+func (conn *Connection) ExecuteOptions(q Query, opts *QueryOptions) ([][]interface{}, error) {
 	// make options
 	if opts == nil {
 		opts = &QueryOptions{}
@@ -84,6 +84,6 @@ func (conn *Connection) ExecuteOptions(q Query, opts *QueryOptions) ([]interface
 	return conn.doExecute(q, deadline, nil)
 }
 
-func (conn *Connection) Execute(q Query) (result []interface{}, err error) {
+func (conn *Connection) Execute(q Query) ([][]interface{}, error) {
 	return conn.ExecuteOptions(q, nil)
 }

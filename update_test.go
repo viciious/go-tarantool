@@ -57,7 +57,7 @@ func TestUpdate(t *testing.T) {
 	})
 
 	if assert.NoError(err) {
-		assert.Equal([]interface{}{
+		assert.Equal([][]interface{}{
 			[]interface{}{
 				uint64(1),
 				"Hello World",

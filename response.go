@@ -11,7 +11,7 @@ import (
 type Response struct {
 	Code       uint32
 	Error      error
-	Data       []interface{}
+	Data       []([]interface{})
 	requestID  uint32
 	poolRecord *PoolRecord // read buffer. For delayer unpack
 }
@@ -116,7 +116,12 @@ func (resp *Response) decodeBody(r *bytes.Buffer) (err error) {
 			return err
 		}
 		if body[KeyData] != nil {
-			resp.Data = body[KeyData].([]interface{})
+			v := body[KeyData].([]interface{})
+
+			resp.Data = make([]([]interface{}), len(v))
+			for i := 0; i < len(v); i++ {
+				resp.Data[i] = v[i].([]interface{})
+			}
 		}
 		if body[KeyError] != nil {
 			resp.Error = errors.New(body[KeyError].(string))

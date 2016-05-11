@@ -53,7 +53,7 @@ func TestCall(t *testing.T) {
 	}
 	defer box.Close()
 
-	do := func(connectOptions *Options, query *Call, expected []interface{}) {
+	do := func(connectOptions *Options, query *Call, expected [][]interface{}) {
 		conn, err := box.Connect(connectOptions)
 		assert.NoError(err)
 		assert.NotNil(conn)
@@ -72,7 +72,7 @@ func TestCall(t *testing.T) {
 		&Call{
 			Name: "sel_all",
 		},
-		[]interface{}{
+		[][]interface{}{
 			[]interface{}{
 				uint64(1),
 				"First record",
@@ -95,7 +95,7 @@ func TestCall(t *testing.T) {
 			Name:  "sel_name",
 			Tuple: []interface{}{2, "Music"},
 		},
-		[]interface{}{
+		[][]interface{}{
 			[]interface{}{
 				uint64(2),
 				"Music",
