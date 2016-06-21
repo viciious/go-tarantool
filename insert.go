@@ -22,7 +22,7 @@ func (s *Insert) Pack(requestID uint32, data *packData) ([]byte, error) {
 	encoder.EncodeMapLen(2) // Space, Tuple
 
 	// Space
-	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+	if err = data.writeSpace(s.Space, &bodyBuffer, encoder); err != nil {
 		return nil, err
 	}
 

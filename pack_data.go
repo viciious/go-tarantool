@@ -87,12 +87,7 @@ func (data *packData) spaceNo(space interface{}) (uint64, error) {
 	}
 }
 
-func (data *packData) writeSpace(space interface{}, buffer bytes.Buffer, encoder *msgpack.Encoder) error {
-	if space == nil {
-		buffer.Write(data.packedDefaultSpace)
-		return nil
-	}
-
+func (data *packData) encodeSpace(space interface{}, encoder *msgpack.Encoder) error {
 	spaceNo, err := data.spaceNo(space)
 	if err != nil {
 		return err
@@ -101,6 +96,15 @@ func (data *packData) writeSpace(space interface{}, buffer bytes.Buffer, encoder
 	encoder.EncodeUint32(KeySpaceNo)
 	encoder.Encode(spaceNo)
 	return nil
+}
+
+func (data *packData) writeSpace(space interface{}, buffer *bytes.Buffer, encoder *msgpack.Encoder) error {
+	if space == nil {
+		buffer.Write(data.packedDefaultSpace)
+		return nil
+	}
+
+	return data.encodeSpace(space, encoder)
 }
 
 func (data *packData) indexNo(space interface{}, index interface{}) (uint64, error) {

@@ -23,7 +23,7 @@ func (s *Upsert) Pack(requestID uint32, data *packData) ([]byte, error) {
 	encoder.EncodeMapLen(3) // Space, Tuple, Update operators
 
 	// Space
-	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+	if err = data.writeSpace(s.Space, &bodyBuffer, encoder); err != nil {
 		return nil, err
 	}
 

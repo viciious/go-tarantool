@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/phonkee/godsn"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type Options struct {
@@ -205,6 +206,11 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 	for _, space := range res.Data {
 		conn.packData.spaceMap[space[2].(string)] = space[0].(uint64)
 	}
+
+	var defSpaceBuf bytes.Buffer
+	defSpaceEnc := msgpack.NewEncoder(&defSpaceBuf)
+	conn.packData.encodeSpace(opts.DefaultSpace, defSpaceEnc)
+	conn.packData.packedDefaultSpace = defSpaceBuf.Bytes()
 
 	res, err = request(&Select{
 		Space:    ViewIndex,

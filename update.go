@@ -25,7 +25,7 @@ func (s *Update) Pack(requestID uint32, data *packData) ([]byte, error) {
 	encoder.EncodeMapLen(4) // Space, Index, Key, Update operators
 
 	// Space
-	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+	if err = data.writeSpace(s.Space, &bodyBuffer, encoder); err != nil {
 		return nil, err
 	}
 
