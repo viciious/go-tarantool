@@ -37,9 +37,16 @@ func packSelectSingleKey() []byte {
 }
 
 func newPackData(defaultSpace interface{}) (*packData, error) {
+	var packedDefaultSpace []byte
+	if spaceNo, ok := defaultSpace.(uint64); ok {
+		packedDefaultSpace = encodeValues2(KeySpaceNo, spaceNo)
+	} else {
+		packedDefaultSpace = nil
+	}
+
 	d := &packData{
 		defaultSpace:        defaultSpace,
-		packedDefaultSpace:  encodeValues2(KeySpaceNo, defaultSpace),
+		packedDefaultSpace:  packedDefaultSpace,
 		packedDefaultIndex:  encodeValues2(KeyIndexNo, uint32(0)),
 		packedIterEq:        encodeValues2(KeyIterator, IterEq),
 		packedDefaultLimit:  encodeValues2(KeyLimit, DefaultLimit),
@@ -99,7 +106,7 @@ func (data *packData) encodeSpace(space interface{}, encoder *msgpack.Encoder) e
 }
 
 func (data *packData) writeSpace(space interface{}, buffer *bytes.Buffer, encoder *msgpack.Encoder) error {
-	if space == nil {
+	if space == nil && data.packedDefaultSpace != nil {
 		buffer.Write(data.packedDefaultSpace)
 		return nil
 	}
