@@ -59,11 +59,6 @@ func newPackData(defaultSpace interface{}) (*packData, error) {
 	return d, nil
 }
 
-func testPackData() *packData {
-	d, _ := newPackData(0)
-	return d
-}
-
 func (data *packData) spaceNo(space interface{}) (uint64, error) {
 	if space == nil {
 		space = data.defaultSpace
