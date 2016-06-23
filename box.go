@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -19,7 +20,9 @@ type Box struct {
 	cmd      *exec.Cmd
 	stderr   io.ReadCloser
 	stopOnce sync.Once
+	running  bool
 	stopped  chan bool
+	initLua  string
 }
 
 type BoxOptions struct {
@@ -27,6 +30,10 @@ type BoxOptions struct {
 	PortMin uint
 	PortMax uint
 }
+
+var (
+	ErrPortAlreadyInUse = errors.New("Port already in use")
+)
 
 func NewBox(config string, options *BoxOptions) (*Box, error) {
 	if options == nil {
@@ -57,18 +64,19 @@ START_LOOP:
 		}
 
 		initLua := `
-        box.cfg{
-            listen = {port},
-            snap_dir = "{root}/snap/",
-            sophia_dir = "{root}/sophia/",
-            wal_dir = "{root}/wal/"
-        }
-        box.schema.user.grant('guest', 'read', 'universe')
-        `
+			box.cfg{
+				listen = {port},
+				snap_dir = "{root}/snap/",
+				sophia_dir = "{root}/sophia/",
+				wal_dir = "{root}/wal/"
+			}
+			box.once('guest:read_universe', function()
+				box.schema.user.grant('guest', 'read', 'universe', {if_not_exists = true})
+			end)
+		`
 
 		initLua = strings.Replace(initLua, "{port}", fmt.Sprintf("%d", port), -1)
 		initLua = strings.Replace(initLua, "{root}", tmpDir, -1)
-
 		initLua = fmt.Sprintf("%s\n%s", initLua, config)
 
 		initLuaFile := path.Join(tmpDir, "init.lua")
@@ -84,49 +92,24 @@ START_LOOP:
 			}
 		}
 
-		cmd := exec.Command("tarantool", initLuaFile)
-		boxStderr, err := cmd.StderrPipe()
-		if err != nil {
-			return nil, err
-		}
-
-		err = cmd.Start()
-		if err != nil {
-			return nil, err
-		}
-
-		var boxStderrBuffer bytes.Buffer
-
-		p := make([]byte, 1024)
-
 		box = &Box{
 			Root:    tmpDir,
 			Port:    port,
-			cmd:     cmd,
+			cmd:     nil,
+			running: false,
 			stopped: make(chan bool),
-			stderr:  boxStderr,
+			stderr:  nil,
+			initLua: initLuaFile,
 		}
 
-	WAIT_LOOP:
-		for {
-			if strings.Contains(boxStderrBuffer.String(), "entering the event loop") {
-				break START_LOOP
-			}
-
-			if strings.Contains(boxStderrBuffer.String(), "is already in use, will retry binding after") {
-				cmd.Process.Kill()
-				cmd.Process.Wait()
-				break WAIT_LOOP
-			}
-
-			n, err := boxStderr.Read(p)
-			if n > 0 {
-				boxStderrBuffer.Write(p[:n])
-			}
-			if err != nil {
-				fmt.Println(boxStderrBuffer.String())
+		err = box.Start()
+		if err != nil {
+			if err != ErrPortAlreadyInUse {
 				return nil, err
 			}
+		}
+		if box.running {
+			break START_LOOP
 		}
 
 		os.RemoveAll(box.Root)
@@ -135,6 +118,55 @@ START_LOOP:
 
 	if box == nil {
 		return nil, fmt.Errorf("Can't bind any port from %d to %d", options.PortMin, options.PortMax)
+	}
+
+	return box, nil
+}
+
+func (box *Box) Start() error {
+	if box.running {
+		return nil
+	}
+
+	cmd := exec.Command("tarantool", box.initLua)
+	boxStderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	var boxStderrBuffer bytes.Buffer
+
+	p := make([]byte, 1024)
+
+	box.running = false
+	box.cmd = cmd
+	box.stderr = boxStderr
+	box.stopped = make(chan bool)
+
+	for {
+		if strings.Contains(boxStderrBuffer.String(), "entering the event loop") {
+			break
+		}
+
+		if strings.Contains(boxStderrBuffer.String(), "is already in use, will retry binding after") {
+			cmd.Process.Kill()
+			cmd.Process.Wait()
+			return ErrPortAlreadyInUse
+		}
+
+		n, err := boxStderr.Read(p)
+		if n > 0 {
+			boxStderrBuffer.Write(p[:n])
+		}
+		if err != nil {
+			fmt.Println(boxStderrBuffer.String())
+			return err
+		}
 	}
 
 	// print logs
@@ -150,17 +182,25 @@ START_LOOP:
 		}
 	}()
 
-	return box, nil
+	box.running = true
+	return nil
+}
+
+func (box *Box) Stop() {
+	go func() {
+		box.cmd.Process.Kill()
+		box.cmd.Process.Wait()
+		close(box.stopped)
+	}()
+	<-box.stopped
+	box.running = false
 }
 
 func (box *Box) Close() {
 	box.stopOnce.Do(func() {
-		box.cmd.Process.Kill()
-		box.cmd.Process.Wait()
+		box.Stop()
 		os.RemoveAll(box.Root)
-		close(box.stopped)
 	})
-	<-box.stopped
 }
 
 func (box *Box) Addr() string {
