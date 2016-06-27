@@ -187,6 +187,9 @@ func (box *Box) Start() error {
 }
 
 func (box *Box) Stop() {
+	if !box.running {
+		return
+	}
 	go func() {
 		box.cmd.Process.Kill()
 		box.cmd.Process.Wait()
