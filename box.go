@@ -20,7 +20,6 @@ type Box struct {
 	cmd      *exec.Cmd
 	stderr   io.ReadCloser
 	stopOnce sync.Once
-	running  bool
 	stopped  chan bool
 	initLua  string
 }
@@ -55,7 +54,6 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 
 	var box *Box
 
-START_LOOP:
 	for port := options.PortMin; port <= options.PortMax; port++ {
 
 		tmpDir, err := ioutil.TempDir("", "") //os.RemoveAll(tmpDir);
@@ -96,22 +94,19 @@ START_LOOP:
 			Root:    tmpDir,
 			Port:    port,
 			cmd:     nil,
-			running: false,
 			stopped: make(chan bool),
 			stderr:  nil,
 			initLua: initLuaFile,
 		}
+		close(box.stopped)
 
 		err = box.Start()
-		if err != nil {
-			if err != ErrPortAlreadyInUse {
-				return nil, err
-			}
+		if err == nil {
+			break
 		}
-		if box.running {
-			break START_LOOP
+		if err != ErrPortAlreadyInUse {
+			return nil, err
 		}
-
 		os.RemoveAll(box.Root)
 		box = nil
 	}
@@ -124,9 +119,11 @@ START_LOOP:
 }
 
 func (box *Box) Start() error {
-	if box.running {
+	if !box.IsStopped() {
 		return nil
 	}
+
+	box.stopped = make(chan bool)
 
 	cmd := exec.Command("tarantool", box.initLua)
 	boxStderr, err := cmd.StderrPipe()
@@ -139,14 +136,13 @@ func (box *Box) Start() error {
 		return err
 	}
 
+
 	var boxStderrBuffer bytes.Buffer
 
 	p := make([]byte, 1024)
 
-	box.running = false
 	box.cmd = cmd
 	box.stderr = boxStderr
-	box.stopped = make(chan bool)
 
 	for {
 		if strings.Contains(boxStderrBuffer.String(), "entering the event loop") {
@@ -154,8 +150,7 @@ func (box *Box) Start() error {
 		}
 
 		if strings.Contains(boxStderrBuffer.String(), "is already in use, will retry binding after") {
-			cmd.Process.Kill()
-			cmd.Process.Wait()
+			box.Close()
 			return ErrPortAlreadyInUse
 		}
 
@@ -165,6 +160,7 @@ func (box *Box) Start() error {
 		}
 		if err != nil {
 			fmt.Println(boxStderrBuffer.String())
+			box.Close()
 			return err
 		}
 	}
@@ -182,21 +178,33 @@ func (box *Box) Start() error {
 		}
 	}()
 
-	box.running = true
 	return nil
 }
 
 func (box *Box) Stop() {
-	if !box.running {
-		return
-	}
 	go func() {
-		box.cmd.Process.Kill()
-		box.cmd.Process.Wait()
-		close(box.stopped)
+		select {
+			case <-box.stopped:
+				return
+			default:
+				if box.cmd != nil {
+					box.cmd.Process.Kill()
+					box.cmd.Process.Wait()
+					box.cmd = nil
+				}
+				close(box.stopped)
+		}
 	}()
 	<-box.stopped
-	box.running = false
+}
+
+func (box *Box) IsStopped() bool {
+	select {
+		case <-box.stopped:
+			return true
+		default:
+			return false
+	}
 }
 
 func (box *Box) Close() {
