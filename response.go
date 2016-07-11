@@ -160,7 +160,7 @@ func (resp *Response) decodeBody(r *bytes.Buffer) (err error) {
 				if err != nil {
 					return err
 				}
-				resp.Error = errors.New(errorMessage)
+				resp.Error = NewQueryError(errorMessage)
 			default:
 				if _, err = d.DecodeInterface(); err != nil {
 					return
