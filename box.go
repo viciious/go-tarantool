@@ -136,7 +136,6 @@ func (box *Box) Start() error {
 		return err
 	}
 
-
 	var boxStderrBuffer bytes.Buffer
 
 	p := make([]byte, 1024)
@@ -184,15 +183,15 @@ func (box *Box) Start() error {
 func (box *Box) Stop() {
 	go func() {
 		select {
-			case <-box.stopped:
-				return
-			default:
-				if box.cmd != nil {
-					box.cmd.Process.Kill()
-					box.cmd.Process.Wait()
-					box.cmd = nil
-				}
-				close(box.stopped)
+		case <-box.stopped:
+			return
+		default:
+			if box.cmd != nil {
+				box.cmd.Process.Kill()
+				box.cmd.Process.Wait()
+				box.cmd = nil
+			}
+			close(box.stopped)
 		}
 	}()
 	<-box.stopped
@@ -200,10 +199,10 @@ func (box *Box) Stop() {
 
 func (box *Box) IsStopped() bool {
 	select {
-		case <-box.stopped:
-			return true
-		default:
-			return false
+	case <-box.stopped:
+		return true
+	default:
+		return false
 	}
 }
 

@@ -1,33 +1,33 @@
 package tarantool
 
 import (
-        "sync"
+	"sync"
 )
 
 type Connector struct {
-        sync.Mutex
-        remoteAddr string
-        options    *Options
-        conn       *Connection
+	sync.Mutex
+	remoteAddr string
+	options    *Options
+	conn       *Connection
 }
 
 func New(remoteAddr string, option *Options) *Connector {
-        return &Connector{
-                remoteAddr: remoteAddr,
-                options:    option,
-        }
+	return &Connector{
+		remoteAddr: remoteAddr,
+		options:    option,
+	}
 }
 
 func (c *Connector) Connect() (*Connection, error) {
-        var err error
-        var conn *Connection
+	var err error
+	var conn *Connection
 
-        c.Lock()
-        if c.conn == nil || c.conn.IsClosed() {
-                c.conn, err = Connect(c.remoteAddr, c.options)
-        }
-        conn = c.conn
-        c.Unlock()
+	c.Lock()
+	if c.conn == nil || c.conn.IsClosed() {
+		c.conn, err = Connect(c.remoteAddr, c.options)
+	}
+	conn = c.conn
+	c.Unlock()
 
-        return conn, err
+	return conn, err
 }
