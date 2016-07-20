@@ -76,7 +76,17 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 		opts.QueryTimeout = time.Duration(time.Second)
 	}
 
-	dsn, err := godsn.Parse("//" + addr)
+	var dsn *godsn.DSN
+
+	// remove schema, if present
+	if strings.HasPrefix(addr, "tcp://") {
+		dsn, err = godsn.Parse(strings.Split(addr, "tcp:")[1])
+	} else if strings.HasPrefix(addr, "unix://") {
+		dsn, err = godsn.Parse(strings.Split(addr, "unix:")[1])
+	} else {
+		dsn, err = godsn.Parse("//" + addr)
+	}
+
 	if err != nil {
 		return nil, err
 	}
