@@ -31,3 +31,12 @@ func (c *Connector) Connect() (*Connection, error) {
 
 	return conn, err
 }
+
+func (c *Connector) Close() {
+	c.Lock()
+	if c.conn != nil && !c.conn.IsClosed() {
+		c.conn.Close()
+	}
+	c.conn = nil
+	c.Unlock()
+}
