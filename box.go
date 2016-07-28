@@ -17,6 +17,7 @@ import (
 type Box struct {
 	Root     string
 	Port     uint
+	Listen   string
 	cmd      *exec.Cmd
 	stderr   io.ReadCloser
 	stopOnce sync.Once
@@ -25,7 +26,8 @@ type Box struct {
 }
 
 type BoxOptions struct {
-	Listen  uint
+	Host string
+	Port  uint
 	PortMin uint
 	PortMax uint
 }
@@ -47,10 +49,15 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 		options.PortMax = 9000
 	}
 
-	if options.Listen != 0 {
-		options.PortMin = options.Listen
-		options.PortMax = options.Listen
+	if options.Port != 0 {
+		options.PortMin = options.Port
+		options.PortMax = options.Port
 	}
+
+	if options.Host == "" {
+		options.Host = "127.0.0.1"
+	}
+	options.Host += ":"
 
 	var box *Box
 
@@ -63,7 +70,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 
 		initLua := `
 			box.cfg{
-				listen = {port},
+				listen = "{host}{port}",
 				snap_dir = "{root}/snap/",
 				sophia_dir = "{root}/sophia/",
 				wal_dir = "{root}/wal/"
@@ -73,6 +80,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 			end)
 		`
 
+		initLua = strings.Replace(initLua, "{host}", options.Host, -1)
 		initLua = strings.Replace(initLua, "{port}", fmt.Sprintf("%d", port), -1)
 		initLua = strings.Replace(initLua, "{root}", tmpDir, -1)
 		initLua = fmt.Sprintf("%s\n%s", initLua, config)
@@ -92,6 +100,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 
 		box = &Box{
 			Root:    tmpDir,
+			Listen:  fmt.Sprintf("%s%d", options.Host, port),
 			Port:    port,
 			cmd:     nil,
 			stopped: make(chan bool),
@@ -214,7 +223,7 @@ func (box *Box) Close() {
 }
 
 func (box *Box) Addr() string {
-	return fmt.Sprintf("127.0.0.1:%d", box.Port)
+	return box.Listen
 }
 
 func (box *Box) Connect(options *Options) (*Connection, error) {
