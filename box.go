@@ -26,8 +26,8 @@ type Box struct {
 }
 
 type BoxOptions struct {
-	Host string
-	Port  uint
+	Host    string
+	Port    uint
 	PortMin uint
 	PortMax uint
 }
