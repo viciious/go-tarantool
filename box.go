@@ -62,7 +62,6 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 	var box *Box
 
 	for port := options.PortMin; port <= options.PortMax; port++ {
-
 		tmpDir, err := ioutil.TempDir("", "") //os.RemoveAll(tmpDir);
 		if err != nil {
 			return nil, err
@@ -85,12 +84,6 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 		initLua = strings.Replace(initLua, "{root}", tmpDir, -1)
 		initLua = fmt.Sprintf("%s\n%s", initLua, config)
 
-		initLuaFile := path.Join(tmpDir, "init.lua")
-		err = ioutil.WriteFile(initLuaFile, []byte(initLua), 0644)
-		if err != nil {
-			return nil, err
-		}
-
 		for _, subDir := range []string{"sophia", "snap", "wal"} {
 			err = os.Mkdir(path.Join(tmpDir, subDir), 0755)
 			if err != nil {
@@ -105,7 +98,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 			cmd:     nil,
 			stopped: make(chan bool),
 			stderr:  nil,
-			initLua: initLuaFile,
+			initLua: initLua,
 		}
 		close(box.stopped)
 
@@ -127,14 +120,25 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 	return box, nil
 }
 
-func (box *Box) Start() error {
+func (box *Box) StartWithLua(luaTransform func(string) string) error {
 	if !box.IsStopped() {
 		return nil
 	}
 
 	box.stopped = make(chan bool)
 
-	cmd := exec.Command("tarantool", box.initLua)
+	initLua := box.initLua
+	if luaTransform != nil {
+		initLua = luaTransform(initLua)
+	}
+
+	initLuaFile := path.Join(box.Root, "init.lua")
+	err := ioutil.WriteFile(initLuaFile, []byte(initLua), 0644)
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command("tarantool", initLuaFile)
 	boxStderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err
@@ -187,6 +191,10 @@ func (box *Box) Start() error {
 	}()
 
 	return nil
+}
+
+func (box *Box) Start() error {
+	return box.StartWithLua(nil)
 }
 
 func (box *Box) Stop() {
