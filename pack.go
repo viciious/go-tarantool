@@ -23,7 +23,12 @@ func packBig(value int, bytes int) []byte {
 	return result
 }
 
-// Uint32 is alias for PackL
+// Uint32 is an alias for PackL
 func Uint32(value uint32) []byte {
 	return packLittle(uint(value), 4)
+}
+
+// Uint64 is an alias for PackQ
+func Uint64(value uint64) []byte {
+	return packLittle(uint(value), 8)
 }
