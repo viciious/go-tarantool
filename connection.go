@@ -139,6 +139,20 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 		return
 	}
 
+	read := func(r io.Reader) (*Response, error) {
+		body, rerr := readMessage(r)
+		if rerr != nil {
+			return nil, rerr
+		}
+
+		response, rerr := decodeResponse(bytes.NewBuffer(body))
+		if rerr != nil {
+			return nil, rerr
+		}
+
+		return response, nil
+	}
+
 	conn.Greeting = &Greeting{
 		Version: greeting[:64],
 		Auth:    greeting[64:108],
@@ -380,6 +394,14 @@ READER_LOOP:
 
 		req = conn.requests.Pop(response.requestID)
 		if req != nil {
+			if response.Error == nil {
+				// finish decode message body
+				err = response.decodeBody(response.buf)
+				if err != nil {
+					response.Error = err
+				}
+			}
+
 			req.replyChan <- response
 			close(req.replyChan)
 		}

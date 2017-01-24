@@ -184,17 +184,3 @@ func decodeResponse(r *bytes.Buffer) (*Response, error) {
 	}
 	return resp, nil
 }
-
-func read(r io.Reader) (*Response, error) {
-	body, err := readMessage(r)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := decodeResponse(bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}

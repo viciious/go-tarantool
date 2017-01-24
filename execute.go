@@ -1,33 +1,31 @@
 package tarantool
 
-import "time"
+import (
+	"context"
+	"fmt"
+	"time"
+)
 
 type QueryOptions struct {
 	Timeout time.Duration
 }
 
-func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan bool) ([][]interface{}, error) {
-	request := &request{
-		query:     q,
-		replyChan: make(chan *Response, 1),
-	}
-
+func (conn *Connection) doExecute(r *request, ctx context.Context) *Response {
 	requestID := conn.nextID()
 
-	packed, err := request.query.Pack(requestID, conn.packData)
+	packed, err := r.query.Pack(requestID, conn.packData)
 	if err != nil {
-		request.replyChan <- &Response{
+		return &Response{
 			Error: &QueryError{
 				error: err,
 			},
 		}
-		return nil, err
 	}
 
-	oldRequest := conn.requests.Put(requestID, request)
+	oldRequest := conn.requests.Put(requestID, r)
 	if oldRequest != nil {
 		oldRequest.replyChan <- &Response{
-			Error: NewConnectionError(conn, "Shred old requests"), // wtf?
+			Error: NewConnectionError(conn, "Shred old requests", false), // wtf?
 		}
 		close(oldRequest.replyChan)
 	}
@@ -35,51 +33,70 @@ func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan
 	select {
 	case conn.writeChan <- packed:
 		// pass
-	case <-deadline:
-		return nil, NewConnectionError(conn, "Request send timeout")
-	case <-abort:
-		return nil, NewConnectionError(conn, "Request aborted")
+	case <-ctx.Done():
+		err := ctx.Err()
+		return &Response{
+			Error: NewConnectionError(conn, fmt.Sprintf("Send error: %s", err), err == context.DeadlineExceeded),
+		}
 	case <-conn.exit:
-		return nil, ConnectionClosedError(conn)
+		return &Response{
+			Error: ConnectionClosedError(conn),
+		}
 	}
 
 	var response *Response
 	select {
-	case response = <-request.replyChan:
+	case response = <-r.replyChan:
 		// pass
-	case <-deadline:
-		return nil, NewConnectionError(conn, "Response read timeout")
-	case <-abort:
-		return nil, NewConnectionError(conn, "Request aborted")
+	case <-ctx.Done():
+		err := ctx.Err()
+		return &Response{
+			Error: NewConnectionError(conn, fmt.Sprintf("Recv error: %s", err), err == context.DeadlineExceeded),
+		}
 	case <-conn.exit:
-		return nil, ConnectionClosedError(conn)
-	}
-
-	if response.Error == nil {
-		// finish decode message body
-		err = response.decodeBody(response.buf)
-		if err != nil {
-			response.Error = err
+		return &Response{ 
+			Error: ConnectionClosedError(conn),
 		}
 	}
 
-	return response.Data, response.Error
+	return response
+}
+
+func (conn *Connection) Exec(q Query, ctx context.Context) *Result {
+	var cancel context.CancelFunc = func() {}
+
+	request := &request{
+		query:     q,
+		replyChan: make(chan *Response, 1),
+	}
+
+	if _, ok := ctx.Deadline(); !ok && conn.queryTimeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, conn.queryTimeout)
+	}
+	response := conn.doExecute(request, ctx)
+	cancel()
+
+	return &Result{response.Error, response.Data}
 }
 
 func (conn *Connection) ExecuteOptions(q Query, opts *QueryOptions) ([][]interface{}, error) {
+	var res *Result
+	var ctx context.Context = context.Background()
+	var cancel context.CancelFunc = func() {}
+
 	// make options
 	if opts == nil {
 		opts = &QueryOptions{}
 	}
 
-	if opts.Timeout.Nanoseconds() == 0 {
-		opts.Timeout = conn.queryTimeout
+	if opts.Timeout != 0 {
+		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
 	}
 
-	// set execute deadline
-	deadline := time.After(opts.Timeout)
+	res = conn.Exec(q, ctx)
+	cancel()
 
-	return conn.doExecute(q, deadline, nil)
+	return res.Data, res.Error
 }
 
 func (conn *Connection) Execute(q Query) ([][]interface{}, error) {
