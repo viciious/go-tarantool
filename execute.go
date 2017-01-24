@@ -27,7 +27,7 @@ func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan
 	oldRequest := conn.requests.Put(requestID, request)
 	if oldRequest != nil {
 		oldRequest.replyChan <- &Response{
-			Error: NewConnectionError("Shred old requests"), // wtf?
+			Error: NewConnectionError(conn, "Shred old requests"), // wtf?
 		}
 		close(oldRequest.replyChan)
 	}
@@ -36,11 +36,11 @@ func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan
 	case conn.writeChan <- packed:
 		// pass
 	case <-deadline:
-		return nil, NewConnectionError("Request send timeout")
+		return nil, NewConnectionError(conn, "Request send timeout")
 	case <-abort:
-		return nil, NewConnectionError("Request aborted")
+		return nil, NewConnectionError(conn, "Request aborted")
 	case <-conn.exit:
-		return nil, ConnectionClosedError()
+		return nil, ConnectionClosedError(conn)
 	}
 
 	var response *Response
@@ -48,11 +48,11 @@ func (conn *Connection) doExecute(q Query, deadline <-chan time.Time, abort chan
 	case response = <-request.replyChan:
 		// pass
 	case <-deadline:
-		return nil, NewConnectionError("Response read timeout")
+		return nil, NewConnectionError(conn, "Response read timeout")
 	case <-abort:
-		return nil, NewConnectionError("Request aborted")
+		return nil, NewConnectionError(conn, "Request aborted")
 	case <-conn.exit:
-		return nil, ConnectionClosedError()
+		return nil, ConnectionClosedError(conn)
 	}
 
 	if response.Error == nil {

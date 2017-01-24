@@ -30,7 +30,7 @@ type Greeting struct {
 }
 
 type Connection struct {
-	addr      string
+	dsn       *godsn.DSN
 	requestID uint32
 	requests  *requestMap
 	writeChan chan []byte // packed messages with header
@@ -44,7 +44,9 @@ type Connection struct {
 	packData     *packData
 }
 
-func Connect(addr string, options *Options) (conn *Connection, err error) {
+func Connect(dsnString string, options *Options) (conn *Connection, err error) {
+	var dsn *godsn.DSN
+
 	defer func() { // close opened connection if error
 		if err != nil && conn != nil {
 			if conn.tcpConn != nil {
@@ -54,8 +56,21 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 		}
 	}()
 
+	// remove schema, if present
+	if strings.HasPrefix(dsnString, "tcp://") {
+		dsn, err = godsn.Parse(strings.Split(dsnString, "tcp:")[1])
+	} else if strings.HasPrefix(dsnString, "unix://") {
+		dsn, err = godsn.Parse(strings.Split(dsnString, "unix:")[1])
+	} else {
+		dsn, err = godsn.Parse("//" + dsnString)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
 	conn = &Connection{
-		addr:      addr,
+		dsn:       dsn,
 		requests:  newRequestMap(),
 		writeChan: make(chan []byte, 256),
 		exit:      make(chan bool),
@@ -76,21 +91,6 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 		opts.QueryTimeout = time.Duration(time.Second)
 	}
 
-	var dsn *godsn.DSN
-
-	// remove schema, if present
-	if strings.HasPrefix(addr, "tcp://") {
-		dsn, err = godsn.Parse(strings.Split(addr, "tcp:")[1])
-	} else if strings.HasPrefix(addr, "unix://") {
-		dsn, err = godsn.Parse(strings.Split(addr, "unix:")[1])
-	} else {
-		dsn, err = godsn.Parse("//" + addr)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
 	if options.User == "" {
 		user := dsn.User()
 		if user != nil {
@@ -99,19 +99,19 @@ func Connect(addr string, options *Options) (conn *Connection, err error) {
 			options.User = username
 			options.Password = pass
 		}
-
 	}
+
 	remoteAddr := dsn.Host()
 	path := dsn.Path()
 
 	if opts.DefaultSpace == "" {
 		if len(path) > 0 {
-			splittedPath := strings.Split(path, "/")
-			if len(splittedPath) > 1 {
-				if splittedPath[1] == "" {
-					return nil, fmt.Errorf("Wrong space: %s", splittedPath[1])
+			splitPath := strings.Split(path, "/")
+			if len(splitPath) > 1 {
+				if splitPath[1] == "" {
+					return nil, fmt.Errorf("Wrong space: %s", splitPath[1])
 				}
-				opts.DefaultSpace = splittedPath[1]
+				opts.DefaultSpace = splitPath[1]
 			}
 		}
 	}
@@ -298,7 +298,7 @@ func (conn *Connection) worker(tcpConn net.Conn) {
 	// send error reply to all pending requests
 	conn.requests.CleanUp(func(req *request) {
 		req.replyChan <- &Response{
-			Error: ConnectionClosedError(),
+			Error: ConnectionClosedError(conn),
 		}
 		close(req.replyChan)
 	})

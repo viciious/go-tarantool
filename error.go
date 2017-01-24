@@ -1,6 +1,9 @@
 package tarantool
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 type Error interface {
 	error
@@ -18,14 +21,14 @@ type QueryError struct {
 var _ Error = (*ConnectionError)(nil)
 var _ Error = (*QueryError)(nil)
 
-func NewConnectionError(message string) error {
+func NewConnectionError(con *Connection, message string) error {
 	return &ConnectionError{
-		error: errors.New(message),
+		error: errors.New(fmt.Sprintf("%s, remote: %s", message, con.dsn.Host)),
 	}
 }
 
-func ConnectionClosedError() error {
-	return NewConnectionError("Connection closed")
+func ConnectionClosedError(con *Connection) error {
+	return NewConnectionError(con, "Connection closed")
 }
 
 func (e *ConnectionError) Connection() bool {
