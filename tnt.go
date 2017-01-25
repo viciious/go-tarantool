@@ -5,8 +5,8 @@ type Query interface {
 }
 
 type Result struct {
-	Error     error
-	Data      [][]interface{}
+	Error error
+	Data  [][]interface{}
 }
 
 type request struct {

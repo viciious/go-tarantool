@@ -54,7 +54,7 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Response {
 			Error: NewConnectionError(conn, fmt.Sprintf("Recv error: %s", err), err == context.DeadlineExceeded),
 		}
 	case <-conn.exit:
-		return &Response{ 
+		return &Response{
 			Error: ConnectionClosedError(conn),
 		}
 	}
