@@ -39,3 +39,7 @@ func (s *Call) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	return packIproto(CallRequest, requestID, bodyBuffer.Bytes()), nil
 }
+
+func (q *Call) Unpack(decoder *msgpack.Decoder) error {
+	return nil
+}

@@ -39,3 +39,7 @@ func (s *Insert) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	return packIproto(InsertRequest, requestID, bodyBuffer.Bytes()), nil
 }
+
+func (q *Insert) Unpack(decoder *msgpack.Decoder) error {
+	return nil
+}

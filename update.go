@@ -65,3 +65,7 @@ func (s *Update) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	return packIproto(UpdateRequest, requestID, bodyBuffer.Bytes()), nil
 }
+
+func (q *Update) Unpack(decoder *msgpack.Decoder) error {
+	return nil
+}

@@ -17,6 +17,9 @@ type Auth struct {
 
 var _ Query = (*Auth)(nil)
 
+const authHash = "chap-sha1"
+const scrambleSize = sha1.Size // == 20
+
 // copy-paste from go-tarantool
 func scramble(encodedSalt []byte, pass string) (scramble []byte, err error) {
 	/* ==================================================================
@@ -30,7 +33,6 @@ func scramble(encodedSalt []byte, pass string) (scramble []byte, err error) {
 	    return scramble;
 
 	===================================================================== */
-	scrambleSize := sha1.Size // == 20
 
 	salt, err := base64.StdEncoding.DecodeString(string(encodedSalt))
 	if err != nil {
@@ -70,8 +72,39 @@ func (auth *Auth) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	encoder.EncodeUint64(KeyTuple)
 	encoder.EncodeArrayLen(2)
-	encoder.EncodeString("chap-sha1")
+	encoder.EncodeString(authHash)
 	encoder.EncodeBytes(scr)
 
 	return packIproto(AuthRequest, requestID, bodyBuffer.Bytes()), nil
+}
+
+func (auth *Auth) Unpack(decoder *msgpack.Decoder) (err error) {
+	var l int
+	var t uint64
+
+	if auth.User, err = decoder.DecodeString(); err != nil {
+		return
+	}
+
+	if t, err = decoder.DecodeUint64(); err != nil {
+		return
+	}
+	if t != KeyTuple {
+		return
+	}
+
+	if l, err = decoder.DecodeSliceLen(); err != nil {
+		return
+	}
+
+	if l == 2 {
+		if _, err = decoder.DecodeString(); err != nil {
+			return
+		}
+		if auth.GreetingAuth, err = decoder.DecodeBytes(); err != nil {
+			return
+		}
+	}
+
+	return nil
 }

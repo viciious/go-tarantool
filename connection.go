@@ -139,18 +139,18 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 		return
 	}
 
-	read := func(r io.Reader) (*Response, error) {
+	read := func(r io.Reader) (*Packet, error) {
 		body, rerr := readMessage(r)
 		if rerr != nil {
 			return nil, rerr
 		}
 
-		response, rerr := decodeResponse(bytes.NewBuffer(body))
+		packet, rerr := decodePacket(bytes.NewBuffer(body))
 		if rerr != nil {
 			return nil, rerr
 		}
 
-		return response, nil
+		return packet, nil
 	}
 
 	conn.Greeting = &Greeting{
@@ -160,7 +160,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 
 	if options.User != "" {
 		var authRaw []byte
-		var authResponse *Response
+		var authResponse *Packet
 
 		authRequestID := conn.nextID()
 
@@ -192,7 +192,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	}
 
 	// select space and index schema
-	request := func(req Query) (*Response, error) {
+	request := func(req Query) (*Result, error) {
 		var err error
 		requestID := conn.nextID()
 		packedReq, _ := (req).Pack(requestID, conn.packData)
@@ -215,7 +215,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 			return nil, res.Error
 		}
 
-		return res, nil
+		return &Result{Data: res.Data}, nil
 	}
 
 	res, err := request(&Select{
@@ -311,7 +311,7 @@ func (conn *Connection) worker(tcpConn net.Conn) {
 
 	// send error reply to all pending requests
 	conn.requests.CleanUp(func(req *request) {
-		req.replyChan <- &Response{
+		req.replyChan <- &Result{
 			Error: ConnectionClosedError(conn),
 		}
 		close(req.replyChan)
@@ -367,7 +367,7 @@ WRITER_LOOP:
 }
 
 func (conn *Connection) reader(tcpConn net.Conn) {
-	var response *Response
+	var packet *Packet
 	var err error
 	var body []byte
 	var req *request
@@ -382,27 +382,31 @@ READER_LOOP:
 			break READER_LOOP
 		}
 
-		response = &Response{
+		packet = &Packet{
 			buf: bytes.NewBuffer(body),
 		}
 
-		// decode response header. for requestID
-		err = response.decodeHeader(response.buf)
+		// decode packet header for requestID
+		err = packet.decodeHeader(packet.buf)
 		if err != nil {
 			break READER_LOOP
 		}
 
-		req = conn.requests.Pop(response.requestID)
+		req = conn.requests.Pop(packet.requestID)
 		if req != nil {
-			if response.Error == nil {
+			res := &Result{Error: packet.Error}
+			if packet.Error == nil {
 				// finish decode message body
-				err = response.decodeBody(response.buf)
+				err = packet.decodeBody(packet.buf)
 				if err != nil {
-					response.Error = err
+					res.Error = err
+				} else {
+					res.Error = packet.Error
+					res.Data = packet.Data
 				}
 			}
 
-			req.replyChan <- response
+			req.replyChan <- res
 			close(req.replyChan)
 		}
 	}

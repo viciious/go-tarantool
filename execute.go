@@ -10,12 +10,12 @@ type QueryOptions struct {
 	Timeout time.Duration
 }
 
-func (conn *Connection) doExecute(r *request, ctx context.Context) *Response {
+func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 	requestID := conn.nextID()
 
 	packed, err := r.query.Pack(requestID, conn.packData)
 	if err != nil {
-		return &Response{
+		return &Result{
 			Error: &QueryError{
 				error: err,
 			},
@@ -24,7 +24,7 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Response {
 
 	oldRequest := conn.requests.Put(requestID, r)
 	if oldRequest != nil {
-		oldRequest.replyChan <- &Response{
+		oldRequest.replyChan <- &Result{
 			Error: NewConnectionError(conn, "Shred old requests", false), // wtf?
 		}
 		close(oldRequest.replyChan)
@@ -35,31 +35,31 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Response {
 		// pass
 	case <-ctx.Done():
 		err := ctx.Err()
-		return &Response{
+		return &Result{
 			Error: NewConnectionError(conn, fmt.Sprintf("Send error: %s", err), err == context.DeadlineExceeded),
 		}
 	case <-conn.exit:
-		return &Response{
+		return &Result{
 			Error: ConnectionClosedError(conn),
 		}
 	}
 
-	var response *Response
+	var res *Result
 	select {
-	case response = <-r.replyChan:
+	case res = <-r.replyChan:
 		// pass
 	case <-ctx.Done():
 		err := ctx.Err()
-		return &Response{
+		return &Result{
 			Error: NewConnectionError(conn, fmt.Sprintf("Recv error: %s", err), err == context.DeadlineExceeded),
 		}
 	case <-conn.exit:
-		return &Response{
+		return &Result{
 			Error: ConnectionClosedError(conn),
 		}
 	}
 
-	return response
+	return res
 }
 
 func (conn *Connection) Exec(q Query, ctx context.Context) *Result {
@@ -67,16 +67,15 @@ func (conn *Connection) Exec(q Query, ctx context.Context) *Result {
 
 	request := &request{
 		query:     q,
-		replyChan: make(chan *Response, 1),
+		replyChan: make(chan *Result, 1),
 	}
 
 	if _, ok := ctx.Deadline(); !ok && conn.queryTimeout != 0 {
 		ctx, cancel = context.WithTimeout(ctx, conn.queryTimeout)
 	}
-	response := conn.doExecute(request, ctx)
+	result := conn.doExecute(request, ctx)
 	cancel()
-
-	return &Result{response.Error, response.Data}
+	return result
 }
 
 func (conn *Connection) ExecuteOptions(q Query, opts *QueryOptions) ([][]interface{}, error) {

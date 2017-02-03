@@ -51,3 +51,7 @@ func (s *Delete) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	return packIproto(DeleteRequest, requestID, bodyBuffer.Bytes()), nil
 }
+
+func (q *Delete) Unpack(decoder *msgpack.Decoder) error {
+	return nil
+}

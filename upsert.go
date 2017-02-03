@@ -51,3 +51,7 @@ func (s *Upsert) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	return packIproto(UpsertRequest, requestID, bodyBuffer.Bytes()), nil
 }
+
+func (q *Upsert) Unpack(decoder *msgpack.Decoder) error {
+	return nil
+}

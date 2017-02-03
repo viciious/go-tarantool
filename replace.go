@@ -39,3 +39,7 @@ func (s *Replace) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	return packIproto(ReplaceRequest, requestID, bodyBuffer.Bytes()), nil
 }
+
+func (q *Replace) Unpack(decoder *msgpack.Decoder) error {
+	return nil
+}

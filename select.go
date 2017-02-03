@@ -81,3 +81,7 @@ func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	return packIproto(SelectRequest, requestID, bodyBuffer.Bytes()), nil
 }
+
+func (q *Select) Unpack(decoder *msgpack.Decoder) error {
+	return nil
+}

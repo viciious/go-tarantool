@@ -19,6 +19,7 @@ const (
 
 	KeyCode         = 0x00
 	KeySync         = 0x01
+	KeySchemaID     = 0x05
 	KeySpaceNo      = 0x10
 	KeyIndexNo      = 0x11
 	KeyLimit        = 0x12
