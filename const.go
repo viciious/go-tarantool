@@ -5,17 +5,17 @@ Copy-Paste from https://github.com/tarantool/go-tarantool/blob/master/const.go
 */
 
 const (
-	SelectRequest    = 1
-	InsertRequest    = 2
-	ReplaceRequest   = 3
-	UpdateRequest    = 4
-	DeleteRequest    = 5
-	CallRequest      = 6
-	AuthRequest      = 7
-	EvalRequest      = 8
-	UpsertRequest    = 9
-	PingRequest      = 64
-	SubscribeRequest = 66
+	SelectRequest    = byte(1)
+	InsertRequest    = byte(2)
+	ReplaceRequest   = byte(3)
+	UpdateRequest    = byte(4)
+	DeleteRequest    = byte(5)
+	CallRequest      = byte(6)
+	AuthRequest      = byte(7)
+	EvalRequest      = byte(8)
+	UpsertRequest    = byte(9)
+	PingRequest      = byte(64)
+	SubscribeRequest = byte(66)
 
 	KeyCode         = 0x00
 	KeySync         = 0x01

@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"bytes"
+	"fmt"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -82,6 +83,74 @@ func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 	return packIproto(SelectRequest, requestID, bodyBuffer.Bytes()), nil
 }
 
-func (q *Select) Unpack(decoder *msgpack.Decoder) error {
+func (q *Select) Unpack(r *bytes.Buffer) (err error) {
+	var i int
+	var k, kl int
+	var t uint
+
+	decoder := msgpack.NewDecoder(r)
+
+	if i, err = decoder.DecodeMapLen(); err != nil {
+		return
+	}
+
+	q.Index = 0
+	q.Offset = 0
+	q.Limit = 0
+	q.Iterator = IterEq
+
+	for ; i > 0; i-- {
+		if k, err = decoder.DecodeInt(); err != nil {
+			return
+		}
+
+		switch k {
+		case KeySpaceNo:
+			if t, err = decoder.DecodeUint(); err != nil {
+				return
+			}
+			q.Space = int(t)
+		case KeyIndexNo:
+			if t, err = decoder.DecodeUint(); err != nil {
+				return
+			}
+			q.Index = int(t)
+		case KeyOffset:
+			if t, err = decoder.DecodeUint(); err != nil {
+				return
+			}
+			q.Offset = uint32(t)
+		case KeyLimit:
+			if t, err = decoder.DecodeUint(); err != nil {
+				return
+			}
+			q.Limit = uint32(t)
+		case KeyIterator:
+			if t, err = decoder.DecodeUint(); err != nil {
+				return
+			}
+			q.Iterator = uint8(t)
+		case KeyKey:
+			if kl, err = decoder.DecodeSliceLen(); err != nil {
+				return
+			}
+			if kl == 1 {
+				if q.Key, err = decoder.DecodeInterface(); err != nil {
+					return
+				}
+			} else if kl > 1 {
+				array, err := decoder.DecodeInterface()
+				if err != nil {
+					return err
+				}
+				q.KeyTuple = array.([]interface{})
+			}
+		}
+	}
+
+	if q.Space == nil {
+		return fmt.Errorf("Select.Unpack: no space specified")
+	}
+
 	return nil
 }

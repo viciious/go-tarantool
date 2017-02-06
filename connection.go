@@ -134,6 +134,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	greeting := make([]byte, 128)
 
 	conn.tcpConn.SetDeadline(connectDeadline)
+
 	_, err = io.ReadFull(conn.tcpConn, greeting)
 	if err != nil {
 		return
@@ -169,6 +170,9 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 			Password:     options.Password,
 			GreetingAuth: conn.Greeting.Auth,
 		}).Pack(authRequestID, conn.packData)
+		if err != nil {
+			return
+		}
 
 		_, err = conn.tcpConn.Write(authRaw)
 		if err != nil {
@@ -410,23 +414,4 @@ READER_LOOP:
 			close(req.replyChan)
 		}
 	}
-}
-
-func packIproto(requestCode byte, requestID uint32, body []byte) []byte {
-	h := [...]byte{
-		0xce, 0, 0, 0, 0, // length
-		0x82,                       // 2 element map
-		KeyCode, byte(requestCode), // request code
-		KeySync, 0xce,
-		byte(requestID >> 24), byte(requestID >> 16),
-		byte(requestID >> 8), byte(requestID),
-	}
-
-	l := uint32(len(h) - 5 + len(body))
-	h[1] = byte(l >> 24)
-	h[2] = byte(l >> 16)
-	h[3] = byte(l >> 8)
-	h[4] = byte(l)
-
-	return append(h[:], body...)
 }

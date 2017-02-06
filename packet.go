@@ -137,53 +137,54 @@ func (pack *Packet) decodeHeader(r *bytes.Buffer) (err error) {
 
 func (pack *Packet) decodeBody(r *bytes.Buffer) (err error) {
 	if r.Len() > 2 {
-
-		var l int
-		d := msgpack.NewDecoder(r)
-		if l, err = d.DecodeMapLen(); err != nil {
-			return
-		}
-		for ; l > 0; l-- {
-			var cd int
-			if cd, err = d.DecodeInt(); err != nil {
+		var code = byte(pack.Code)
+		switch code {
+		case SelectRequest:
+			q := &Select{}
+			if err = q.Unpack(r); err != nil {
 				return
 			}
-			switch cd {
-			case KeyData:
-				value, err := d.DecodeInterface()
-				if err != nil {
-					return err
+			pack.request = q
+			return
+		case AuthRequest:
+			q := &Auth{}
+			if err = q.Unpack(r); err != nil {
+				return
+			}
+			pack.request = q
+			return
+		default:
+			var l int
+			d := msgpack.NewDecoder(r)
+			if l, err = d.DecodeMapLen(); err != nil {
+				return
+			}
+			for ; l > 0; l-- {
+				var cd int
+				if cd, err = d.DecodeInt(); err != nil {
+					return
 				}
-				v := value.([]interface{})
-
-				pack.Data = make([]([]interface{}), len(v))
-				for i := 0; i < len(v); i++ {
-					pack.Data[i] = v[i].([]interface{})
-				}
-			case KeyError:
-				errorMessage, err := d.DecodeString()
-				if err != nil {
-					return err
-				}
-				pack.Error = NewQueryError(errorMessage)
-			default:
-				switch pack.Code {
-					case SelectRequest:
-						q := &Select{}
-						if err = q.Unpack(d); err != nil {
-							return
-						}
-						pack.request = q
-					case AuthRequest:
-						q := &Auth{}
-						if err = q.Unpack(d); err != nil {
-							return
-						}
-						pack.request = q
-					default:
-						if _, err = d.DecodeInterface(); err != nil {
-							return
-						}
+				switch cd {
+				case KeyData:
+					value, err := d.DecodeInterface()
+					if err != nil {
+						return err
+					}
+					v := value.([]interface{})
+					pack.Data = make([]([]interface{}), len(v))
+					for i := 0; i < len(v); i++ {
+						pack.Data[i] = v[i].([]interface{})
+					}
+				case KeyError:
+					errorMessage, err := d.DecodeString()
+					if err != nil {
+						return err
+					}
+					pack.Error = NewQueryError(errorMessage)
+				default:
+					if _, err = d.DecodeInterface(); err != nil {
+						return
+					}
 				}
 			}
 		}

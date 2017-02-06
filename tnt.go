@@ -1,15 +1,10 @@
 package tarantool
 
-import "gopkg.in/vmihailenco/msgpack.v2"
+import "bytes"
 
 type Query interface {
 	Pack(requestID uint32, data *packData) ([]byte, error)
-	Unpack(decoder *msgpack.Decoder) error
-}
-
-type Result struct {
-	Error error
-	Data  [][]interface{}
+	Unpack(r *bytes.Buffer) error
 }
 
 type request struct {

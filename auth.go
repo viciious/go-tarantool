@@ -78,31 +78,40 @@ func (auth *Auth) Pack(requestID uint32, data *packData) ([]byte, error) {
 	return packIproto(AuthRequest, requestID, bodyBuffer.Bytes()), nil
 }
 
-func (auth *Auth) Unpack(decoder *msgpack.Decoder) (err error) {
-	var l int
-	var t uint64
+func (auth *Auth) Unpack(r *bytes.Buffer) (err error) {
+	var i, l int
+	var k uint64
 
-	if auth.User, err = decoder.DecodeString(); err != nil {
+	decoder := msgpack.NewDecoder(r)
+
+	if i, err = decoder.DecodeMapLen(); err != nil {
 		return
 	}
 
-	if t, err = decoder.DecodeUint64(); err != nil {
-		return
-	}
-	if t != KeyTuple {
-		return
-	}
-
-	if l, err = decoder.DecodeSliceLen(); err != nil {
-		return
-	}
-
-	if l == 2 {
-		if _, err = decoder.DecodeString(); err != nil {
+	for ; i > 0; i-- {
+		if k, err = decoder.DecodeUint64(); err != nil {
 			return
 		}
-		if auth.GreetingAuth, err = decoder.DecodeBytes(); err != nil {
-			return
+
+		switch k {
+		case KeyUserName:
+			if auth.User, err = decoder.DecodeString(); err != nil {
+				return
+			}
+		case KeyTuple:
+			if l, err = decoder.DecodeSliceLen(); err != nil {
+				return
+			}
+			if l == 2 {
+				if _, err = decoder.DecodeString(); err != nil {
+					return
+				}
+				if auth.GreetingAuth, err = decoder.DecodeBytes(); err != nil {
+					return
+				}
+			}
+		default:
+			return fmt.Errorf("Auth.Unpack: Expected KeyUserName or KeyTuple")
 		}
 	}
 

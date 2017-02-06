@@ -3,10 +3,11 @@ package tarantool
 import (
 	"bufio"
 	"bytes"
-	"fmt"
-	"net"
 	"encoding/base64"
-	"math/rand"
+	"fmt"
+	"crypto/rand"
+	"net"
+	"sync"
 )
 
 const greetingSize = 128
@@ -14,21 +15,27 @@ const saltSize = 32
 const tarantoolVersion = "Tarantool 1.6.8 (Binary)"
 const connBufSize = 128 * 1024
 
+type QueryHandler func(query Query) *Result
+
 type IprotoServer struct {
-	conn   net.Conn
-	reader *bufio.Reader
-	writer *bufio.Writer
-	uuid   string
-	salt   []byte
-	quit   chan bool
+	conn    net.Conn
+	reader  *bufio.Reader
+	writer  *bufio.Writer
+	uuid    string
+	salt    []byte
+	quit    chan bool
+	handler QueryHandler
+	output  chan []byte
+	closeOnce sync.Once
 }
 
-func NewIprotoServer(uuid string) *IprotoServer {
+func NewIprotoServer(uuid string, handler QueryHandler) *IprotoServer {
 	return &IprotoServer{
-		conn:   nil,
-		reader: nil,
-		writer: nil,
-		uuid:   uuid,
+		conn:    nil,
+		reader:  nil,
+		writer:  nil,
+		handler: handler,
+		uuid:    uuid,
 	}
 }
 
@@ -37,6 +44,7 @@ func (s *IprotoServer) Accept(conn net.Conn) {
 	s.reader = bufio.NewReaderSize(conn, connBufSize)
 	s.writer = bufio.NewWriterSize(conn, connBufSize)
 	s.quit = make(chan bool)
+	s.output = make(chan []byte, 1024)
 
 	err := s.greet()
 	if err != nil {
@@ -44,11 +52,14 @@ func (s *IprotoServer) Accept(conn net.Conn) {
 		return
 	}
 
-	s.loop()
+	go s.loop()
 }
 
 func (s *IprotoServer) Close() {
-	close(s.quit)
+	s.closeOnce.Do(func() {
+		close(s.quit)
+		s.conn.Close()
+	})
 }
 
 func (s *IprotoServer) greet() (err error) {
@@ -63,9 +74,9 @@ func (s *IprotoServer) greet() (err error) {
 	}
 
 	line1 = fmt.Sprintf("%s %s", tarantoolVersion, s.uuid)
-	line2 = fmt.Sprintf("%s", base64.URLEncoding.EncodeToString(s.salt))
+	line2 = fmt.Sprintf("%s", base64.StdEncoding.EncodeToString(s.salt))
 
-	format = fmt.Sprintf("%%-%ds\n%%-%ds\n", greetingSize/2 - 1, greetingSize/2 - 1)
+	format = fmt.Sprintf("%%-%ds\n%%-%ds\n", greetingSize/2-1, greetingSize/2-1)
 	greeting = fmt.Sprintf(format, line1, line2)
 
 	// send greeting
@@ -86,7 +97,6 @@ func (s *IprotoServer) read() {
 	var packet *Packet
 	var err error
 	var body []byte
-	//var req *request
 
 	r := s.reader
 
@@ -107,16 +117,78 @@ READER_LOOP:
 				break READER_LOOP
 			}
 
-			fmt.Println("packet ", packet.Code)
+			if packet.request != nil {
+				go func(packet *Packet) {
+					var res *Result
+					var code = byte(packet.Code)
+
+					if code == AuthRequest {
+						res = s.handler(packet.request.(Query))
+						if res.Error == nil {
+							s.output <- packIprotoOk(packet.requestID)
+						} else {
+							body, _ = res.pack(packet.requestID)
+							s.output <- body
+						}
+					} else if code == PingRequest {
+						s.output <- packIprotoOk(packet.requestID)
+					} else {
+						res = s.handler(packet.request.(Query))
+						body, _ = res.pack(packet.requestID)
+						s.output <- body
+					}
+				}(packet)
+			}
 		}
 	}
+
+	fmt.Println("err", err)
+
+	s.Close()
 }
 
 func (s *IprotoServer) write() {
+	var err error
+	var n int
+
+	w := s.writer
+
+WRITER_LOOP:
 	for {
 		select {
+		case messageBody, ok := <-s.output:
+			if !ok {
+				break WRITER_LOOP
+			}
+			n, err = w.Write(messageBody)
+			if err != nil || n != len(messageBody) {
+				break WRITER_LOOP
+			}
 		case <-s.quit:
-			return
+			break WRITER_LOOP
+		default:
+			if err = w.Flush(); err != nil {
+				break WRITER_LOOP
+			}
+
+			// same without flush
+			select {
+			case messageBody, ok := <-s.output:
+				if !ok {
+					break WRITER_LOOP
+				}
+				n, err = w.Write(messageBody)
+				if err != nil || n != len(messageBody) {
+					break WRITER_LOOP
+				}
+			case <-s.quit:
+				break WRITER_LOOP
+			}
+
 		}
 	}
+
+	fmt.Println("err", err)
+
+	s.Close()
 }

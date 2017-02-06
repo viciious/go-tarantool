@@ -1,6 +1,6 @@
 package tarantool
 
-import "gopkg.in/vmihailenco/msgpack.v2"
+import "bytes"
 
 type Ping struct {
 }
@@ -11,6 +11,6 @@ func (s *Ping) Pack(requestID uint32, data *packData) ([]byte, error) {
 	return packIproto(PingRequest, requestID, []byte{}), nil
 }
 
-func (q *Ping) Unpack(decoder *msgpack.Decoder) error {
+func (q *Ping) Unpack(r *bytes.Buffer) error {
 	return nil
 }
