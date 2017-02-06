@@ -32,7 +32,7 @@ func (s *Select) Pack(requestID uint32, data *packData) ([]byte, error) {
 	}
 
 	// Index
-	if err = data.writeIndex(s.Space, s.Index, bodyBuffer, encoder); err != nil {
+	if err = data.writeIndex(s.Space, s.Index, &bodyBuffer, encoder); err != nil {
 		return nil, err
 	}
 

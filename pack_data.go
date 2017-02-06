@@ -149,7 +149,7 @@ func (data *packData) indexNo(space interface{}, index interface{}) (uint64, err
 	}
 }
 
-func (data *packData) writeIndex(space interface{}, index interface{}, buffer bytes.Buffer, encoder *msgpack.Encoder) error {
+func (data *packData) writeIndex(space interface{}, index interface{}, buffer *bytes.Buffer, encoder *msgpack.Encoder) error {
 	if index == nil {
 		buffer.Write(data.packedDefaultIndex)
 		return nil
