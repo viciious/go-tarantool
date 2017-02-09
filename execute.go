@@ -13,7 +13,7 @@ type QueryOptions struct {
 func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 	requestID := conn.nextID()
 
-	packed, err := r.query.Pack(requestID, conn.packData)
+	code, packed, err := r.query.Pack(conn.packData)
 	if err != nil {
 		return &Result{
 			Error: &QueryError{
@@ -31,7 +31,7 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 	}
 
 	select {
-	case conn.writeChan <- packed:
+	case conn.writeChan <- packIproto(code, requestID, packed):
 		// pass
 	case <-ctx.Done():
 		err := ctx.Err()

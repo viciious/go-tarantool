@@ -3,9 +3,9 @@ package tarantool
 import (
 	"bufio"
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"crypto/rand"
 	"net"
 	"sync"
 )
@@ -18,14 +18,14 @@ const connBufSize = 128 * 1024
 type QueryHandler func(query Query) *Result
 
 type IprotoServer struct {
-	conn    net.Conn
-	reader  *bufio.Reader
-	writer  *bufio.Writer
-	uuid    string
-	salt    []byte
-	quit    chan bool
-	handler QueryHandler
-	output  chan []byte
+	conn      net.Conn
+	reader    *bufio.Reader
+	writer    *bufio.Writer
+	uuid      string
+	salt      []byte
+	quit      chan bool
+	handler   QueryHandler
+	output    chan []byte
 	closeOnce sync.Once
 }
 
@@ -53,6 +53,24 @@ func (s *IprotoServer) Accept(conn net.Conn) {
 	}
 
 	go s.loop()
+}
+
+func (s *IprotoServer) CheckAuth(hash []byte, password string) bool {
+	scr, err := scramble(s.salt, password)
+	if err != nil {
+		return false
+	}
+
+	if len(scr) != len(hash) {
+		return false
+	}
+
+	for i, v := range hash {
+		if v != scr[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *IprotoServer) Close() {
@@ -120,17 +138,9 @@ READER_LOOP:
 			if packet.request != nil {
 				go func(packet *Packet) {
 					var res *Result
-					var code = byte(packet.Code)
+					var code = byte(packet.code)
 
-					if code == AuthRequest {
-						res = s.handler(packet.request.(Query))
-						if res.Error == nil {
-							s.output <- packIprotoOk(packet.requestID)
-						} else {
-							body, _ = res.pack(packet.requestID)
-							s.output <- body
-						}
-					} else if code == PingRequest {
+					if code == PingRequest {
 						s.output <- packIprotoOk(packet.requestID)
 					} else {
 						res = s.handler(packet.request.(Query))
@@ -141,8 +151,6 @@ READER_LOOP:
 			}
 		}
 	}
-
-	fmt.Println("err", err)
 
 	s.Close()
 }
@@ -165,6 +173,7 @@ WRITER_LOOP:
 				break WRITER_LOOP
 			}
 		case <-s.quit:
+			w.Flush()
 			break WRITER_LOOP
 		default:
 			if err = w.Flush(); err != nil {
@@ -182,13 +191,12 @@ WRITER_LOOP:
 					break WRITER_LOOP
 				}
 			case <-s.quit:
+				w.Flush()
 				break WRITER_LOOP
 			}
 
 		}
 	}
-
-	fmt.Println("err", err)
 
 	s.Close()
 }

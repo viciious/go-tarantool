@@ -160,21 +160,22 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	}
 
 	if options.User != "" {
+		var authCode byte
 		var authRaw []byte
 		var authResponse *Packet
 
-		authRequestID := conn.nextID()
+		requestID := conn.nextID()
 
-		authRaw, err = (&Auth{
+		authCode, authRaw, err = (&Auth{
 			User:         options.User,
 			Password:     options.Password,
 			GreetingAuth: conn.Greeting.Auth,
-		}).Pack(authRequestID, conn.packData)
+		}).Pack(conn.packData)
 		if err != nil {
 			return
 		}
 
-		_, err = conn.tcpConn.Write(authRaw)
+		_, err = conn.tcpConn.Write(packIproto(authCode, requestID, authRaw))
 		if err != nil {
 			return
 		}
@@ -184,13 +185,13 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 			return
 		}
 
-		if authResponse.requestID != authRequestID {
+		if authResponse.requestID != requestID {
 			err = errors.New("Bad auth responseID")
 			return
 		}
 
-		if authResponse.Error != nil {
-			err = authResponse.Error
+		if authResponse.result != nil && authResponse.result.Error != nil {
+			err = authResponse.result.Error
 			return
 		}
 	}
@@ -199,27 +200,34 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	request := func(req Query) (*Result, error) {
 		var err error
 		requestID := conn.nextID()
-		packedReq, _ := (req).Pack(requestID, conn.packData)
-
-		_, err = conn.tcpConn.Write(packedReq)
+		packedCode, packedReq, err := (req).Pack(conn.packData)
 		if err != nil {
 			return nil, err
 		}
 
-		res, err := read(conn.tcpConn)
+		_, err = conn.tcpConn.Write(packIproto(packedCode, requestID, packedReq))
 		if err != nil {
 			return nil, err
 		}
 
-		if res.requestID != requestID {
-			return nil, errors.New("Bad auth responseID")
+		response, err := read(conn.tcpConn)
+		if err != nil {
+			return nil, err
 		}
 
-		if res.Error != nil {
-			return nil, res.Error
+		if response.requestID != requestID {
+			return nil, errors.New("Bad response requestID")
 		}
 
-		return &Result{Data: res.Data}, nil
+		if response.result == nil {
+			return nil, errors.New("Nil response result")
+		}
+
+		if response.result.Error != nil {
+			return nil, response.result.Error
+		}
+
+		return response.result, nil
 	}
 
 	res, err := request(&Select{
@@ -398,16 +406,13 @@ READER_LOOP:
 
 		req = conn.requests.Pop(packet.requestID)
 		if req != nil {
-			res := &Result{Error: packet.Error}
-			if packet.Error == nil {
-				// finish decode message body
-				err = packet.decodeBody(packet.buf)
-				if err != nil {
-					res.Error = err
-				} else {
-					res.Error = packet.Error
-					res.Data = packet.Data
-				}
+			res := &Result{}
+			// finish decode message body
+			err = packet.decodeBody(packet.buf)
+			if err != nil {
+				res.Error = err
+			} else if packet.result != nil {
+				res = packet.result
 			}
 
 			req.replyChan <- res

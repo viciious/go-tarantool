@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"bytes"
 	"os"
 	"testing"
 
@@ -60,6 +61,18 @@ func TestCall(t *testing.T) {
 
 		defer conn.Close()
 
+		_, packed, err := query.Pack(conn.packData)
+
+		if assert.NoError(err) {
+			var query2 = &Call{}
+			err = query2.Unpack(bytes.NewBuffer(packed))
+
+			if assert.NoError(err) {
+				assert.Equal(query.Name, query2.Name)
+				assert.Equal(query.Tuple, query2.Tuple)
+			}
+		}
+
 		data, err := conn.Execute(query)
 
 		if assert.NoError(err) {
@@ -93,7 +106,7 @@ func TestCall(t *testing.T) {
 	do(nil,
 		&Call{
 			Name:  "sel_name",
-			Tuple: []interface{}{2, "Music"},
+			Tuple: []interface{}{uint64(2), "Music"},
 		},
 		[][]interface{}{
 			[]interface{}{
@@ -109,6 +122,6 @@ func BenchmarkCallPack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
-		(&Call{Name: "sel_all"}).Pack(0, d)
+		(&Call{Name: "sel_all"}).Pack(d)
 	}
 }

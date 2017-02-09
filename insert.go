@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"bytes"
+	"errors"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -13,9 +14,13 @@ type Insert struct {
 
 var _ Query = (*Insert)(nil)
 
-func (s *Insert) Pack(requestID uint32, data *packData) ([]byte, error) {
+func (s *Insert) Pack(data *packData) (byte, []byte, error) {
 	var bodyBuffer bytes.Buffer
 	var err error
+
+	if s.Tuple == nil {
+		return BadRequest, nil, errors.New("Tuple can not be nil")
+	}
 
 	encoder := msgpack.NewEncoder(&bodyBuffer)
 
@@ -23,23 +28,60 @@ func (s *Insert) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	// Space
 	if err = data.writeSpace(s.Space, &bodyBuffer, encoder); err != nil {
-		return nil, err
+		return BadRequest, nil, err
 	}
 
 	// Tuple
-	if s.Tuple != nil {
-		encoder.EncodeUint32(KeyTuple)
-		encoder.EncodeArrayLen(len(s.Tuple))
-		for _, value := range s.Tuple {
-			if err = encoder.Encode(value); err != nil {
-				return nil, err
+	encoder.EncodeUint32(KeyTuple)
+	encoder.EncodeArrayLen(len(s.Tuple))
+	for _, value := range s.Tuple {
+		if err = encoder.Encode(value); err != nil {
+			return BadRequest, nil, err
+		}
+	}
+
+	return InsertRequest, bodyBuffer.Bytes(), nil
+}
+
+func (q *Insert) Unpack(r *bytes.Buffer) (err error) {
+	var i int
+	var k int
+	var t uint
+
+	q.Space = nil
+	q.Tuple = nil
+
+	decoder := msgpack.NewDecoder(r)
+
+	if i, err = decoder.DecodeMapLen(); err != nil {
+		return
+	}
+
+	for ; i > 0; i-- {
+		if k, err = decoder.DecodeInt(); err != nil {
+			return
+		}
+
+		switch k {
+		case KeySpaceNo:
+			if t, err = decoder.DecodeUint(); err != nil {
+				return
+			}
+			q.Space = int(t)
+		case KeyTuple:
+			q.Tuple, err = decoder.DecodeSlice()
+			if err != nil {
+				return err
 			}
 		}
 	}
 
-	return packIproto(InsertRequest, requestID, bodyBuffer.Bytes()), nil
-}
+	if q.Space == nil {
+		return errors.New("Insert.Unpack: no space specified")
+	}
+	if q.Tuple == nil {
+		return errors.New("Insert.Unpack: no tuple specified")
+	}
 
-func (q *Insert) Unpack(r *bytes.Buffer) error {
 	return nil
 }

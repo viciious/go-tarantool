@@ -3,7 +3,7 @@ package tarantool
 import "bytes"
 
 type Query interface {
-	Pack(requestID uint32, data *packData) ([]byte, error)
+	Pack(data *packData) (byte, []byte, error)
 	Unpack(r *bytes.Buffer) error
 }
 

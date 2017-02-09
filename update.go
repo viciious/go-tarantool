@@ -16,7 +16,7 @@ type Update struct {
 
 var _ Query = (*Update)(nil)
 
-func (s *Update) Pack(requestID uint32, data *packData) ([]byte, error) {
+func (s *Update) Pack(data *packData) (byte, []byte, error) {
 	var bodyBuffer bytes.Buffer
 	var err error
 
@@ -26,26 +26,26 @@ func (s *Update) Pack(requestID uint32, data *packData) ([]byte, error) {
 
 	// Space
 	if err = data.writeSpace(s.Space, &bodyBuffer, encoder); err != nil {
-		return nil, err
+		return BadRequest, nil, err
 	}
 
 	// Index
 	if err = data.writeIndex(s.Space, s.Index, &bodyBuffer, encoder); err != nil {
-		return nil, err
+		return BadRequest, nil, err
 	}
 
 	// Key
 	if s.Key != nil {
 		bodyBuffer.Write(data.packedSingleKey)
 		if err = encoder.Encode(s.Key); err != nil {
-			return nil, err
+			return BadRequest, nil, err
 		}
 	} else if s.KeyTuple != nil {
 		encoder.EncodeUint32(KeyKey)
 		encoder.EncodeArrayLen(len(s.KeyTuple))
 		for _, key := range s.KeyTuple {
 			if err = encoder.Encode(key); err != nil {
-				return nil, err
+				return BadRequest, nil, err
 			}
 		}
 	}
@@ -58,14 +58,16 @@ func (s *Update) Pack(requestID uint32, data *packData) ([]byte, error) {
 		encoder.EncodeArrayLen(len(t))
 		for _, value := range t {
 			if err = encoder.Encode(value); err != nil {
-				return nil, err
+				return BadRequest, nil, err
 			}
 		}
 	}
 
-	return packIproto(UpdateRequest, requestID, bodyBuffer.Bytes()), nil
+	return UpdateRequest, bodyBuffer.Bytes(), nil
 }
 
 func (q *Update) Unpack(r *bytes.Buffer) error {
-	return nil
+	decoder := msgpack.NewDecoder(r)
+	_, err := decoder.DecodeInterface()
+	return err
 }

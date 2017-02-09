@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,23 @@ func TestReplace(t *testing.T) {
 
 	defer conn.Close()
 
-	data, err := conn.Execute(&Replace{
+	do := func(query *Replace) ([][]interface{}, error) {
+		_, packed, err := query.Pack(conn.packData)
+
+		if assert.NoError(err) {
+			var query2 = &Replace{}
+			err = query2.Unpack(bytes.NewBuffer(packed))
+
+			if assert.NoError(err) {
+				assert.Equal(42, query2.Space)
+				assert.Equal(query.Tuple, query2.Tuple)
+			}
+		}
+
+		return conn.Execute(query)
+	}
+
+	data, err := do(&Replace{
 		Space: "tester",
 		Tuple: []interface{}{uint64(4), "Hello"},
 	})
@@ -49,7 +66,7 @@ func TestReplace(t *testing.T) {
 		}, data)
 	}
 
-	data, err = conn.Execute(&Replace{
+	data, err = do(&Replace{
 		Space: "tester",
 		Tuple: []interface{}{uint64(4), "World"},
 	})
@@ -68,6 +85,6 @@ func BenchmarkReplacePack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
-		(&Replace{Tuple: []interface{}{3, "Hello world"}}).Pack(0, d)
+		(&Replace{Tuple: []interface{}{3, "Hello world"}}).Pack(d)
 	}
 }

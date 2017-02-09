@@ -9,11 +9,10 @@ import (
 )
 
 type Packet struct {
-	Code      uint32
-	Error     error
-	Data      [][]interface{}
-	request   interface{}
+	code      uint32
 	requestID uint32
+	request   interface{}
+	result    *Result
 	buf       *bytes.Buffer // read buffer. For delayer unpack
 }
 
@@ -119,7 +118,7 @@ func (pack *Packet) decodeHeader(r *bytes.Buffer) (err error) {
 				return
 			}
 		case KeyCode:
-			if pack.Code, err = d.DecodeUint32(); err != nil {
+			if pack.code, err = d.DecodeUint32(); err != nil {
 				return
 			}
 		case KeySchemaID:
@@ -136,59 +135,51 @@ func (pack *Packet) decodeHeader(r *bytes.Buffer) (err error) {
 }
 
 func (pack *Packet) decodeBody(r *bytes.Buffer) (err error) {
+	unpackq := func(q Query) error {
+		if err := q.Unpack(r); err != nil {
+			return err
+		}
+		pack.request = q
+		return nil
+	}
+
+	unpackr := func(errorCode uint32) error {
+		res := &Result{ErrorCode: errorCode}
+		if err := res.unpack(r); err != nil {
+			return err
+		}
+		pack.result = res
+		return nil
+	}
+
 	if r.Len() > 2 {
-		var code = byte(pack.Code)
-		switch code {
+		if pack.code&uint32(ErrorFlag) != 0 {
+			// error
+			return unpackr(pack.code - ErrorFlag)
+		}
+
+		switch byte(pack.code) {
 		case SelectRequest:
-			q := &Select{}
-			if err = q.Unpack(r); err != nil {
-				return
-			}
-			pack.request = q
-			return
+			return unpackq(&Select{})
 		case AuthRequest:
-			q := &Auth{}
-			if err = q.Unpack(r); err != nil {
-				return
-			}
-			pack.request = q
-			return
+			return unpackq(&Auth{})
+		case InsertRequest:
+			return unpackq(&Insert{})
+		case ReplaceRequest:
+			return unpackq(&Replace{})
+		case DeleteRequest:
+			return unpackq(&Delete{})
+		case CallRequest:
+			return unpackq(&Call{})
+		case UpdateRequest:
+			return unpackq(&Update{})
+		case UpsertRequest:
+			return unpackq(&Upsert{})
 		default:
-			var l int
-			d := msgpack.NewDecoder(r)
-			if l, err = d.DecodeMapLen(); err != nil {
-				return
-			}
-			for ; l > 0; l-- {
-				var cd int
-				if cd, err = d.DecodeInt(); err != nil {
-					return
-				}
-				switch cd {
-				case KeyData:
-					value, err := d.DecodeInterface()
-					if err != nil {
-						return err
-					}
-					v := value.([]interface{})
-					pack.Data = make([]([]interface{}), len(v))
-					for i := 0; i < len(v); i++ {
-						pack.Data[i] = v[i].([]interface{})
-					}
-				case KeyError:
-					errorMessage, err := d.DecodeString()
-					if err != nil {
-						return err
-					}
-					pack.Error = NewQueryError(errorMessage)
-				default:
-					if _, err = d.DecodeInterface(); err != nil {
-						return
-					}
-				}
-			}
+			return unpackr(OkCode)
 		}
 	}
+
 	return
 }
 

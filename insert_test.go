@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,28 @@ func TestInsert(t *testing.T) {
 
 	defer conn.Close()
 
-	data, err := conn.Execute(&Insert{
+	do := func(query *Insert) ([][]interface{}, error) {
+		var err error
+		_, packed, err := query.Pack(conn.packData)
+
+		if assert.NoError(err) {
+			var query2 = &Insert{}
+			err = query2.Unpack(bytes.NewBuffer(packed))
+
+			if assert.NoError(err) {
+				assert.Equal(42, query2.Space)
+				assert.Equal(query.Tuple, query2.Tuple)
+			} else {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
+
+		return conn.Execute(query)
+	}
+
+	data, err := do(&Insert{
 		Space: "tester",
 		Tuple: []interface{}{uint64(4), "Hello"},
 	})
@@ -49,9 +71,9 @@ func TestInsert(t *testing.T) {
 		}, data)
 	}
 
-	data, err = conn.Execute(&Insert{
+	data, err = do(&Insert{
 		Space: "tester",
-		Tuple: []interface{}{4, "World"},
+		Tuple: []interface{}{uint64(4), "World"},
 	})
 
 	if assert.Error(err) {
@@ -63,6 +85,6 @@ func BenchmarkInsertPack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
-		(&Insert{Tuple: []interface{}{3, "Hello world"}}).Pack(0, d)
+		(&Insert{Tuple: []interface{}{3, "Hello world"}}).Pack(d)
 	}
 }

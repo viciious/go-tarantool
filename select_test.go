@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,6 +43,37 @@ func TestSelect(t *testing.T) {
 
 		defer conn.Close()
 
+		_, packed, err := query.Pack(conn.packData)
+
+		if assert.NoError(err) {
+			var query2 = &Select{}
+			err = query2.Unpack(bytes.NewBuffer(packed))
+
+			if assert.NoError(err) {
+				assert.Equal(42, query2.Space)
+				if query.Key != nil {
+					switch query.Key.(type) {
+					case int:
+						assert.Equal(query.Key, query2.Key)
+					default:
+						assert.Equal(query.Key, query2.Key)
+					}
+				}
+				if query.KeyTuple != nil {
+					assert.Equal(query.KeyTuple, query2.KeyTuple)
+				}
+				if query.Index != nil {
+					switch query.Index.(type) {
+					case string:
+						assert.Equal(conn.packData.indexMap[42][query.Index.(string)], uint64(query2.Index.(int)))
+					default:
+						assert.Equal(query.Index, query2.Index)
+					}
+				}
+				assert.Equal(query.Iterator, query2.Iterator)
+			}
+		}
+
 		data, err := conn.Execute(query)
 
 		if assert.NoError(err) {
@@ -53,7 +85,7 @@ func TestSelect(t *testing.T) {
 	do(nil,
 		&Select{
 			Space: 42,
-			Key:   3,
+			Key:   uint64(3),
 		},
 		[][]interface{}{
 			[]interface{}{
@@ -68,7 +100,7 @@ func TestSelect(t *testing.T) {
 	do(nil,
 		&Select{
 			Space: "tester",
-			Key:   3,
+			Key:   uint64(3),
 		},
 		[][]interface{}{
 			[]interface{}{
@@ -99,7 +131,7 @@ func TestSelect(t *testing.T) {
 		&Select{
 			Space:    42,
 			Index:    "id_name",
-			KeyTuple: []interface{}{2, "Music"},
+			KeyTuple: []interface{}{uint64(2), "Music"},
 		},
 		[][]interface{}{
 			[]interface{}{
@@ -114,7 +146,7 @@ func TestSelect(t *testing.T) {
 		&Select{
 			Space:    42,
 			Index:    "id_name",
-			KeyTuple: []interface{}{2, "Length"},
+			KeyTuple: []interface{}{uint64(2), "Length"},
 		},
 		[][]interface{}{},
 	)
@@ -186,6 +218,6 @@ func BenchmarkSelectPack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
-		(&Select{Key: 3}).Pack(0, d)
+		(&Select{Key: 3}).Pack(d)
 	}
 }

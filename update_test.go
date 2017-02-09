@@ -82,6 +82,6 @@ func BenchmarkUpdatePack(b *testing.B) {
 					Argument: "Hello World",
 				},
 			},
-		}).Pack(0, d)
+		}).Pack(d)
 	}
 }
