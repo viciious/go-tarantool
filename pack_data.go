@@ -18,6 +18,7 @@ type packData struct {
 	packedSingleKey     []byte
 	spaceMap            map[string]uint64
 	indexMap            map[uint64](map[string]uint64)
+	primaryKeyMap       map[uint64]([]int)
 }
 
 func encodeValues2(v1, v2 interface{}) []byte {
@@ -54,6 +55,7 @@ func newPackData(defaultSpace interface{}) (*packData, error) {
 		packedSingleKey:     packSelectSingleKey(),
 		spaceMap:            make(map[string]uint64),
 		indexMap:            make(map[uint64](map[string]uint64)),
+		primaryKeyMap:       make(map[uint64]([]int)),
 	}
 
 	return d, nil

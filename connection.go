@@ -42,6 +42,7 @@ type Connection struct {
 	queryTimeout time.Duration
 	Greeting     *Greeting
 	packData     *packData
+	remoteAddr   string
 }
 
 func Connect(dsnString string, options *Options) (conn *Connection, err error) {
@@ -126,6 +127,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 
 	connectDeadline := time.Now().Add(opts.ConnectTimeout)
 
+	conn.remoteAddr = remoteAddr
 	conn.tcpConn, err = net.DialTimeout("tcp", remoteAddr, opts.ConnectTimeout)
 	if err != nil {
 		return nil, err
@@ -259,12 +261,29 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 
 	for _, index := range res.Data {
 		spaceID := index[0].(uint64)
+		indexID := index[1].(uint64)
+		indexName := index[2].(string)
+		indexAttr := index[4].(map[interface{}]interface{}) // e.g: {"unique": true}
+		indexFields := index[5].([]interface{})             // e.g: [[0 num] [1 str]]
+
 		indexSpaceMap, exists := conn.packData.indexMap[spaceID]
 		if !exists {
 			indexSpaceMap = make(map[string]uint64)
 			conn.packData.indexMap[spaceID] = indexSpaceMap
 		}
-		indexSpaceMap[index[2].(string)] = index[1].(uint64)
+		indexSpaceMap[indexName] = indexID
+
+		// build list of primary key field numbers for this space, if the PK is detected
+		if indexAttr != nil && indexID == 0 {
+			if unique, ok := indexAttr["unique"]; ok && unique.(bool) {
+				pk := make([]int, len(indexFields))
+				for i := range indexFields {
+					f := indexFields[i].([]interface{})
+					pk[i] = int(f[0].(uint64))
+				}
+				conn.packData.primaryKeyMap[spaceID] = pk
+			}
+		}
 	}
 
 	// remove deadline
@@ -287,9 +306,38 @@ func (conn *Connection) stop() {
 	})
 }
 
+func (conn *Connection) GetPrimaryKeyFields(space interface{}) ([]int, bool) {
+	if conn.packData == nil {
+		return nil, false
+	}
+
+	var spaceID uint64
+	switch space.(type) {
+	case int:
+		spaceID = uint64(space.(int))
+	case uint:
+		spaceID = uint64(space.(uint))
+	case uint32:
+		spaceID = uint64(space.(uint32))
+	case uint64:
+		spaceID = space.(uint64)
+	case string:
+		spaceID = conn.packData.spaceMap[space.(string)]
+	default:
+		return nil, false
+	}
+
+	f, ok := conn.packData.primaryKeyMap[spaceID]
+	return f, ok
+}
+
 func (conn *Connection) Close() {
 	conn.stop()
 	<-conn.closed
+}
+
+func (conn *Connection) String() string {
+	return conn.remoteAddr
 }
 
 func (conn *Connection) IsClosed() bool {
