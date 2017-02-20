@@ -22,7 +22,7 @@ type IprotoServer struct {
 	reader    *bufio.Reader
 	writer    *bufio.Writer
 	uuid      string
-	salt      []byte
+	salt      []byte // base64-encoded salt
 	quit      chan bool
 	handler   QueryHandler
 	output    chan []byte
@@ -85,14 +85,16 @@ func (s *IprotoServer) greet() (err error) {
 	var format, greeting string
 	var n int
 
-	s.salt = make([]byte, saltSize)
+	salt := make([]byte, saltSize)
 	_, err = rand.Read(s.salt)
 	if err != nil {
 		return
 	}
 
+	s.salt = []byte(base64.StdEncoding.EncodeToString(salt))
+
 	line1 = fmt.Sprintf("%s %s", tarantoolVersion, s.uuid)
-	line2 = fmt.Sprintf("%s", base64.StdEncoding.EncodeToString(s.salt))
+	line2 = fmt.Sprintf("%s", s.salt)
 
 	format = fmt.Sprintf("%%-%ds\n%%-%ds\n", greetingSize/2-1, greetingSize/2-1)
 	greeting = fmt.Sprintf(format, line1, line2)
