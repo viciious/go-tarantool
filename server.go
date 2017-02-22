@@ -16,29 +16,29 @@ const tarantoolVersion = "Tarantool 1.6.8 (Binary)"
 const connBufSize = 128 * 1024
 
 type QueryHandler func(query Query) *Result
-type OnDisconnectCallback func()
+type OnCloseCallback func()
 
 type IprotoServer struct {
-	conn          net.Conn
-	reader        *bufio.Reader
-	writer        *bufio.Writer
-	uuid          string
-	salt          []byte // base64-encoded salt
-	quit          chan bool
-	handler       QueryHandler
-	on_disconnect OnDisconnectCallback
-	output        chan []byte
-	closeOnce     sync.Once
+	conn      net.Conn
+	reader    *bufio.Reader
+	writer    *bufio.Writer
+	uuid      string
+	salt      []byte // base64-encoded salt
+	quit      chan bool
+	handler   QueryHandler
+	onClose   OnCloseCallback
+	output    chan []byte
+	closeOnce sync.Once
 }
 
-func NewIprotoServer(uuid string, handler QueryHandler, on_disconnect OnDisconnectCallback) *IprotoServer {
+func NewIprotoServer(uuid string, handler QueryHandler, onClose OnCloseCallback) *IprotoServer {
 	return &IprotoServer{
-		conn:          nil,
-		reader:        nil,
-		writer:        nil,
-		handler:       handler,
-		on_disconnect: on_disconnect,
-		uuid:          uuid,
+		conn:    nil,
+		reader:  nil,
+		writer:  nil,
+		handler: handler,
+		onClose: onClose,
+		uuid:    uuid,
 	}
 }
 
@@ -78,8 +78,8 @@ func (s *IprotoServer) CheckAuth(hash []byte, password string) bool {
 
 func (s *IprotoServer) Close() {
 	s.closeOnce.Do(func() {
-		if s.on_disconnect != nil {
-			s.on_disconnect()
+		if s.onClose != nil {
+			s.onClose()
 		}
 		close(s.quit)
 		s.conn.Close()
