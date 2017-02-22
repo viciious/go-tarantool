@@ -7,7 +7,7 @@ import (
 )
 
 type Result struct {
-	ErrorCode uint32
+	ErrorCode int
 	Error     error
 	Data      [][]interface{}
 }

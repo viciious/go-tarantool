@@ -9,7 +9,7 @@ import (
 )
 
 type Packet struct {
-	code      uint32
+	code      int
 	requestID uint32
 	request   interface{}
 	result    *Result
@@ -118,7 +118,7 @@ func (pack *Packet) decodeHeader(r *bytes.Buffer) (err error) {
 				return
 			}
 		case KeyCode:
-			if pack.code, err = d.DecodeUint32(); err != nil {
+			if pack.code, err = d.DecodeInt(); err != nil {
 				return
 			}
 		case KeySchemaID:
@@ -143,7 +143,7 @@ func (pack *Packet) decodeBody(r *bytes.Buffer) (err error) {
 		return nil
 	}
 
-	unpackr := func(errorCode uint32) error {
+	unpackr := func(errorCode int) error {
 		res := &Result{ErrorCode: errorCode}
 		if err := res.unpack(r); err != nil {
 			return err
@@ -153,7 +153,7 @@ func (pack *Packet) decodeBody(r *bytes.Buffer) (err error) {
 	}
 
 	if r.Len() > 2 {
-		if pack.code&uint32(ErrorFlag) != 0 {
+		if pack.code&ErrorFlag != 0 {
 			// error
 			return unpackr(pack.code - ErrorFlag)
 		}

@@ -97,7 +97,7 @@ func packIproto(code interface{}, requestID uint32, body []byte) []byte {
 	return append(h[:], body...)
 }
 
-func packIprotoError(code uint32, requestID uint32, body []byte) []byte {
+func packIprotoError(code int, requestID uint32, body []byte) []byte {
 	return packIproto(ErrorFlag|code, requestID, body)
 }
 

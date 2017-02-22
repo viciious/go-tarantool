@@ -47,7 +47,7 @@ const (
 	IterBitsAnySet    = uint8(8) // at least one x's bit is set
 	IterBitsAllNotSet = uint8(9) // all bits are not set
 
-	OkCode            = uint32(0)
+	OkCode            = 0
 	PacketLengthBytes = 5
 	ErrorFlag         = 0x8000
 )
