@@ -16,6 +16,7 @@ import (
 // Box is tarantool instance. For start/stop tarantool in tests
 type Box struct {
 	Root     string
+	WorkDir  string
 	Port     uint
 	Listen   string
 	cmd      *exec.Cmd
@@ -30,6 +31,7 @@ type BoxOptions struct {
 	Port    uint
 	PortMin uint
 	PortMax uint
+	WorkDir string
 }
 
 var (
@@ -93,6 +95,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 
 		box = &Box{
 			Root:    tmpDir,
+			WorkDir: options.WorkDir,
 			Listen:  fmt.Sprintf("%s%d", options.Host, port),
 			Port:    port,
 			cmd:     nil,
@@ -136,6 +139,19 @@ func (box *Box) StartWithLua(luaTransform func(string) string) error {
 	err := ioutil.WriteFile(initLuaFile, []byte(initLua), 0644)
 	if err != nil {
 		return err
+	}
+
+	if box.WorkDir != "" {
+		oldwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+
+		err = os.Chdir(box.WorkDir)
+		if err != nil {
+			return err
+		}
+		defer os.Chdir(oldwd)
 	}
 
 	cmd := exec.Command("tarantool", initLuaFile)
