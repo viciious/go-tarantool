@@ -71,7 +71,6 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 
 		initLua := `
 			box.cfg{
-				listen = "{host}{port}",
 				snap_dir = "{root}/snap/",
 				sophia_dir = "{root}/sophia/",
 				wal_dir = "{root}/wal/"
@@ -79,6 +78,9 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 			box.once('guest:read_universe', function()
 				box.schema.user.grant('guest', 'read', 'universe', {if_not_exists = true})
 			end)
+			box.cfg{
+				listen = "{host}{port}",
+			}
 		`
 
 		initLua = strings.Replace(initLua, "{host}", options.Host, -1)
@@ -173,7 +175,7 @@ func (box *Box) StartWithLua(luaTransform func(string) string) error {
 	box.stderr = boxStderr
 
 	for {
-		if strings.Contains(boxStderrBuffer.String(), "entering the event loop") {
+		if strings.Contains(boxStderrBuffer.String(), "bound to") {
 			break
 		}
 
