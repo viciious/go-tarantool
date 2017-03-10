@@ -78,15 +78,17 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 			box.once('guest:read_universe', function()
 				box.schema.user.grant('guest', 'read', 'universe', {if_not_exists = true})
 			end)
+		`
+		listenLua := `
 			box.cfg{
 				listen = "{host}{port}",
 			}
 		`
 
+		initLua = fmt.Sprintf("%s\n%s\n%s", initLua, config, listenLua)
 		initLua = strings.Replace(initLua, "{host}", options.Host, -1)
 		initLua = strings.Replace(initLua, "{port}", fmt.Sprintf("%d", port), -1)
 		initLua = strings.Replace(initLua, "{root}", tmpDir, -1)
-		initLua = fmt.Sprintf("%s\n%s", initLua, config)
 
 		for _, subDir := range []string{"sophia", "snap", "wal"} {
 			err = os.Mkdir(path.Join(tmpDir, subDir), 0755)
