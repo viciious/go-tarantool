@@ -92,7 +92,7 @@ func (s *IprotoServer) greet() (err error) {
 	var n int
 
 	salt := make([]byte, saltSize)
-	_, err = rand.Read(s.salt)
+	_, err = rand.Read(salt)
 	if err != nil {
 		return
 	}
