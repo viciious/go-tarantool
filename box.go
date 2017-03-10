@@ -72,7 +72,6 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 		initLua := `
 			box.cfg{
 				snap_dir = "{root}/snap/",
-				sophia_dir = "{root}/sophia/",
 				wal_dir = "{root}/wal/"
 			}
 			box.once('guest:read_universe', function()
@@ -90,7 +89,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 		initLua = strings.Replace(initLua, "{port}", fmt.Sprintf("%d", port), -1)
 		initLua = strings.Replace(initLua, "{root}", tmpDir, -1)
 
-		for _, subDir := range []string{"sophia", "snap", "wal"} {
+		for _, subDir := range []string{"snap", "wal"} {
 			err = os.Mkdir(path.Join(tmpDir, subDir), 0755)
 			if err != nil {
 				return nil, err
