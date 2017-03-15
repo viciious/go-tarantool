@@ -225,7 +225,7 @@ func (box *Box) StartWithLua(luaTransform func(string) string) error {
 					box.Close()
 					return fmt.Errorf("Box status is '%s', not READY", status)
 				}
-			case <-time.After(time.Second):
+			case <-time.After(time.Millisecond * 50):
 				box.Close()
 				return ErrPortAlreadyInUse
 			}
