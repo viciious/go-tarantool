@@ -16,15 +16,15 @@ import (
 
 // Box is tarantool instance. For start/stop tarantool in tests
 type Box struct {
-	Root     string
-	WorkDir  string
-	Port     uint
-	Listen   string
-	cmd      *exec.Cmd
-	stopOnce sync.Once
-	stopped  chan bool
-	initLua  string
-	notSock  string
+	Root       string
+	WorkDir    string
+	Port       uint
+	Listen     string
+	cmd        *exec.Cmd
+	stopOnce   sync.Once
+	stopped    chan bool
+	initLua    string
+	notifySock string
 }
 
 type BoxOptions struct {
@@ -69,7 +69,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 		if err != nil {
 			return nil, err
 		}
-		notSock := filepath.Join(tmpDir, "not.sock")
+		notifySock := filepath.Join(tmpDir, "notify.sock")
 
 		initLua := `
 			local sendstatus = function(status)
@@ -112,7 +112,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 		initLua = strings.Replace(initLua, "{host}", options.Host, -1)
 		initLua = strings.Replace(initLua, "{port}", fmt.Sprintf("%d", port), -1)
 		initLua = strings.Replace(initLua, "{root}", tmpDir, -1)
-		initLua = strings.Replace(initLua, "{notify_sock_path}", notSock, -1)
+		initLua = strings.Replace(initLua, "{notify_sock_path}", notifySock, -1)
 
 		for _, subDir := range []string{"snap", "wal"} {
 			err = os.Mkdir(path.Join(tmpDir, subDir), 0755)
@@ -122,14 +122,14 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 		}
 
 		box = &Box{
-			Root:    tmpDir,
-			WorkDir: options.WorkDir,
-			Listen:  fmt.Sprintf("%s%d", options.Host, port),
-			Port:    port,
-			cmd:     nil,
-			stopped: make(chan bool),
-			initLua: initLua,
-			notSock: notSock,
+			Root:       tmpDir,
+			WorkDir:    options.WorkDir,
+			Listen:     fmt.Sprintf("%s%d", options.Host, port),
+			Port:       port,
+			cmd:        nil,
+			stopped:    make(chan bool),
+			initLua:    initLua,
+			notifySock: notifySock,
 		}
 		close(box.stopped)
 
@@ -183,11 +183,11 @@ func (box *Box) StartWithLua(luaTransform func(string) string) error {
 	}
 
 	statusCh := make(chan string, 10)
-	u, err := net.ListenUnixgram("unixgram", &net.UnixAddr{box.notSock, "unix"})
+	u, err := net.ListenUnixgram("unixgram", &net.UnixAddr{box.notifySock, "unix"})
 	if err != nil {
 		return err
 	}
-	defer os.Remove(box.notSock)
+	defer os.Remove(box.notifySock)
 
 	go func() {
 		for {
