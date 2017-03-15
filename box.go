@@ -1,16 +1,17 @@
 package tarantool
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Box is tarantool instance. For start/stop tarantool in tests
@@ -20,10 +21,10 @@ type Box struct {
 	Port     uint
 	Listen   string
 	cmd      *exec.Cmd
-	stderr   io.ReadCloser
 	stopOnce sync.Once
 	stopped  chan bool
 	initLua  string
+	notSock  string
 }
 
 type BoxOptions struct {
@@ -68,22 +69,50 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 		if err != nil {
 			return nil, err
 		}
+		notSock := filepath.Join(tmpDir, "not.sock")
 
 		initLua := `
+			local sendstatus = function(status)
+				local path = "{notify_sock_path}"
+				if path ~= "" and path ~= "{" .. "notify_sock_path" .. "}" then
+					local socket = require('socket')
+					local sock = socket("AF_UNIX", "SOCK_DGRAM", 0)
+					sock:sysconnect("unix/", path)
+					if sock ~= nil then
+						sock:write(status)
+						sock:close()
+					end
+				end
+			end
+
+			sendstatus("STARTING")
+
 			box.cfg{
-				listen = "{host}{port}",
 				snap_dir = "{root}/snap/",
 				wal_dir = "{root}/wal/"
 			}
+
 			box.once('guest:read_universe', function()
 				box.schema.user.grant('guest', 'read', 'universe', {if_not_exists = true})
 			end)
+
+			sendstatus("BINDING")
+
+			box.cfg{
+				listen = "{host}{port}",
+			}
+
+			sendstatus("READY")
+		`
+		readyLua := `
+			sendstatus("RUNNING")
 		`
 
-		initLua = fmt.Sprintf("%s\n%s", initLua, config)
+		initLua = fmt.Sprintf("%s\n%s\n%s\n", initLua, config, readyLua)
 		initLua = strings.Replace(initLua, "{host}", options.Host, -1)
 		initLua = strings.Replace(initLua, "{port}", fmt.Sprintf("%d", port), -1)
 		initLua = strings.Replace(initLua, "{root}", tmpDir, -1)
+		initLua = strings.Replace(initLua, "{notify_sock_path}", notSock, -1)
 
 		for _, subDir := range []string{"snap", "wal"} {
 			err = os.Mkdir(path.Join(tmpDir, subDir), 0755)
@@ -99,8 +128,8 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 			Port:    port,
 			cmd:     nil,
 			stopped: make(chan bool),
-			stderr:  nil,
 			initLua: initLua,
+			notSock: notSock,
 		}
 		close(box.stopped)
 
@@ -153,59 +182,58 @@ func (box *Box) StartWithLua(luaTransform func(string) string) error {
 		defer os.Chdir(oldwd)
 	}
 
-	cmd := exec.Command("tarantool", initLuaFile)
-	boxStderr, err := cmd.StderrPipe()
+	statusCh := make(chan string, 10)
+	u, err := net.ListenUnixgram("unixgram", &net.UnixAddr{box.notSock, "unix"})
 	if err != nil {
 		return err
 	}
+	defer os.Remove(box.notSock)
+
+	go func() {
+		for {
+			pck := make([]byte, 128)
+			nr, err := u.Read(pck)
+			if err != nil {
+				close(statusCh)
+				return
+			}
+			msg := string(pck[0:nr])
+			statusCh <- msg
+			if msg == "RUNNING" {
+				close(statusCh)
+				return
+			}
+		}
+	}()
+
+	cmd := exec.Command("tarantool", initLuaFile)
+	box.cmd = cmd
 
 	err = cmd.Start()
 	if err != nil {
 		return err
 	}
 
-	var boxStderrBuffer bytes.Buffer
-
-	p := make([]byte, 1024)
-
-	box.cmd = cmd
-	box.stderr = boxStderr
-
-	for {
-		if strings.Contains(boxStderrBuffer.String(), "entering the event loop") {
-			break
+	for status := range statusCh {
+		if status == "RUNNING" {
+			return nil
 		}
-
-		if strings.Contains(boxStderrBuffer.String(), "is already in use, will retry binding after") {
-			box.Close()
-			return ErrPortAlreadyInUse
-		}
-
-		n, err := boxStderr.Read(p)
-		if n > 0 {
-			boxStderrBuffer.Write(p[:n])
-		}
-		if err != nil {
-			fmt.Println(boxStderrBuffer.String())
-			box.Close()
-			return err
+		if status == "BINDING" {
+			select {
+			case status = <-statusCh:
+				if status != "READY" {
+					box.Close()
+					return fmt.Errorf("Box status is '%s', not READY", status)
+				}
+			case <-time.After(time.Second):
+				box.Close()
+				return ErrPortAlreadyInUse
+			}
 		}
 	}
 
-	// print logs
-	go func() {
-		p := make([]byte, 1024)
-
-		for {
-			n, err := box.stderr.Read(p)
-			if err != nil {
-				return
-			}
-			fmt.Println(string(p[:n]))
-		}
-	}()
-
-	return nil
+	box.Close()
+	return ErrPortAlreadyInUse
 }
 
 func (box *Box) Start() error {
