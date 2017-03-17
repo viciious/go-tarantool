@@ -44,9 +44,15 @@ func Uint32(value uint32) []byte {
 	return packLittle(uint(value), 4)
 }
 
-// Uint64 is an alias for PackQ
+// Uint64 is an alias for PackQ (returns unpacked uint64 btyes in little-endian order)
 func Uint64(value uint64) []byte {
-	return packLittle(uint(value), 8)
+	b := value
+	result := make([]byte, 8)
+	for i := 0; i < 8; i++ {
+		result[i] = uint8(b & 0xFF)
+		b >>= 8
+	}
+	return result
 }
 
 func packIproto(code interface{}, requestID uint32, body []byte) []byte {
