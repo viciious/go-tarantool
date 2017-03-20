@@ -72,19 +72,6 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 		notifySock := filepath.Join(tmpDir, "notify.sock")
 
 		initLua := `
-			local sendstatus = function(status)
-				local path = "{notify_sock_path}"
-				if path ~= "" and path ~= "{" .. "notify_sock_path" .. "}" then
-					local socket = require('socket')
-					local sock = socket("AF_UNIX", "SOCK_DGRAM", 0)
-					sock:sysconnect("unix/", path)
-					if sock ~= nil then
-						sock:write(status)
-						sock:close()
-					end
-				end
-			end
-
 			sendstatus("STARTING")
 
 			box.cfg{
@@ -112,6 +99,30 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 		initLua = strings.Replace(initLua, "{host}", options.Host, -1)
 		initLua = strings.Replace(initLua, "{port}", fmt.Sprintf("%d", port), -1)
 		initLua = strings.Replace(initLua, "{root}", tmpDir, -1)
+
+		initLua = fmt.Sprintf(`
+			local sendstatus = function(status)
+				local path = "{notify_sock_path}"
+				if path ~= "" and path ~= "{" .. "notify_sock_path" .. "}" then
+					local socket = require('socket')
+					local sock = socket("AF_UNIX", "SOCK_DGRAM", 0)
+					sock:sysconnect("unix/", path)
+					if sock ~= nil then
+						sock:write(status)
+						sock:close()
+					end
+				end
+			end
+
+			local status, err = pcall(function()
+			%s
+			end)
+			if status == false then
+				sendstatus("ERROR " .. err)
+				require("os").exit(-1)
+			end
+		`, initLua)
+
 		initLua = strings.Replace(initLua, "{notify_sock_path}", notifySock, -1)
 
 		for _, subDir := range []string{"snap", "wal"} {
@@ -217,6 +228,10 @@ func (box *Box) StartWithLua(luaTransform func(string) string) error {
 	for status := range statusCh {
 		if status == "RUNNING" {
 			return nil
+		}
+		if strings.HasPrefix(status, "ERROR") {
+			box.Close()
+			return fmt.Errorf("Box error: %s", strings.Split(status, "ERROR ")[1])
 		}
 		if status == "BINDING" {
 			select {
