@@ -13,7 +13,7 @@ import (
 const greetingSize = 128
 const saltSize = 32
 const tarantoolVersion = "Tarantool 1.6.8 (Binary)"
-const connBufSize = 128 * 1024
+const connBufSize = 2 * 1024 * 1024
 
 type QueryHandler func(query Query) *Result
 type OnCloseCallback func()
@@ -87,7 +87,9 @@ func (s *IprotoServer) GetLastError() error {
 func (s *IprotoServer) setError(err error) {
 	s.Lock()
 	defer s.Unlock()
-	s.lastError = err
+	if s.lastError == nil {
+		s.lastError = err
+	}
 }
 
 func (s *IprotoServer) Close() {
@@ -182,7 +184,6 @@ READER_LOOP:
 
 func (s *IprotoServer) write() {
 	var err error
-	var n int
 
 	w := s.writer
 
@@ -193,8 +194,8 @@ WRITER_LOOP:
 			if !ok {
 				break WRITER_LOOP
 			}
-			n, err = w.Write(messageBody)
-			if err != nil || n != len(messageBody) {
+			_, err = w.Write(messageBody)
+			if err != nil {
 				break WRITER_LOOP
 			}
 		case <-s.quit:
@@ -211,8 +212,8 @@ WRITER_LOOP:
 				if !ok {
 					break WRITER_LOOP
 				}
-				n, err = w.Write(messageBody)
-				if err != nil || n != len(messageBody) {
+				_, err = w.Write(messageBody)
+				if err != nil {
 					break WRITER_LOOP
 				}
 			case <-s.quit:
