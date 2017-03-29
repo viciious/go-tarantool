@@ -19,6 +19,7 @@ type QueryHandler func(query Query) *Result
 type OnCloseCallback func()
 
 type IprotoServer struct {
+	sync.Mutex
 	conn      net.Conn
 	reader    *bufio.Reader
 	writer    *bufio.Writer
@@ -29,6 +30,7 @@ type IprotoServer struct {
 	onClose   OnCloseCallback
 	output    chan []byte
 	closeOnce sync.Once
+	lastError error
 }
 
 func NewIprotoServer(uuid string, handler QueryHandler, onClose OnCloseCallback) *IprotoServer {
@@ -74,6 +76,18 @@ func (s *IprotoServer) CheckAuth(hash []byte, password string) bool {
 		}
 	}
 	return true
+}
+
+func (s *IprotoServer) GetLastError() error {
+	s.Lock()
+	defer s.Unlock()
+	return s.lastError
+}
+
+func (s *IprotoServer) setError(err error) {
+	s.Lock()
+	defer s.Unlock()
+	s.lastError = err
 }
 
 func (s *IprotoServer) Close() {
@@ -160,6 +174,9 @@ READER_LOOP:
 		}
 	}
 
+	if err != nil {
+		s.setError(err)
+	}
 	s.Close()
 }
 
@@ -204,6 +221,10 @@ WRITER_LOOP:
 			}
 
 		}
+	}
+
+	if err != nil {
+		s.setError(err)
 	}
 
 	s.Close()
