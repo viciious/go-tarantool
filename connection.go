@@ -39,10 +39,12 @@ type Connection struct {
 	closed    chan bool
 	tcpConn   net.Conn
 	// options
-	queryTimeout time.Duration
-	Greeting     *Greeting
-	packData     *packData
-	remoteAddr   string
+	queryTimeout   time.Duration
+	Greeting       *Greeting
+	packData       *packData
+	remoteAddr     string
+	firstError     error
+	firstErrorLock *sync.Mutex
 }
 
 func Connect(dsnString string, options *Options) (conn *Connection, err error) {
@@ -71,11 +73,12 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	}
 
 	conn = &Connection{
-		dsn:       dsn,
-		requests:  newRequestMap(),
-		writeChan: make(chan []byte, 256),
-		exit:      make(chan bool),
-		closed:    make(chan bool),
+		dsn:            dsn,
+		requests:       newRequestMap(),
+		writeChan:      make(chan []byte, 256),
+		exit:           make(chan bool),
+		closed:         make(chan bool),
+		firstErrorLock: &sync.Mutex{},
 	}
 
 	if options == nil {
@@ -349,6 +352,22 @@ func (conn *Connection) IsClosed() bool {
 	}
 }
 
+func (conn *Connection) Error() error {
+	conn.firstErrorLock.Lock()
+	defer conn.firstErrorLock.Unlock()
+	return conn.firstError
+}
+
+func (conn *Connection) setError(err error) {
+	if err != nil {
+		conn.firstErrorLock.Lock()
+		if conn.firstError == nil {
+			conn.firstError = err
+		}
+		conn.firstErrorLock.Unlock()
+	}
+}
+
 func (conn *Connection) worker(tcpConn net.Conn) {
 
 	var wg sync.WaitGroup
@@ -356,13 +375,15 @@ func (conn *Connection) worker(tcpConn net.Conn) {
 	wg.Add(2)
 
 	go func() {
-		writer(tcpConn, conn.writeChan, conn.exit)
+		err := writer(tcpConn, conn.writeChan, conn.exit)
+		conn.setError(err)
 		conn.stop()
 		wg.Done()
 	}()
 
 	go func() {
-		conn.reader(tcpConn)
+		err := conn.reader(tcpConn)
+		conn.setError(err)
 		conn.stop()
 		wg.Done()
 	}()
@@ -380,10 +401,7 @@ func (conn *Connection) worker(tcpConn net.Conn) {
 	close(conn.closed)
 }
 
-func writer(tcpConn net.Conn, writeChan chan []byte, stopChan chan bool) {
-	var err error
-	var n int
-
+func writer(tcpConn net.Conn, writeChan chan []byte, stopChan chan bool) (err error) {
 	w := bufio.NewWriter(tcpConn)
 
 WRITER_LOOP:
@@ -393,8 +411,8 @@ WRITER_LOOP:
 			if !ok {
 				break WRITER_LOOP
 			}
-			n, err = w.Write(messageBody)
-			if err != nil || n != len(messageBody) {
+			_, err = w.Write(messageBody)
+			if err != nil {
 				break WRITER_LOOP
 			}
 		case <-stopChan:
@@ -410,8 +428,8 @@ WRITER_LOOP:
 				if !ok {
 					break WRITER_LOOP
 				}
-				n, err = w.Write(messageBody)
-				if err != nil || n != len(messageBody) {
+				_, err = w.Write(messageBody)
+				if err != nil {
 					break WRITER_LOOP
 				}
 			case <-stopChan:
@@ -420,15 +438,11 @@ WRITER_LOOP:
 
 		}
 	}
-	if err != nil {
-		// @TODO
-		// pp.Println(err)
-	}
+	return
 }
 
-func (conn *Connection) reader(tcpConn net.Conn) {
+func (conn *Connection) reader(tcpConn net.Conn) (err error) {
 	var packet *Packet
-	var err error
 	var body []byte
 	var req *request
 
@@ -467,4 +481,5 @@ READER_LOOP:
 			close(req.replyChan)
 		}
 	}
+	return
 }
