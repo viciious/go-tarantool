@@ -3,6 +3,7 @@ package tarantool
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -25,7 +26,7 @@ func readMessage(r io.Reader) ([]byte, error) {
 	}
 
 	if header[0] != 0xce {
-		return nil, errors.New("Wrong reponse header")
+		return nil, fmt.Errorf("Wrong response header: %#v", header)
 	}
 
 	bodyLength := (int(header[1]) << 24) +
@@ -53,7 +54,7 @@ func readMessageToBuffer(r io.Reader, buffer []byte) ([]byte, error) {
 	}
 
 	if buffer[0] != 0xce {
-		return nil, errors.New("Wrong reponse header")
+		return nil, fmt.Errorf("Wrong response header: %#v", header)
 	}
 
 	bodyLength := (int(buffer[1]) << 24) +
