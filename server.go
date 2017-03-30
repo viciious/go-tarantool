@@ -163,6 +163,7 @@ READER_LOOP:
 				go func(packet *Packet) {
 					var res *Result
 					var code = byte(packet.code)
+					var body []byte
 
 					if code == PingRequest {
 						s.output <- packIprotoOk(packet.requestID)
