@@ -54,7 +54,7 @@ func readMessageToBuffer(r io.Reader, buffer []byte) ([]byte, error) {
 	}
 
 	if buffer[0] != 0xce {
-		return nil, fmt.Errorf("Wrong response header: %#v", header)
+		return nil, fmt.Errorf("Wrong response header: %#v", buffer)
 	}
 
 	bodyLength := (int(buffer[1]) << 24) +

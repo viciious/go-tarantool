@@ -194,6 +194,7 @@ WRITER_LOOP:
 			if !ok {
 				break WRITER_LOOP
 			}
+			fmt.Println(messageBody[0])
 			_, err = w.Write(messageBody)
 			if err != nil {
 				break WRITER_LOOP
