@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"context"
 	"errors"
 	"fmt"
 )
@@ -17,6 +18,7 @@ type ConnectionError struct {
 
 type ContextError struct {
 	error
+	contextErr error
 }
 
 type QueryError struct {
@@ -28,7 +30,7 @@ var _ Error = (*QueryError)(nil)
 
 func NewConnectionError(con *Connection, message string, timeout bool) error {
 	return &ConnectionError{
-		error: errors.New(fmt.Sprintf("%s, remote: %s", message, con.dsn.Host())),
+		error: fmt.Errorf("%s, remote: %s", message, con.dsn.Host()),
 	}
 }
 
@@ -41,9 +43,10 @@ func ConnectionClosedError(con *Connection) error {
 	return NewConnectionError(con, message, false)
 }
 
-func NewContextError(con *Connection, message string) error {
+func NewContextError(con *Connection, message string, ctx context.Context) error {
 	return &ContextError{
-		error: errors.New(fmt.Sprintf("%s, remote: %s", message, con.dsn.Host())),
+		error:      fmt.Errorf("%s: %s, remote: %s", message, ctx.Err(), con.dsn.Host()),
+		contextErr: ctx.Err(),
 	}
 }
 
@@ -71,4 +74,8 @@ func (e *QueryError) Connection() bool {
 
 func (e *ContextError) Connection() bool {
 	return false
+}
+
+func (e *ContextError) ContextErr() error {
+	return e.contextErr
 }

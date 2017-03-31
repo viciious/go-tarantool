@@ -2,7 +2,6 @@ package tarantool
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
@@ -19,6 +18,7 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 			Error: &QueryError{
 				error: err,
 			},
+			ErrorCode: ErrInvalidMsgpack,
 		}
 	}
 
@@ -34,9 +34,8 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 	case conn.writeChan <- packIproto(code, requestID, packed):
 		// pass
 	case <-ctx.Done():
-		err := ctx.Err()
 		return &Result{
-			Error:     NewContextError(conn, fmt.Sprintf("Send error: %s", err)),
+			Error:     NewContextError(conn, "Send error", ctx),
 			ErrorCode: ErrTimeout,
 		}
 	case <-conn.exit:
@@ -51,9 +50,8 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 	case res = <-r.replyChan:
 		// pass
 	case <-ctx.Done():
-		err := ctx.Err()
 		return &Result{
-			Error:     NewContextError(conn, fmt.Sprintf("Recv error: %s", err)),
+			Error:     NewContextError(conn, "Recv error", ctx),
 			ErrorCode: ErrTimeout,
 		}
 	case <-conn.exit:
