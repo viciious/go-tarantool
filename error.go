@@ -15,6 +15,10 @@ type ConnectionError struct {
 	timeout bool
 }
 
+type ContextError struct {
+	error
+}
+
 type QueryError struct {
 	error
 }
@@ -37,6 +41,12 @@ func ConnectionClosedError(con *Connection) error {
 	return NewConnectionError(con, message, false)
 }
 
+func NewContextError(con *Connection, message string) error {
+	return &ContextError{
+		error: errors.New(fmt.Sprintf("%s, remote: %s", message, con.dsn.Host())),
+	}
+}
+
 func (e *ConnectionError) Connection() bool {
 	return true
 }
@@ -56,5 +66,9 @@ func NewQueryError(message string) error {
 }
 
 func (e *QueryError) Connection() bool {
+	return false
+}
+
+func (e *ContextError) Connection() bool {
 	return false
 }
