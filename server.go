@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 )
@@ -78,21 +79,17 @@ func (s *IprotoServer) CheckAuth(hash []byte, password string) bool {
 	return true
 }
 
-func (s *IprotoServer) GetLastError() error {
-	s.Lock()
-	defer s.Unlock()
-	return s.lastError
-}
-
 func (s *IprotoServer) setError(err error) {
-	s.Lock()
-	defer s.Unlock()
-	if s.lastError == nil {
-		s.lastError = err
+	if err != nil && err != io.EOF {
+		s.Lock()
+		defer s.Unlock()
+		if s.lastError == nil {
+			s.lastError = err
+		}
 	}
 }
 
-func (s *IprotoServer) Close() {
+func (s *IprotoServer) Close() error {
 	s.closeOnce.Do(func() {
 		if s.onClose != nil {
 			s.onClose()
@@ -100,6 +97,10 @@ func (s *IprotoServer) Close() {
 		close(s.quit)
 		s.conn.Close()
 	})
+
+	s.Lock()
+	defer s.Unlock()
+	return s.lastError
 }
 
 func (s *IprotoServer) greet() (err error) {
