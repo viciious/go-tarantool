@@ -30,7 +30,7 @@ func NewConnectionError(con *Connection, message string, timeout bool) error {
 
 func ConnectionClosedError(con *Connection) error {
 	var message string = "Connection closed"
-	err := con.Error()
+	_, err := con.IsClosed()
 	if err != nil {
 		message = fmt.Sprintf("Connection error: %s", err)
 	}

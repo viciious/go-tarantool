@@ -23,7 +23,11 @@ func (c *Connector) Connect() (*Connection, error) {
 	var conn *Connection
 
 	c.Lock()
-	if c.conn == nil || c.conn.IsClosed() {
+	isClosed := c.conn == nil
+	if c.conn != nil {
+		isClosed, _ = c.conn.IsClosed()
+	}
+	if isClosed {
 		c.conn, err = Connect(c.remoteAddr, c.options)
 	}
 	conn = c.conn
@@ -34,7 +38,11 @@ func (c *Connector) Connect() (*Connection, error) {
 
 func (c *Connector) Close() {
 	c.Lock()
-	if c.conn != nil && !c.conn.IsClosed() {
+	isClosed := c.conn == nil
+	if c.conn != nil {
+		isClosed, _ = c.conn.IsClosed()
+	}
+	if !isClosed {
 		c.conn.Close()
 	}
 	c.conn = nil

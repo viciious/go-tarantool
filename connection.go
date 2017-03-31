@@ -343,23 +343,23 @@ func (conn *Connection) String() string {
 	return conn.remoteAddr
 }
 
-func (conn *Connection) IsClosed() bool {
+func (conn *Connection) IsClosed() (bool, error) {
 	select {
 	case <-conn.exit:
-		return true
+		return true, conn.getError()
 	default:
-		return false
+		return false, conn.getError()
 	}
 }
 
-func (conn *Connection) Error() error {
+func (conn *Connection) getError() error {
 	conn.firstErrorLock.Lock()
 	defer conn.firstErrorLock.Unlock()
 	return conn.firstError
 }
 
 func (conn *Connection) setError(err error) {
-	if err != nil {
+	if err != nil && err != io.EOF {
 		conn.firstErrorLock.Lock()
 		if conn.firstError == nil {
 			conn.firstError = err
