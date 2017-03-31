@@ -36,11 +36,13 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 	case <-ctx.Done():
 		err := ctx.Err()
 		return &Result{
-			Error: NewConnectionError(conn, fmt.Sprintf("Send error: %s", err), err == context.DeadlineExceeded),
+			Error:     NewConnectionError(conn, fmt.Sprintf("Send error: %s", err), err == context.DeadlineExceeded),
+			ErrorCode: ErrTimeout,
 		}
 	case <-conn.exit:
 		return &Result{
-			Error: ConnectionClosedError(conn),
+			Error:     ConnectionClosedError(conn),
+			ErrorCode: ErrNoConnection,
 		}
 	}
 
@@ -51,11 +53,13 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 	case <-ctx.Done():
 		err := ctx.Err()
 		return &Result{
-			Error: NewConnectionError(conn, fmt.Sprintf("Recv error: %s", err), err == context.DeadlineExceeded),
+			Error:     NewConnectionError(conn, fmt.Sprintf("Recv error: %s", err), err == context.DeadlineExceeded),
+			ErrorCode: ErrTimeout,
 		}
 	case <-conn.exit:
 		return &Result{
-			Error: ConnectionClosedError(conn),
+			Error:     ConnectionClosedError(conn),
+			ErrorCode: ErrNoConnection,
 		}
 	}
 
