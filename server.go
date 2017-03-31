@@ -17,21 +17,21 @@ const tarantoolVersion = "Tarantool 1.6.8 (Binary)"
 const connBufSize = 2 * 1024 * 1024
 
 type QueryHandler func(query Query) *Result
-type OnCloseCallback func()
+type OnCloseCallback func(err error)
 
 type IprotoServer struct {
 	sync.Mutex
-	conn      net.Conn
-	reader    *bufio.Reader
-	writer    *bufio.Writer
-	uuid      string
-	salt      []byte // base64-encoded salt
-	quit      chan bool
-	handler   QueryHandler
-	onClose   OnCloseCallback
-	output    chan []byte
-	closeOnce sync.Once
-	lastError error
+	conn       net.Conn
+	reader     *bufio.Reader
+	writer     *bufio.Writer
+	uuid       string
+	salt       []byte // base64-encoded salt
+	quit       chan bool
+	handler    QueryHandler
+	onClose    OnCloseCallback
+	output     chan []byte
+	closeOnce  sync.Once
+	firstError error
 }
 
 func NewIprotoServer(uuid string, handler QueryHandler, onClose OnCloseCallback) *IprotoServer {
@@ -83,24 +83,30 @@ func (s *IprotoServer) setError(err error) {
 	if err != nil && err != io.EOF {
 		s.Lock()
 		defer s.Unlock()
-		if s.lastError == nil {
-			s.lastError = err
+		if s.firstError == nil {
+			s.firstError = err
 		}
 	}
 }
 
+func (s *IprotoServer) getError() error {
+	s.Lock()
+	defer s.Unlock()
+	return s.firstError
+}
+
 func (s *IprotoServer) Close() error {
+	err := s.getError()
+
 	s.closeOnce.Do(func() {
 		if s.onClose != nil {
-			s.onClose()
+			s.onClose(err)
 		}
 		close(s.quit)
 		s.conn.Close()
 	})
 
-	s.Lock()
-	defer s.Unlock()
-	return s.lastError
+	return err
 }
 
 func (s *IprotoServer) greet() (err error) {
