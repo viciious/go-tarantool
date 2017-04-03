@@ -143,7 +143,6 @@ func (s *IprotoServer) loop() {
 }
 
 func (s *IprotoServer) read() {
-	var packet *Packet
 	var err error
 	var body []byte
 
@@ -161,26 +160,22 @@ READER_LOOP:
 				break READER_LOOP
 			}
 
-			packet, err = decodePacket(bytes.NewBuffer(body))
-			if err != nil {
-				break READER_LOOP
-			}
+			go func(inBody []byte) {
+				packet, err := decodePacket(bytes.NewBuffer(inBody))
+				if err != nil {
+					s.setError(err)
+					s.Close()
+				}
 
-			if packet.request != nil {
-				go func(packet *Packet) {
-					var res *Result
-					var code = byte(packet.code)
-					var body []byte
-
-					if code == PingRequest {
-						s.output <- packIprotoOk(packet.requestID)
-					} else {
-						res = s.handler(packet.request.(Query))
-						body, _ = res.pack(packet.requestID)
-						s.output <- body
-					}
-				}(packet)
-			}
+				code := byte(packet.code)
+				if code == PingRequest {
+					s.output <- packIprotoOk(packet.requestID)
+				} else {
+					res := s.handler(packet.request.(Query))
+					outBody, _ := res.pack(packet.requestID)
+					s.output <- outBody
+				}
+			}(body)
 		}
 	}
 
