@@ -150,6 +150,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 		if rerr != nil {
 			return nil, rerr
 		}
+		defer pp.Release()
 
 		packet, rerr := decodePacket(pp)
 		if rerr != nil {
@@ -181,7 +182,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 		}
 
 		packed := packIproto(authCode, requestID, authRaw)
-		_, err = packed.Write(conn.tcpConn)
+		_, err = packed.WriteTo(conn.tcpConn)
 		if err != nil {
 			return
 		}
@@ -212,7 +213,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 		}
 
 		packed := packIproto(packedCode, requestID, packedReq)
-		_, err = packed.Write(conn.tcpConn)
+		_, err = packed.WriteTo(conn.tcpConn)
 		if err != nil {
 			return nil, err
 		}
@@ -414,7 +415,7 @@ WRITER_LOOP:
 				break WRITER_LOOP
 			}
 
-			_, err = packet.Write(w)
+			_, err = packet.WriteTo(w)
 			if err != nil {
 				break WRITER_LOOP
 			}
@@ -431,7 +432,7 @@ WRITER_LOOP:
 				if !ok {
 					break WRITER_LOOP
 				}
-				_, err = packet.Write(w)
+				_, err = packet.WriteTo(w)
 				if err != nil {
 					break WRITER_LOOP
 				}
@@ -458,6 +459,7 @@ READER_LOOP:
 		if err != nil {
 			break READER_LOOP
 		}
+		defer pp.Release()
 
 		packet, err = decodePacket(pp)
 

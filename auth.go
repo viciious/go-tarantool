@@ -62,9 +62,9 @@ func (auth *Auth) Pack(data *packData) (byte, []byte, error) {
 		return BadRequest, nil, fmt.Errorf("auth: scrambling failure: %s", err.Error())
 	}
 
-	var bodyBuffer bytes.Buffer
+	bodyBuffer := packetPool.Get(1024).buffer
 
-	encoder := msgpack.NewEncoder(&bodyBuffer)
+	encoder := msgpack.NewEncoder(bodyBuffer)
 
 	encoder.EncodeMapLen(2) // User, Password
 	encoder.EncodeUint64(KeyUserName)

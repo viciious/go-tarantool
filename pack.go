@@ -1,7 +1,6 @@
 package tarantool
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -11,10 +10,10 @@ import (
 var packedOkBody = []byte{0x80}
 
 type packedPacket struct {
-	header    []byte
-	body      []byte
-	headerBuf [18]byte
-	buf       *bytes.Buffer // read buffer. For delayer unpack
+	header     []byte
+	body       []byte
+	headerBuf  [18]byte
+	poolBuffer *bufferPoolRecord
 }
 
 func packLittle(value uint, bytes int) []byte {
@@ -130,7 +129,7 @@ func packIprotoOk(requestID uint32) *packedPacket {
 	return packIproto(OkCode, requestID, packedOkBody)
 }
 
-func (pp *packedPacket) Write(w io.Writer) (n int, err error) {
+func (pp *packedPacket) WriteTo(w io.Writer) (n int, err error) {
 	n, err = w.Write(pp.header)
 	if err != nil {
 		return
@@ -140,6 +139,13 @@ func (pp *packedPacket) Write(w io.Writer) (n int, err error) {
 		return n + nn, err
 	}
 	return n + nn, nil
+}
+
+func (pp *packedPacket) Release() {
+	if pp.poolBuffer != nil {
+		pp.poolBuffer.Release()
+	}
+	pp.poolBuffer = nil
 }
 
 func readPacked(r io.Reader) (*packedPacket, error) {
@@ -161,7 +167,9 @@ func readPacked(r io.Reader) (*packedPacket, error) {
 		return nil, errors.New("Packet should not be 0 length")
 	}
 
-	pp.body = make([]byte, bodyLength)
+	pp.poolBuffer = packetPool.Get(bodyLength)
+	pp.body = pp.poolBuffer.buffer.Bytes()[:bodyLength]
+
 	_, err = io.ReadAtLeast(r, pp.body, bodyLength)
 	if err != nil {
 		return nil, err

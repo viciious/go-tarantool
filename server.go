@@ -188,6 +188,11 @@ func (s *IprotoServer) write() {
 	var err error
 
 	w := s.writer
+	wp := func(w io.Writer, packet *packedPacket) error {
+		_, err = packet.WriteTo(w)
+		defer packet.Release()
+		return err
+	}
 
 WRITER_LOOP:
 	for {
@@ -197,7 +202,7 @@ WRITER_LOOP:
 				break WRITER_LOOP
 			}
 
-			_, err = packet.Write(w)
+			err = wp(w, packet)
 			if err != nil {
 				break WRITER_LOOP
 			}
@@ -215,7 +220,7 @@ WRITER_LOOP:
 				if !ok {
 					break WRITER_LOOP
 				}
-				_, err = packet.Write(w)
+				err = wp(w, packet)
 				if err != nil {
 					break WRITER_LOOP
 				}
