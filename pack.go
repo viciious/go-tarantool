@@ -1,7 +1,21 @@
 package tarantool
 
-var packedInt0 = Uint32(0)
-var packedInt1 = Uint32(1)
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"io"
+)
+
+var packedOkBody = []byte{0x80}
+
+type packedPacket struct {
+	header    []byte
+	body      []byte
+	headerBuf [18]byte
+	buf       *bytes.Buffer // read buffer. For delayer unpack
+}
 
 func packLittle(value uint, bytes int) []byte {
 	b := value
@@ -55,7 +69,7 @@ func Uint64(value uint64) []byte {
 	return result
 }
 
-func packIproto(code interface{}, requestID uint32, body []byte) []byte {
+func packIproto(code interface{}, requestID uint32, body []byte) *packedPacket {
 	h8 := [...]byte{
 		0xce, 0, 0, 0, 0, // length
 		0x82,       // 2 element map
@@ -100,13 +114,58 @@ func packIproto(code interface{}, requestID uint32, body []byte) []byte {
 	l := uint(len(h) - 5 + len(body))
 	packBigTo(l, 4, h[1:])
 
-	return append(h[:], body...)
+	pp := &packedPacket{}
+	pp.body = body
+	pp.header = pp.headerBuf[:len(h)]
+	copy(pp.header, h[:])
+
+	return pp
 }
 
-func packIprotoError(code int, requestID uint32, body []byte) []byte {
+func packIprotoError(code int, requestID uint32, body []byte) *packedPacket {
 	return packIproto(ErrorFlag|code, requestID, body)
 }
 
-func packIprotoOk(requestID uint32) []byte {
-	return packIproto(OkCode, requestID, []byte{0x80})
+func packIprotoOk(requestID uint32) *packedPacket {
+	return packIproto(OkCode, requestID, packedOkBody)
+}
+
+func (pp *packedPacket) Write(w io.Writer) (n int, err error) {
+	n, err = w.Write(pp.header)
+	if err != nil {
+		return
+	}
+	nn, err := w.Write(pp.body)
+	if err != nil {
+		return n + nn, err
+	}
+	return n + nn, nil
+}
+
+func readPacked(r io.Reader) (*packedPacket, error) {
+	var err error
+
+	pp := &packedPacket{}
+
+	pp.header = pp.headerBuf[:5]
+	if _, err = io.ReadAtLeast(r, pp.header, 5); err != nil {
+		return nil, err
+	}
+
+	if pp.header[0] != 0xce {
+		return nil, fmt.Errorf("Wrong response header: %#v", pp.header)
+	}
+
+	bodyLength := int(binary.BigEndian.Uint32(pp.header[1:5]))
+	if bodyLength == 0 {
+		return nil, errors.New("Packet should not be 0 length")
+	}
+
+	pp.body = make([]byte, bodyLength)
+	_, err = io.ReadAtLeast(r, pp.body, bodyLength)
+	if err != nil {
+		return nil, err
+	}
+
+	return pp, nil
 }

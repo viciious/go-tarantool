@@ -2,9 +2,6 @@ package tarantool
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
-	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -14,70 +11,6 @@ type Packet struct {
 	requestID uint32
 	request   interface{}
 	result    *Result
-	buf       *bytes.Buffer // read buffer. For delayer unpack
-}
-
-func readMessage(r io.Reader) ([]byte, error) {
-	var err error
-	header := make([]byte, PacketLengthBytes)
-
-	if _, err = io.ReadAtLeast(r, header, PacketLengthBytes); err != nil {
-		return nil, err
-	}
-
-	if header[0] != 0xce {
-		return nil, fmt.Errorf("Wrong response header: %#v", header)
-	}
-
-	bodyLength := (int(header[1]) << 24) +
-		(int(header[2]) << 16) +
-		(int(header[3]) << 8) +
-		int(header[4])
-
-	if bodyLength == 0 {
-		return nil, errors.New("Packet should not be 0 length")
-	}
-
-	body := make([]byte, bodyLength)
-	_, err = io.ReadAtLeast(r, body, bodyLength)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
-}
-
-func readMessageToBuffer(r io.Reader, buffer []byte) ([]byte, error) {
-	var err error
-	if _, err = io.ReadAtLeast(r, buffer[:PacketLengthBytes], PacketLengthBytes); err != nil {
-		return nil, err
-	}
-
-	if buffer[0] != 0xce {
-		return nil, fmt.Errorf("Wrong response header: %#v", buffer)
-	}
-
-	bodyLength := (int(buffer[1]) << 24) +
-		(int(buffer[2]) << 16) +
-		(int(buffer[3]) << 8) +
-		int(buffer[4])
-
-	if bodyLength == 0 {
-		return nil, errors.New("Packet should not be 0 length")
-	}
-
-	var body []byte
-	if bodyLength <= len(buffer)-PacketLengthBytes {
-		body = buffer[PacketLengthBytes : bodyLength+PacketLengthBytes]
-	} else {
-		body = make([]byte, bodyLength)
-	}
-	_, err = io.ReadAtLeast(r, body, bodyLength)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
 }
 
 func msgpackDecodeBody(d *msgpack.Decoder) ([][]interface{}, error) {
@@ -184,7 +117,9 @@ func (pack *Packet) decodeBody(r *bytes.Buffer) (err error) {
 	return
 }
 
-func decodePacket(r *bytes.Buffer) (*Packet, error) {
+func decodePacket(pp *packedPacket) (*Packet, error) {
+	r := bytes.NewBuffer(pp.body)
+
 	pack := &Packet{}
 	err := pack.decodeHeader(r)
 	if err != nil {

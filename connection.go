@@ -33,7 +33,7 @@ type Connection struct {
 	dsn       *godsn.DSN
 	requestID uint32
 	requests  *requestMap
-	writeChan chan []byte // packed messages with header
+	writeChan chan *packedPacket // packed messages with header
 	closeOnce sync.Once
 	exit      chan bool
 	closed    chan bool
@@ -75,7 +75,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	conn = &Connection{
 		dsn:            dsn,
 		requests:       newRequestMap(),
-		writeChan:      make(chan []byte, 256),
+		writeChan:      make(chan *packedPacket, 256),
 		exit:           make(chan bool),
 		closed:         make(chan bool),
 		firstErrorLock: &sync.Mutex{},
@@ -146,12 +146,12 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	}
 
 	read := func(r io.Reader) (*Packet, error) {
-		body, rerr := readMessage(r)
+		pp, rerr := readPacked(r)
 		if rerr != nil {
 			return nil, rerr
 		}
 
-		packet, rerr := decodePacket(bytes.NewBuffer(body))
+		packet, rerr := decodePacket(pp)
 		if rerr != nil {
 			return nil, rerr
 		}
@@ -180,7 +180,8 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 			return
 		}
 
-		_, err = conn.tcpConn.Write(packIproto(authCode, requestID, authRaw))
+		packed := packIproto(authCode, requestID, authRaw)
+		_, err = packed.Write(conn.tcpConn)
 		if err != nil {
 			return
 		}
@@ -210,7 +211,8 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 			return nil, err
 		}
 
-		_, err = conn.tcpConn.Write(packIproto(packedCode, requestID, packedReq))
+		packed := packIproto(packedCode, requestID, packedReq)
+		_, err = packed.Write(conn.tcpConn)
 		if err != nil {
 			return nil, err
 		}
@@ -401,17 +403,18 @@ func (conn *Connection) worker(tcpConn net.Conn) {
 	close(conn.closed)
 }
 
-func writer(tcpConn net.Conn, writeChan chan []byte, stopChan chan bool) (err error) {
+func writer(tcpConn net.Conn, writeChan chan *packedPacket, stopChan chan bool) (err error) {
 	w := bufio.NewWriter(tcpConn)
 
 WRITER_LOOP:
 	for {
 		select {
-		case messageBody, ok := <-writeChan:
+		case packet, ok := <-writeChan:
 			if !ok {
 				break WRITER_LOOP
 			}
-			_, err = w.Write(messageBody)
+
+			_, err = packet.Write(w)
 			if err != nil {
 				break WRITER_LOOP
 			}
@@ -424,11 +427,11 @@ WRITER_LOOP:
 
 			// same without flush
 			select {
-			case messageBody, ok := <-writeChan:
+			case packet, ok := <-writeChan:
 				if !ok {
 					break WRITER_LOOP
 				}
-				_, err = w.Write(messageBody)
+				_, err = packet.Write(w)
 				if err != nil {
 					break WRITER_LOOP
 				}
@@ -443,7 +446,7 @@ WRITER_LOOP:
 
 func (conn *Connection) reader(tcpConn net.Conn) (err error) {
 	var packet *Packet
-	var body []byte
+	var pp *packedPacket
 	var req *request
 
 	r := bufio.NewReaderSize(tcpConn, 128*1024)
@@ -451,26 +454,17 @@ func (conn *Connection) reader(tcpConn net.Conn) (err error) {
 READER_LOOP:
 	for {
 		// read raw bytes
-		body, err = readMessage(r)
+		pp, err = readPacked(r)
 		if err != nil {
 			break READER_LOOP
 		}
 
-		packet = &Packet{
-			buf: bytes.NewBuffer(body),
-		}
-
-		// decode packet header for requestID
-		err = packet.decodeHeader(packet.buf)
-		if err != nil {
-			break READER_LOOP
-		}
+		packet, err = decodePacket(pp)
 
 		req = conn.requests.Pop(packet.requestID)
 		if req != nil {
 			res := &Result{}
-			// finish decode message body
-			err = packet.decodeBody(packet.buf)
+
 			if err != nil {
 				res.Error = err
 			} else if packet.result != nil {

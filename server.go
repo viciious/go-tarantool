@@ -2,7 +2,6 @@ package tarantool
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -29,7 +28,7 @@ type IprotoServer struct {
 	quit       chan bool
 	handler    QueryHandler
 	onClose    OnCloseCallback
-	output     chan []byte
+	output     chan *packedPacket
 	closeOnce  sync.Once
 	firstError error
 }
@@ -50,7 +49,7 @@ func (s *IprotoServer) Accept(conn net.Conn) {
 	s.reader = bufio.NewReaderSize(conn, connBufSize)
 	s.writer = bufio.NewWriterSize(conn, connBufSize)
 	s.quit = make(chan bool)
-	s.output = make(chan []byte, 1024)
+	s.output = make(chan *packedPacket, 1024)
 
 	err := s.greet()
 	if err != nil {
@@ -144,7 +143,7 @@ func (s *IprotoServer) loop() {
 
 func (s *IprotoServer) read() {
 	var err error
-	var body []byte
+	var pp *packedPacket
 
 	r := s.reader
 
@@ -155,13 +154,13 @@ READER_LOOP:
 			break READER_LOOP
 		default:
 			// read raw bytes
-			body, err = readMessage(r)
+			pp, err = readPacked(r)
 			if err != nil {
 				break READER_LOOP
 			}
 
-			go func(inBody []byte) {
-				packet, err := decodePacket(bytes.NewBuffer(inBody))
+			go func(pp *packedPacket) {
+				packet, err := decodePacket(pp)
 				if err != nil {
 					s.setError(err)
 					s.Close()
@@ -175,7 +174,7 @@ READER_LOOP:
 					outBody, _ := res.pack(packet.requestID)
 					s.output <- outBody
 				}
-			}(body)
+			}(pp)
 		}
 	}
 
@@ -193,11 +192,12 @@ func (s *IprotoServer) write() {
 WRITER_LOOP:
 	for {
 		select {
-		case messageBody, ok := <-s.output:
+		case packet, ok := <-s.output:
 			if !ok {
 				break WRITER_LOOP
 			}
-			_, err = w.Write(messageBody)
+
+			_, err = packet.Write(w)
 			if err != nil {
 				break WRITER_LOOP
 			}
@@ -211,11 +211,11 @@ WRITER_LOOP:
 
 			// same without flush
 			select {
-			case messageBody, ok := <-s.output:
+			case packet, ok := <-s.output:
 				if !ok {
 					break WRITER_LOOP
 				}
-				_, err = w.Write(messageBody)
+				_, err = packet.Write(w)
 				if err != nil {
 					break WRITER_LOOP
 				}

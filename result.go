@@ -12,7 +12,7 @@ type Result struct {
 	Data      [][]interface{}
 }
 
-func (r *Result) pack(requestID uint32) ([]byte, error) {
+func (r *Result) pack(requestID uint32) (*packedPacket, error) {
 	var err error
 	var bodyBuffer bytes.Buffer
 	var h, body []byte
