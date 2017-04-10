@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -166,23 +167,23 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	}
 
 	if options.User != "" {
-		var authCode byte
-		var authRaw []byte
 		var authResponse *Packet
 
 		requestID := conn.nextID()
 
-		authCode, authRaw, err = (&Auth{
+		pp := packIproto(0, requestID)
+		defer pp.Release()
+
+		pp.code, err = (&Auth{
 			User:         options.User,
 			Password:     options.Password,
 			GreetingAuth: conn.Greeting.Auth,
-		}).Pack(conn.packData)
+		}).Pack(conn.packData, pp.poolBuffer.buffer)
 		if err != nil {
 			return
 		}
 
-		packed := packIproto(authCode, requestID, authRaw)
-		_, err = packed.WriteTo(conn.tcpConn)
+		_, err = pp.WriteTo(conn.tcpConn)
 		if err != nil {
 			return
 		}
@@ -206,14 +207,18 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	// select space and index schema
 	request := func(req Query) (*Result, error) {
 		var err error
+
 		requestID := conn.nextID()
-		packedCode, packedReq, err := (req).Pack(conn.packData)
+
+		pp := packIproto(0, requestID)
+		defer pp.Release()
+
+		pp.code, err = (req).Pack(conn.packData, pp.poolBuffer.buffer)
 		if err != nil {
 			return nil, err
 		}
 
-		packed := packIproto(packedCode, requestID, packedReq)
-		_, err = packed.WriteTo(conn.tcpConn)
+		_, err = pp.WriteTo(conn.tcpConn)
 		if err != nil {
 			return nil, err
 		}
@@ -308,7 +313,9 @@ func (conn *Connection) stop() {
 	conn.closeOnce.Do(func() {
 		// debug.PrintStack()
 		close(conn.exit)
+		close(conn.writeChan)
 		conn.tcpConn.Close()
+		runtime.GC()
 	})
 }
 
@@ -432,6 +439,7 @@ WRITER_LOOP:
 				if !ok {
 					break WRITER_LOOP
 				}
+
 				_, err = packet.WriteTo(w)
 				if err != nil {
 					break WRITER_LOOP
@@ -439,9 +447,9 @@ WRITER_LOOP:
 			case <-stopChan:
 				break WRITER_LOOP
 			}
-
 		}
 	}
+
 	return
 }
 
@@ -459,9 +467,11 @@ READER_LOOP:
 		if err != nil {
 			break READER_LOOP
 		}
-		defer pp.Release()
 
 		packet, err = decodePacket(pp)
+		if err != nil {
+			break READER_LOOP
+		}
 
 		req = conn.requests.Pop(packet.requestID)
 		if req != nil {
@@ -476,6 +486,13 @@ READER_LOOP:
 			req.replyChan <- res
 			close(req.replyChan)
 		}
+
+		pp.Release()
+		pp = nil
+	}
+
+	if pp != nil {
+		pp.Release()
 	}
 	return
 }

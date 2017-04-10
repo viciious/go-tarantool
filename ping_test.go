@@ -34,6 +34,6 @@ func BenchmarkPingPack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
-		(&Ping{}).Pack(d)
+		(&Ping{}).Pack(d, nil)
 	}
 }

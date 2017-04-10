@@ -14,21 +14,20 @@ type Replace struct {
 
 var _ Query = (*Replace)(nil)
 
-func (s *Replace) Pack(data *packData) (byte, []byte, error) {
-	var bodyBuffer bytes.Buffer
+func (s *Replace) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	var err error
 
 	if s.Tuple == nil {
-		return BadRequest, nil, errors.New("Tuple can not be nil")
+		return BadRequest, errors.New("Tuple can not be nil")
 	}
 
-	encoder := msgpack.NewEncoder(&bodyBuffer)
+	encoder := msgpack.NewEncoder(bodyBuffer)
 
 	encoder.EncodeMapLen(2) // Space, Tuple
 
 	// Space
-	if err = data.writeSpace(s.Space, &bodyBuffer, encoder); err != nil {
-		return BadRequest, nil, err
+	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+		return BadRequest, err
 	}
 
 	// Tuple
@@ -36,11 +35,11 @@ func (s *Replace) Pack(data *packData) (byte, []byte, error) {
 	encoder.EncodeArrayLen(len(s.Tuple))
 	for _, value := range s.Tuple {
 		if err = encoder.Encode(value); err != nil {
-			return BadRequest, nil, err
+			return BadRequest, err
 		}
 	}
 
-	return ReplaceRequest, bodyBuffer.Bytes(), nil
+	return ReplaceRequest, nil
 }
 
 func (q *Replace) Unpack(r *bytes.Buffer) (err error) {

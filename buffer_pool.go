@@ -19,6 +19,7 @@ func NewBufferPool() *bufferPool {
 
 func (r *bufferPoolRecord) Release() {
 	r.buffer.Reset()
+
 	select {
 	case r.pool <- r:
 		return
@@ -36,10 +37,11 @@ func (p *bufferPool) Get(size int) *bufferPoolRecord {
 		return r
 	default:
 		b := make([]byte, size)[:0]
-		return &bufferPoolRecord{
+		r := &bufferPoolRecord{
 			buffer: bytes.NewBuffer(b),
 			pool:   p.queue,
 		}
+		return r
 	}
 }
 

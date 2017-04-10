@@ -14,17 +14,16 @@ type Upsert struct {
 
 var _ Query = (*Upsert)(nil)
 
-func (s *Upsert) Pack(data *packData) (byte, []byte, error) {
-	var bodyBuffer bytes.Buffer
+func (s *Upsert) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	var err error
 
-	encoder := msgpack.NewEncoder(&bodyBuffer)
+	encoder := msgpack.NewEncoder(bodyBuffer)
 
 	encoder.EncodeMapLen(3) // Space, Tuple, Update operators
 
 	// Space
-	if err = data.writeSpace(s.Space, &bodyBuffer, encoder); err != nil {
-		return BadRequest, nil, err
+	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+		return BadRequest, err
 	}
 
 	// Tuple (to insert)
@@ -32,7 +31,7 @@ func (s *Upsert) Pack(data *packData) (byte, []byte, error) {
 	encoder.EncodeArrayLen(len(s.Tuple))
 	for _, key := range s.Tuple {
 		if err = encoder.Encode(key); err != nil {
-			return BadRequest, nil, err
+			return BadRequest, err
 		}
 	}
 
@@ -44,12 +43,12 @@ func (s *Upsert) Pack(data *packData) (byte, []byte, error) {
 		encoder.EncodeArrayLen(len(t))
 		for _, value := range t {
 			if err = encoder.Encode(value); err != nil {
-				return BadRequest, nil, err
+				return BadRequest, err
 			}
 		}
 	}
 
-	return UpsertRequest, bodyBuffer.Bytes(), nil
+	return UpsertRequest, nil
 }
 
 func (q *Upsert) Unpack(r *bytes.Buffer) error {

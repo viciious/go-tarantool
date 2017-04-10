@@ -164,6 +164,7 @@ READER_LOOP:
 				if err != nil {
 					s.setError(err)
 					s.Close()
+					return
 				}
 
 				code := byte(packet.code)
@@ -174,6 +175,7 @@ READER_LOOP:
 					outBody, _ := res.pack(packet.requestID)
 					s.output <- outBody
 				}
+				pp.Release()
 			}(pp)
 		}
 	}

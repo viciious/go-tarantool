@@ -16,41 +16,40 @@ type Delete struct {
 
 var _ Query = (*Delete)(nil)
 
-func (s *Delete) Pack(data *packData) (byte, []byte, error) {
-	var bodyBuffer bytes.Buffer
+func (s *Delete) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	var err error
 
-	encoder := msgpack.NewEncoder(&bodyBuffer)
+	encoder := msgpack.NewEncoder(bodyBuffer)
 
 	encoder.EncodeMapLen(3) // Space, Index, Key
 
 	// Space
-	if err = data.writeSpace(s.Space, &bodyBuffer, encoder); err != nil {
-		return BadRequest, nil, err
+	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+		return BadRequest, err
 	}
 
 	// Index
-	if err = data.writeIndex(s.Space, s.Index, &bodyBuffer, encoder); err != nil {
-		return BadRequest, nil, err
+	if err = data.writeIndex(s.Space, s.Index, bodyBuffer, encoder); err != nil {
+		return BadRequest, err
 	}
 
 	// Key
 	if s.Key != nil {
 		bodyBuffer.Write(data.packedSingleKey)
 		if err = encoder.Encode(s.Key); err != nil {
-			return BadRequest, nil, err
+			return BadRequest, err
 		}
 	} else if s.KeyTuple != nil {
 		encoder.EncodeUint32(KeyKey)
 		encoder.EncodeArrayLen(len(s.KeyTuple))
 		for _, key := range s.KeyTuple {
 			if err = encoder.Encode(key); err != nil {
-				return BadRequest, nil, err
+				return BadRequest, err
 			}
 		}
 	}
 
-	return DeleteRequest, bodyBuffer.Bytes(), nil
+	return DeleteRequest, nil
 }
 
 func (q *Delete) Unpack(r *bytes.Buffer) (err error) {

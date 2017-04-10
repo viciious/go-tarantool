@@ -10,9 +10,15 @@ type QueryOptions struct {
 }
 
 func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
+	var err error
+
 	requestID := conn.nextID()
 
-	code, packed, err := r.query.Pack(conn.packData)
+	pp := packIproto(0, requestID)
+	defer pp.Release()
+
+	pp.code, err = r.query.Pack(conn.packData, pp.poolBuffer.buffer)
+
 	if err != nil {
 		return &Result{
 			Error: &QueryError{
@@ -31,7 +37,7 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 	}
 
 	select {
-	case conn.writeChan <- packIproto(code, requestID, packed):
+	case conn.writeChan <- pp:
 		// pass
 	case <-ctx.Done():
 		return &Result{

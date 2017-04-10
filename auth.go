@@ -56,13 +56,11 @@ func xor(left, right []byte, size int) []byte {
 	return result
 }
 
-func (auth *Auth) Pack(data *packData) (byte, []byte, error) {
+func (auth *Auth) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	scr, err := scramble(auth.GreetingAuth, auth.Password)
 	if err != nil {
-		return BadRequest, nil, fmt.Errorf("auth: scrambling failure: %s", err.Error())
+		return BadRequest, fmt.Errorf("auth: scrambling failure: %s", err.Error())
 	}
-
-	bodyBuffer := packetPool.Get(1024).buffer
 
 	encoder := msgpack.NewEncoder(bodyBuffer)
 
@@ -75,7 +73,7 @@ func (auth *Auth) Pack(data *packData) (byte, []byte, error) {
 	encoder.EncodeString(authHash)
 	encoder.EncodeBytes(scr)
 
-	return AuthRequest, bodyBuffer.Bytes(), nil
+	return AuthRequest, nil
 }
 
 func (auth *Auth) Unpack(r *bytes.Buffer) (err error) {

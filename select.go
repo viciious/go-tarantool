@@ -19,22 +19,21 @@ type Select struct {
 
 var _ Query = (*Select)(nil)
 
-func (s *Select) Pack(data *packData) (byte, []byte, error) {
-	var bodyBuffer bytes.Buffer
+func (s *Select) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	var err error
 
-	encoder := msgpack.NewEncoder(&bodyBuffer)
+	encoder := msgpack.NewEncoder(bodyBuffer)
 
 	encoder.EncodeMapLen(6) // Space, Index, Offset, Limit, Iterator, Key
 
 	// Space
-	if err = data.writeSpace(s.Space, &bodyBuffer, encoder); err != nil {
-		return BadRequest, nil, err
+	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+		return BadRequest, err
 	}
 
 	// Index
-	if err = data.writeIndex(s.Space, s.Index, &bodyBuffer, encoder); err != nil {
-		return BadRequest, nil, err
+	if err = data.writeIndex(s.Space, s.Index, bodyBuffer, encoder); err != nil {
+		return BadRequest, err
 	}
 
 	// Offset
@@ -65,14 +64,14 @@ func (s *Select) Pack(data *packData) (byte, []byte, error) {
 	if s.Key != nil {
 		bodyBuffer.Write(data.packedSingleKey)
 		if err = encoder.Encode(s.Key); err != nil {
-			return BadRequest, nil, err
+			return BadRequest, err
 		}
 	} else if s.KeyTuple != nil {
 		encoder.EncodeUint32(KeyKey)
 		encoder.EncodeArrayLen(len(s.KeyTuple))
 		for _, key := range s.KeyTuple {
 			if err = encoder.Encode(key); err != nil {
-				return BadRequest, nil, err
+				return BadRequest, err
 			}
 		}
 	} else {
@@ -80,7 +79,7 @@ func (s *Select) Pack(data *packData) (byte, []byte, error) {
 		encoder.EncodeArrayLen(0)
 	}
 
-	return SelectRequest, bodyBuffer.Bytes(), nil
+	return SelectRequest, nil
 }
 
 func (q *Select) Unpack(r *bytes.Buffer) (err error) {

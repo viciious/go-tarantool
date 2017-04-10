@@ -13,11 +13,10 @@ type Call struct {
 
 var _ Query = (*Call)(nil)
 
-func (s *Call) Pack(data *packData) (byte, []byte, error) {
-	var bodyBuffer bytes.Buffer
+func (s *Call) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	var err error
 
-	encoder := msgpack.NewEncoder(&bodyBuffer)
+	encoder := msgpack.NewEncoder(bodyBuffer)
 
 	encoder.EncodeMapLen(2) // Name, Tuple
 
@@ -30,7 +29,7 @@ func (s *Call) Pack(data *packData) (byte, []byte, error) {
 		encoder.EncodeArrayLen(len(s.Tuple))
 		for _, key := range s.Tuple {
 			if err = encoder.Encode(key); err != nil {
-				return byte(0), nil, err
+				return byte(0), err
 			}
 		}
 	} else {
@@ -38,7 +37,7 @@ func (s *Call) Pack(data *packData) (byte, []byte, error) {
 		encoder.EncodeArrayLen(0)
 	}
 
-	return CallRequest, bodyBuffer.Bytes(), nil
+	return CallRequest, nil
 }
 
 func (q *Call) Unpack(r *bytes.Buffer) (err error) {

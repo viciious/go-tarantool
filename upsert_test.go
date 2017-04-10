@@ -126,6 +126,8 @@ func BenchmarkUpsertPack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
+		poolRec := packetPool.Get(256)
+
 		(&Upsert{
 			Space: 1,
 			Tuple: []interface{}{1},
@@ -139,6 +141,8 @@ func BenchmarkUpsertPack(b *testing.B) {
 					Argument: "Hello World",
 				},
 			},
-		}).Pack(d)
+		}).Pack(d, poolRec.buffer)
+
+		poolRec.Release()
 	}
 }

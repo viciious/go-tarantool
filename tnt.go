@@ -5,7 +5,7 @@ import "bytes"
 var packetPool *bufferPool
 
 type Query interface {
-	Pack(data *packData) (byte, []byte, error)
+	Pack(data *packData, r *bytes.Buffer) (byte, error)
 	Unpack(r *bytes.Buffer) error
 }
 

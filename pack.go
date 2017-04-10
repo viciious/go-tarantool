@@ -10,9 +10,9 @@ import (
 var packedOkBody = []byte{0x80}
 
 type packedPacket struct {
-	header     []byte
-	body       []byte
-	headerBuf  [18]byte
+	code       interface{}
+	requestID  uint32
+	body       []byte // for incoming packets
 	poolBuffer *bufferPoolRecord
 }
 
@@ -68,7 +68,30 @@ func Uint64(value uint64) []byte {
 	return result
 }
 
-func packIproto(code interface{}, requestID uint32, body []byte) *packedPacket {
+func packIproto(code interface{}, requestID uint32) *packedPacket {
+	pp := &packedPacket{}
+	pp.requestID = requestID
+	pp.code = code
+	pp.poolBuffer = packetPool.Get(256)
+	return pp
+}
+
+func packIprotoError(code int, requestID uint32) *packedPacket {
+	return packIproto(ErrorFlag|code, requestID)
+}
+
+func packIprotoOk(requestID uint32) *packedPacket {
+	pp := packIproto(OkCode, requestID)
+	pp.poolBuffer.buffer.Write(packedOkBody)
+	return pp
+}
+
+func (pp *packedPacket) WriteTo(w io.Writer) (n int, err error) {
+	if pp.poolBuffer == nil {
+		// already released
+		return
+	}
+
 	h8 := [...]byte{
 		0xce, 0, 0, 0, 0, // length
 		0x82,       // 2 element map
@@ -84,6 +107,10 @@ func packIproto(code interface{}, requestID uint32, body []byte) *packedPacket {
 		KeySync, 0xce, 0, 0, 0, 0,
 	}
 	var h []byte
+
+	code := pp.code
+	requestID := pp.requestID
+	body := pp.poolBuffer.buffer.Bytes()
 
 	switch code.(type) {
 	case byte:
@@ -113,28 +140,12 @@ func packIproto(code interface{}, requestID uint32, body []byte) *packedPacket {
 	l := uint(len(h) - 5 + len(body))
 	packBigTo(l, 4, h[1:])
 
-	pp := &packedPacket{}
-	pp.body = body
-	pp.header = pp.headerBuf[:len(h)]
-	copy(pp.header, h[:])
-
-	return pp
-}
-
-func packIprotoError(code int, requestID uint32, body []byte) *packedPacket {
-	return packIproto(ErrorFlag|code, requestID, body)
-}
-
-func packIprotoOk(requestID uint32) *packedPacket {
-	return packIproto(OkCode, requestID, packedOkBody)
-}
-
-func (pp *packedPacket) WriteTo(w io.Writer) (n int, err error) {
-	n, err = w.Write(pp.header)
+	n, err = w.Write(h)
 	if err != nil {
 		return
 	}
-	nn, err := w.Write(pp.body)
+
+	nn, err := w.Write(body)
 	if err != nil {
 		return n + nn, err
 	}
@@ -150,28 +161,28 @@ func (pp *packedPacket) Release() {
 
 func readPacked(r io.Reader) (*packedPacket, error) {
 	var err error
+	var h [5]byte
 
-	pp := &packedPacket{}
-
-	pp.header = pp.headerBuf[:5]
-	if _, err = io.ReadAtLeast(r, pp.header, 5); err != nil {
+	if _, err = io.ReadAtLeast(r, h[:], 5); err != nil {
 		return nil, err
 	}
 
-	if pp.header[0] != 0xce {
-		return nil, fmt.Errorf("Wrong response header: %#v", pp.header)
+	if h[0] != 0xce {
+		return nil, fmt.Errorf("Wrong response header: %#v", h)
 	}
 
-	bodyLength := int(binary.BigEndian.Uint32(pp.header[1:5]))
+	bodyLength := int(binary.BigEndian.Uint32(h[1:5]))
 	if bodyLength == 0 {
 		return nil, errors.New("Packet should not be 0 length")
 	}
 
+	pp := &packedPacket{}
 	pp.poolBuffer = packetPool.Get(bodyLength)
 	pp.body = pp.poolBuffer.buffer.Bytes()[:bodyLength]
 
 	_, err = io.ReadAtLeast(r, pp.body, bodyLength)
 	if err != nil {
+		pp.Release()
 		return nil, err
 	}
 

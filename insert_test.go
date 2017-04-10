@@ -38,11 +38,13 @@ func TestInsert(t *testing.T) {
 
 	do := func(query *Insert) ([][]interface{}, error) {
 		var err error
-		_, packed, err := query.Pack(conn.packData)
+		var buf bytes.Buffer
+
+		_, err = query.Pack(conn.packData, &buf)
 
 		if assert.NoError(err) {
 			var query2 = &Insert{}
-			err = query2.Unpack(bytes.NewBuffer(packed))
+			err = query2.Unpack(&buf)
 
 			if assert.NoError(err) {
 				assert.Equal(42, query2.Space)
@@ -83,8 +85,9 @@ func TestInsert(t *testing.T) {
 
 func BenchmarkInsertPack(b *testing.B) {
 	d, _ := newPackData(42)
-
 	for i := 0; i < b.N; i += 1 {
-		(&Insert{Tuple: []interface{}{3, "Hello world"}}).Pack(d)
+		poolRec := packetPool.Get(256)
+		(&Insert{Tuple: []interface{}{3, "Hello world"}}).Pack(d, poolRec.buffer)
+		poolRec.Release()
 	}
 }

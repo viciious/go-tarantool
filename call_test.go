@@ -55,17 +55,19 @@ func TestCall(t *testing.T) {
 	defer box.Close()
 
 	do := func(connectOptions *Options, query *Call, expected [][]interface{}) {
+		var buf bytes.Buffer
+
 		conn, err := box.Connect(connectOptions)
 		assert.NoError(err)
 		assert.NotNil(conn)
 
 		defer conn.Close()
 
-		_, packed, err := query.Pack(conn.packData)
+		_, err = query.Pack(conn.packData, &buf)
 
 		if assert.NoError(err) {
 			var query2 = &Call{}
-			err = query2.Unpack(bytes.NewBuffer(packed))
+			err = query2.Unpack(&buf)
 
 			if assert.NoError(err) {
 				assert.Equal(query.Name, query2.Name)
@@ -120,8 +122,9 @@ func TestCall(t *testing.T) {
 
 func BenchmarkCallPack(b *testing.B) {
 	d, _ := newPackData(42)
-
 	for i := 0; i < b.N; i += 1 {
-		(&Call{Name: "sel_all"}).Pack(d)
+		poolRec := packetPool.Get(256)
+		(&Call{Name: "sel_all"}).Pack(d, poolRec.buffer)
+		poolRec.Release()
 	}
 }

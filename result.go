@@ -14,39 +14,44 @@ type Result struct {
 
 func (r *Result) pack(requestID uint32) (*packedPacket, error) {
 	var err error
-	var bodyBuffer bytes.Buffer
-	var h, body []byte
-	var he = [...]byte{
-		0x81, KeyError, 0xdb, 0, 0, 0, 0,
-	}
-	var hd = [...]byte{
-		0x81, KeyData, 0xdd, 0, 0, 0, 0,
-	}
+	var pp *packedPacket
 
 	if r.ErrorCode != OkCode || r.Error != nil {
-		h = he[:]
 		if err = r.Error; err == nil {
 			err = errors.New("Unknown error")
 		}
 		var str = err.Error()
-		packBigTo(uint(len(str)), 4, h[3:])
-		body = append(h[:], str...)
-		return packIprotoError(r.ErrorCode, requestID, body), nil
+
+		pp = packIprotoError(r.ErrorCode, requestID)
+		encoder := msgpack.NewEncoder(pp.poolBuffer.buffer)
+		encoder.EncodeMapLen(1)
+		encoder.EncodeUint8(KeyError)
+		encoder.EncodeString(str)
 	} else {
-		h = hd[:]
-		body = h[:]
+		pp = packIproto(OkCode, requestID)
+		encoder := msgpack.NewEncoder(pp.poolBuffer.buffer)
+		encoder.EncodeMapLen(1)
+		encoder.EncodeUint8(KeyData)
+		encoder.EncodeArrayLen(65536) // force encoding as uin32, to be replaced later
+
 		if r.Data != nil {
-			encoder := msgpack.NewEncoder(&bodyBuffer)
 			for i := 0; i < len(r.Data); i++ {
 				if err = encoder.Encode(r.Data[i]); err != nil {
+					pp.Release()
 					return nil, err
 				}
 			}
-			packBigTo(uint(len(r.Data)), 4, h[3:])
-			body = append(h[:], bodyBuffer.Bytes()...)
 		}
-		return packIproto(OkCode, requestID, body), nil
+
+		b := pp.poolBuffer.buffer.Bytes()
+		if r.Data != nil {
+			packBigTo(uint(len(r.Data)), 4, b[3:])
+		} else {
+			packBigTo(uint(0), 4, b[3:])
+		}
 	}
+
+	return pp, nil
 }
 
 func (r *Result) unpack(b *bytes.Buffer) (err error) {

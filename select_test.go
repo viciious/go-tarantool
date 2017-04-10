@@ -37,17 +37,20 @@ func TestSelect(t *testing.T) {
 	defer box.Close()
 
 	do := func(connectOptions *Options, query *Select, expected [][]interface{}) {
+		var err error
+		var buf bytes.Buffer
+
 		conn, err := box.Connect(connectOptions)
 		assert.NoError(err)
 		assert.NotNil(conn)
 
 		defer conn.Close()
 
-		_, packed, err := query.Pack(conn.packData)
+		_, err = query.Pack(conn.packData, &buf)
 
 		if assert.NoError(err) {
 			var query2 = &Select{}
-			err = query2.Unpack(bytes.NewBuffer(packed))
+			err = query2.Unpack(&buf)
 
 			if assert.NoError(err) {
 				assert.Equal(42, query2.Space)
@@ -218,6 +221,8 @@ func BenchmarkSelectPack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
-		(&Select{Key: 3}).Pack(d)
+		poolRec := packetPool.Get(256)
+		(&Select{Key: 3}).Pack(d, poolRec.buffer)
+		poolRec.Release()
 	}
 }
