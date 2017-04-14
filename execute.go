@@ -17,7 +17,7 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 	pp := packIproto(0, requestID)
 	defer pp.Release()
 
-	pp.code, err = r.query.Pack(conn.packData, pp.poolBuffer.buffer)
+	pp.code, err = r.query.Pack(conn.packData, &pp.buffer)
 
 	if err != nil {
 		return &Result{

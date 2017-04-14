@@ -123,8 +123,8 @@ func TestCall(t *testing.T) {
 func BenchmarkCallPack(b *testing.B) {
 	d, _ := newPackData(42)
 	for i := 0; i < b.N; i += 1 {
-		poolRec := packetPool.Get(256)
-		(&Call{Name: "sel_all"}).Pack(d, poolRec.buffer)
-		poolRec.Release()
+		pp := packetPool.Get()
+		(&Call{Name: "sel_all"}).Pack(d, &pp.buffer)
+		pp.Release()
 	}
 }

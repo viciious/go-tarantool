@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -10,10 +11,11 @@ import (
 var packedOkBody = []byte{0x80}
 
 type packedPacket struct {
-	code       interface{}
-	requestID  uint32
-	body       []byte // for incoming packets
-	poolBuffer *bufferPoolRecord
+	code      interface{}
+	requestID uint32
+	body      []byte // for incoming packets
+	buffer    bytes.Buffer
+	pool      *packedPacketPool
 }
 
 func packLittle(value uint, bytes int) []byte {
@@ -69,10 +71,9 @@ func Uint64(value uint64) []byte {
 }
 
 func packIproto(code interface{}, requestID uint32) *packedPacket {
-	pp := &packedPacket{}
+	pp := packetPool.Get()
 	pp.requestID = requestID
 	pp.code = code
-	pp.poolBuffer = packetPool.Get(256)
 	return pp
 }
 
@@ -82,16 +83,11 @@ func packIprotoError(code int, requestID uint32) *packedPacket {
 
 func packIprotoOk(requestID uint32) *packedPacket {
 	pp := packIproto(OkCode, requestID)
-	pp.poolBuffer.buffer.Write(packedOkBody)
+	pp.buffer.Write(packedOkBody)
 	return pp
 }
 
 func (pp *packedPacket) WriteTo(w io.Writer) (n int, err error) {
-	if pp.poolBuffer == nil {
-		// already released
-		return
-	}
-
 	h8 := [...]byte{
 		0xce, 0, 0, 0, 0, // length
 		0x82,       // 2 element map
@@ -110,7 +106,7 @@ func (pp *packedPacket) WriteTo(w io.Writer) (n int, err error) {
 
 	code := pp.code
 	requestID := pp.requestID
-	body := pp.poolBuffer.buffer.Bytes()
+	body := pp.buffer.Bytes()
 
 	switch code.(type) {
 	case byte:
@@ -153,10 +149,9 @@ func (pp *packedPacket) WriteTo(w io.Writer) (n int, err error) {
 }
 
 func (pp *packedPacket) Release() {
-	if pp.poolBuffer != nil {
-		pp.poolBuffer.Release()
+	if pp.pool != nil {
+		pp.pool.Put(pp)
 	}
-	pp.poolBuffer = nil
 }
 
 func readPacked(r io.Reader) (*packedPacket, error) {
@@ -176,9 +171,9 @@ func readPacked(r io.Reader) (*packedPacket, error) {
 		return nil, errors.New("Packet should not be 0 length")
 	}
 
-	pp := &packedPacket{}
-	pp.poolBuffer = packetPool.Get(bodyLength)
-	pp.body = pp.poolBuffer.buffer.Bytes()[:bodyLength]
+	pp := packetPool.Get()
+	pp.buffer.Grow(bodyLength)
+	pp.body = pp.buffer.Bytes()[:bodyLength]
 
 	_, err = io.ReadAtLeast(r, pp.body, bodyLength)
 	if err != nil {

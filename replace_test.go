@@ -88,8 +88,8 @@ func BenchmarkReplacePack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
-		poolRec := packetPool.Get(256)
-		(&Replace{Tuple: []interface{}{3, "Hello world"}}).Pack(d, poolRec.buffer)
-		poolRec.Release()
+		pp := packetPool.Get()
+		(&Replace{Tuple: []interface{}{3, "Hello world"}}).Pack(d, &pp.buffer)
+		pp.Release()
 	}
 }

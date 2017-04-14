@@ -221,8 +221,8 @@ func BenchmarkSelectPack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
-		poolRec := packetPool.Get(256)
-		(&Select{Key: 3}).Pack(d, poolRec.buffer)
-		poolRec.Release()
+		pp := packetPool.Get()
+		(&Select{Key: 3}).Pack(d, &pp.buffer)
+		pp.Release()
 	}
 }

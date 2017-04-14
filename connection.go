@@ -178,7 +178,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 			User:         options.User,
 			Password:     options.Password,
 			GreetingAuth: conn.Greeting.Auth,
-		}).Pack(conn.packData, pp.poolBuffer.buffer)
+		}).Pack(conn.packData, &pp.buffer)
 		if err != nil {
 			return
 		}
@@ -213,7 +213,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 		pp := packIproto(0, requestID)
 		defer pp.Release()
 
-		pp.code, err = (req).Pack(conn.packData, pp.poolBuffer.buffer)
+		pp.code, err = (req).Pack(conn.packData, &pp.buffer)
 		if err != nil {
 			return nil, err
 		}

@@ -68,7 +68,7 @@ func BenchmarkUpdatePack(b *testing.B) {
 	d, _ := newPackData(42)
 
 	for i := 0; i < b.N; i += 1 {
-		poolRec := packetPool.Get(256)
+		pp := packetPool.Get()
 
 		(&Update{
 			Space: 1,
@@ -84,8 +84,8 @@ func BenchmarkUpdatePack(b *testing.B) {
 					Argument: "Hello World",
 				},
 			},
-		}).Pack(d, poolRec.buffer)
+		}).Pack(d, &pp.buffer)
 
-		poolRec.Release()
+		pp.Release()
 	}
 }

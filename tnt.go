@@ -2,7 +2,7 @@ package tarantool
 
 import "bytes"
 
-var packetPool *bufferPool
+var packetPool *packedPacketPool
 
 type Query interface {
 	Pack(data *packData, r *bytes.Buffer) (byte, error)
@@ -16,5 +16,5 @@ type request struct {
 }
 
 func init() {
-	packetPool = NewBufferPool()
+	packetPool = NewPackedPacketPool()
 }

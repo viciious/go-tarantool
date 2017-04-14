@@ -23,13 +23,13 @@ func (r *Result) pack(requestID uint32) (*packedPacket, error) {
 		var str = err.Error()
 
 		pp = packIprotoError(r.ErrorCode, requestID)
-		encoder := msgpack.NewEncoder(pp.poolBuffer.buffer)
+		encoder := msgpack.NewEncoder(&pp.buffer)
 		encoder.EncodeMapLen(1)
 		encoder.EncodeUint8(KeyError)
 		encoder.EncodeString(str)
 	} else {
 		pp = packIproto(OkCode, requestID)
-		encoder := msgpack.NewEncoder(pp.poolBuffer.buffer)
+		encoder := msgpack.NewEncoder(&pp.buffer)
 		encoder.EncodeMapLen(1)
 		encoder.EncodeUint8(KeyData)
 		encoder.EncodeArrayLen(65536) // force encoding as uin32, to be replaced later
@@ -43,7 +43,7 @@ func (r *Result) pack(requestID uint32) (*packedPacket, error) {
 			}
 		}
 
-		b := pp.poolBuffer.buffer.Bytes()
+		b := pp.buffer.Bytes()
 		if r.Data != nil {
 			packBigTo(uint(len(r.Data)), 4, b[3:])
 		} else {
