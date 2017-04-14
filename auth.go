@@ -1,10 +1,10 @@
 package tarantool
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
+	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -56,13 +56,13 @@ func xor(left, right []byte, size int) []byte {
 	return result
 }
 
-func (auth *Auth) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
+func (auth *Auth) Pack(data *packData, w io.Writer) (byte, error) {
 	scr, err := scramble(auth.GreetingAuth, auth.Password)
 	if err != nil {
 		return BadRequest, fmt.Errorf("auth: scrambling failure: %s", err.Error())
 	}
 
-	encoder := msgpack.NewEncoder(bodyBuffer)
+	encoder := msgpack.NewEncoder(w)
 
 	encoder.EncodeMapLen(2) // User, Password
 	encoder.EncodeUint64(KeyUserName)
@@ -76,7 +76,7 @@ func (auth *Auth) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	return AuthRequest, nil
 }
 
-func (auth *Auth) Unpack(r *bytes.Buffer) (err error) {
+func (auth *Auth) Unpack(r io.Reader) (err error) {
 	var i, l int
 	var k uint64
 

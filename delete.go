@@ -1,8 +1,8 @@
 package tarantool
 
 import (
-	"bytes"
 	"errors"
+	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -16,26 +16,26 @@ type Delete struct {
 
 var _ Query = (*Delete)(nil)
 
-func (s *Delete) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
+func (s *Delete) Pack(data *packData, w io.Writer) (byte, error) {
 	var err error
 
-	encoder := msgpack.NewEncoder(bodyBuffer)
+	encoder := msgpack.NewEncoder(w)
 
 	encoder.EncodeMapLen(3) // Space, Index, Key
 
 	// Space
-	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+	if err = data.writeSpace(s.Space, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Index
-	if err = data.writeIndex(s.Space, s.Index, bodyBuffer, encoder); err != nil {
+	if err = data.writeIndex(s.Space, s.Index, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Key
 	if s.Key != nil {
-		bodyBuffer.Write(data.packedSingleKey)
+		w.Write(data.packedSingleKey)
 		if err = encoder.Encode(s.Key); err != nil {
 			return BadRequest, err
 		}
@@ -52,7 +52,7 @@ func (s *Delete) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	return DeleteRequest, nil
 }
 
-func (q *Delete) Unpack(r *bytes.Buffer) (err error) {
+func (q *Delete) Unpack(r io.Reader) (err error) {
 	var i int
 	var k int
 	var t uint

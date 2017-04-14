@@ -1,16 +1,16 @@
 package tarantool
 
-import "bytes"
+import "io"
 
 type Ping struct {
 }
 
 var _ Query = (*Ping)(nil)
 
-func (s *Ping) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
+func (s *Ping) Pack(data *packData, w io.Writer) (byte, error) {
 	return PingRequest, nil
 }
 
-func (q *Ping) Unpack(r *bytes.Buffer) error {
+func (q *Ping) Unpack(r io.Reader) error {
 	return nil
 }

@@ -1,9 +1,9 @@
 package tarantool
 
 import (
-	"bytes"
 	"errors"
 	"gopkg.in/vmihailenco/msgpack.v2"
+	"io"
 )
 
 type Result struct {
@@ -54,9 +54,9 @@ func (r *Result) pack(requestID uint32) (*packedPacket, error) {
 	return pp, nil
 }
 
-func (r *Result) unpack(b *bytes.Buffer) (err error) {
+func (r *Result) unpack(rr io.Reader) (err error) {
 	var l int
-	d := msgpack.NewDecoder(b)
+	d := msgpack.NewDecoder(rr)
 	if l, err = d.DecodeMapLen(); err != nil {
 		return
 	}

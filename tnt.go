@@ -1,12 +1,12 @@
 package tarantool
 
-import "bytes"
+import "io"
 
 var packetPool *packedPacketPool
 
 type Query interface {
-	Pack(data *packData, r *bytes.Buffer) (byte, error)
-	Unpack(r *bytes.Buffer) error
+	Pack(data *packData, w io.Writer) (byte, error)
+	Unpack(r io.Reader) error
 }
 
 type request struct {

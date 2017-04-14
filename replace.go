@@ -1,8 +1,8 @@
 package tarantool
 
 import (
-	"bytes"
 	"errors"
+	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -14,19 +14,19 @@ type Replace struct {
 
 var _ Query = (*Replace)(nil)
 
-func (s *Replace) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
+func (s *Replace) Pack(data *packData, w io.Writer) (byte, error) {
 	var err error
 
 	if s.Tuple == nil {
 		return BadRequest, errors.New("Tuple can not be nil")
 	}
 
-	encoder := msgpack.NewEncoder(bodyBuffer)
+	encoder := msgpack.NewEncoder(w)
 
 	encoder.EncodeMapLen(2) // Space, Tuple
 
 	// Space
-	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+	if err = data.writeSpace(s.Space, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
@@ -42,7 +42,7 @@ func (s *Replace) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	return ReplaceRequest, nil
 }
 
-func (q *Replace) Unpack(r *bytes.Buffer) (err error) {
+func (q *Replace) Unpack(r io.Reader) (err error) {
 	var i int
 	var k int
 	var t uint

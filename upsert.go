@@ -1,7 +1,7 @@
 package tarantool
 
 import (
-	"bytes"
+	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -14,15 +14,15 @@ type Upsert struct {
 
 var _ Query = (*Upsert)(nil)
 
-func (s *Upsert) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
+func (s *Upsert) Pack(data *packData, w io.Writer) (byte, error) {
 	var err error
 
-	encoder := msgpack.NewEncoder(bodyBuffer)
+	encoder := msgpack.NewEncoder(w)
 
 	encoder.EncodeMapLen(3) // Space, Tuple, Update operators
 
 	// Space
-	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+	if err = data.writeSpace(s.Space, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
@@ -51,7 +51,7 @@ func (s *Upsert) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	return UpsertRequest, nil
 }
 
-func (q *Upsert) Unpack(r *bytes.Buffer) error {
+func (q *Upsert) Unpack(r io.Reader) error {
 	decoder := msgpack.NewDecoder(r)
 	_, err := decoder.DecodeInterface()
 	return err

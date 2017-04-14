@@ -1,7 +1,7 @@
 package tarantool
 
 import (
-	"bytes"
+	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -16,26 +16,26 @@ type Update struct {
 
 var _ Query = (*Update)(nil)
 
-func (s *Update) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
+func (s *Update) Pack(data *packData, w io.Writer) (byte, error) {
 	var err error
 
-	encoder := msgpack.NewEncoder(bodyBuffer)
+	encoder := msgpack.NewEncoder(w)
 
 	encoder.EncodeMapLen(4) // Space, Index, Key, Update operators
 
 	// Space
-	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+	if err = data.writeSpace(s.Space, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Index
-	if err = data.writeIndex(s.Space, s.Index, bodyBuffer, encoder); err != nil {
+	if err = data.writeIndex(s.Space, s.Index, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Key
 	if s.Key != nil {
-		bodyBuffer.Write(data.packedSingleKey)
+		w.Write(data.packedSingleKey)
 		if err = encoder.Encode(s.Key); err != nil {
 			return BadRequest, err
 		}
@@ -65,7 +65,7 @@ func (s *Update) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	return UpdateRequest, nil
 }
 
-func (q *Update) Unpack(r *bytes.Buffer) error {
+func (q *Update) Unpack(r io.Reader) error {
 	decoder := msgpack.NewDecoder(r)
 	_, err := decoder.DecodeInterface()
 	return err

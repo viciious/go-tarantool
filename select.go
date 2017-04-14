@@ -1,8 +1,8 @@
 package tarantool
 
 import (
-	"bytes"
 	"errors"
+	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -19,26 +19,26 @@ type Select struct {
 
 var _ Query = (*Select)(nil)
 
-func (s *Select) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
+func (s *Select) Pack(data *packData, w io.Writer) (byte, error) {
 	var err error
 
-	encoder := msgpack.NewEncoder(bodyBuffer)
+	encoder := msgpack.NewEncoder(w)
 
 	encoder.EncodeMapLen(6) // Space, Index, Offset, Limit, Iterator, Key
 
 	// Space
-	if err = data.writeSpace(s.Space, bodyBuffer, encoder); err != nil {
+	if err = data.writeSpace(s.Space, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Index
-	if err = data.writeIndex(s.Space, s.Index, bodyBuffer, encoder); err != nil {
+	if err = data.writeIndex(s.Space, s.Index, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Offset
 	if s.Offset == 0 {
-		bodyBuffer.Write(data.packedDefaultOffset)
+		w.Write(data.packedDefaultOffset)
 	} else {
 		encoder.EncodeUint32(KeyOffset)
 		encoder.EncodeUint32(s.Offset)
@@ -46,7 +46,7 @@ func (s *Select) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 
 	// Limit
 	if s.Limit == 0 {
-		bodyBuffer.Write(data.packedDefaultLimit)
+		w.Write(data.packedDefaultLimit)
 	} else {
 		encoder.EncodeUint32(KeyLimit)
 		encoder.EncodeUint32(s.Limit)
@@ -54,7 +54,7 @@ func (s *Select) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 
 	// Iterator
 	if s.Iterator == IterEq {
-		bodyBuffer.Write(data.packedIterEq)
+		w.Write(data.packedIterEq)
 	} else {
 		encoder.EncodeUint32(KeyIterator)
 		encoder.EncodeUint8(s.Iterator)
@@ -62,7 +62,7 @@ func (s *Select) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 
 	// Key
 	if s.Key != nil {
-		bodyBuffer.Write(data.packedSingleKey)
+		w.Write(data.packedSingleKey)
 		if err = encoder.Encode(s.Key); err != nil {
 			return BadRequest, err
 		}
@@ -82,7 +82,7 @@ func (s *Select) Pack(data *packData, bodyBuffer *bytes.Buffer) (byte, error) {
 	return SelectRequest, nil
 }
 
-func (q *Select) Unpack(r *bytes.Buffer) (err error) {
+func (q *Select) Unpack(r io.Reader) (err error) {
 	var i int
 	var k int
 	var t uint

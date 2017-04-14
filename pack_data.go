@@ -3,6 +3,7 @@ package tarantool
 import (
 	"bytes"
 	"fmt"
+	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -102,9 +103,9 @@ func (data *packData) encodeSpace(space interface{}, encoder *msgpack.Encoder) e
 	return nil
 }
 
-func (data *packData) writeSpace(space interface{}, buffer *bytes.Buffer, encoder *msgpack.Encoder) error {
+func (data *packData) writeSpace(space interface{}, w io.Writer, encoder *msgpack.Encoder) error {
 	if space == nil && data.packedDefaultSpace != nil {
-		buffer.Write(data.packedDefaultSpace)
+		w.Write(data.packedDefaultSpace)
 		return nil
 	}
 
@@ -151,9 +152,9 @@ func (data *packData) indexNo(space interface{}, index interface{}) (uint64, err
 	}
 }
 
-func (data *packData) writeIndex(space interface{}, index interface{}, buffer *bytes.Buffer, encoder *msgpack.Encoder) error {
+func (data *packData) writeIndex(space interface{}, index interface{}, w io.Writer, encoder *msgpack.Encoder) error {
 	if index == nil {
-		buffer.Write(data.packedDefaultIndex)
+		w.Write(data.packedDefaultIndex)
 		return nil
 	}
 

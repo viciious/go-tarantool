@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"bytes"
+	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
@@ -35,7 +36,7 @@ func msgpackDecodeBody(d *msgpack.Decoder) ([][]interface{}, error) {
 	return s, nil
 }
 
-func (pack *Packet) decodeHeader(r *bytes.Buffer) (err error) {
+func (pack *Packet) decodeHeader(r io.Reader) (err error) {
 	var l int
 	d := msgpack.NewDecoder(r)
 	if l, err = d.DecodeMapLen(); err != nil {
@@ -68,7 +69,7 @@ func (pack *Packet) decodeHeader(r *bytes.Buffer) (err error) {
 	return nil
 }
 
-func (pack *Packet) decodeBody(r *bytes.Buffer) (err error) {
+func (pack *Packet) decodeBody(r io.Reader) (err error) {
 	unpackq := func(q Query) error {
 		if err := q.Unpack(r); err != nil {
 			return err
@@ -86,32 +87,30 @@ func (pack *Packet) decodeBody(r *bytes.Buffer) (err error) {
 		return nil
 	}
 
-	if r.Len() > 2 {
-		if pack.code&ErrorFlag != 0 {
-			// error
-			return unpackr(pack.code - ErrorFlag)
-		}
+	if pack.code&ErrorFlag != 0 {
+		// error
+		return unpackr(pack.code - ErrorFlag)
+	}
 
-		switch byte(pack.code) {
-		case SelectRequest:
-			return unpackq(&Select{})
-		case AuthRequest:
-			return unpackq(&Auth{})
-		case InsertRequest:
-			return unpackq(&Insert{})
-		case ReplaceRequest:
-			return unpackq(&Replace{})
-		case DeleteRequest:
-			return unpackq(&Delete{})
-		case CallRequest:
-			return unpackq(&Call{})
-		case UpdateRequest:
-			return unpackq(&Update{})
-		case UpsertRequest:
-			return unpackq(&Upsert{})
-		default:
-			return unpackr(OkCode)
-		}
+	switch byte(pack.code) {
+	case SelectRequest:
+		return unpackq(&Select{})
+	case AuthRequest:
+		return unpackq(&Auth{})
+	case InsertRequest:
+		return unpackq(&Insert{})
+	case ReplaceRequest:
+		return unpackq(&Replace{})
+	case DeleteRequest:
+		return unpackq(&Delete{})
+	case CallRequest:
+		return unpackq(&Call{})
+	case UpdateRequest:
+		return unpackq(&Update{})
+	case UpsertRequest:
+		return unpackq(&Upsert{})
+	default:
+		return unpackr(OkCode)
 	}
 
 	return
