@@ -66,10 +66,6 @@ func (r *Result) unpack(rr io.Reader) (err error) {
 			return
 		}
 		switch cd {
-		case KeyCode:
-			if r.ErrorCode, err = d.DecodeInt(); err != nil {
-				return
-			}
 		case KeyData:
 			value, err := d.DecodeInterface()
 			if err != nil {
