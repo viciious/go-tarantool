@@ -6,7 +6,7 @@ type packedPacketPool struct {
 
 func NewPackedPacketPool() *packedPacketPool {
 	return &packedPacketPool{
-		queue: make(chan *packedPacket, 10240),
+		queue: make(chan *packedPacket, 1024),
 	}
 }
 
