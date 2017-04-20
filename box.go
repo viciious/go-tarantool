@@ -33,6 +33,9 @@ type BoxOptions struct {
 	PortMin uint
 	PortMax uint
 	WorkDir string
+
+	LogDir        string
+	LogNamePrefix string
 }
 
 var (
@@ -67,19 +70,35 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 	var box *Box
 
 	for port := options.PortMin; port <= options.PortMax; port++ {
-		tmpDir, err := ioutil.TempDir("", "") //os.RemoveAll(tmpDir);
+		tmpDir, err := ioutil.TempDir("", options.LogNamePrefix)
 		if err != nil {
 			return nil, err
 		}
+
 		notifySock := filepath.Join(tmpDir, "notify.sock")
 
-		initLua := `
-			sendstatus("STARTING")
+		logDir := options.LogDir
+		if logDir == "" {
+			logDir = os.Getenv("TNT_LOG_DIR")
+		}
 
+		logPath := "stderr"
+		if logDir != "" {
+			_, fName := filepath.Split(tmpDir)
+			logPath = fmt.Sprintf(`"%s"`, filepath.Join(logDir, fName))
+			fmt.Println("Tarantool log path:", logPath)
+		}
+
+		initLua := fmt.Sprintf(`
 			box.cfg{
 				snap_dir = "{root}/snap/",
-				wal_dir = "{root}/wal/"
+				wal_dir = "{root}/wal/",
+				logger = %s,
 			}
+		`, logPath)
+
+		initLua += `
+			sendstatus("STARTING")
 
 			box.once('guest:read_universe', function()
 				box.schema.user.grant('guest', 'read', 'universe', {if_not_exists = true})
