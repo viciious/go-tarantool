@@ -60,7 +60,9 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 	if options.Host == "" {
 		options.Host = "127.0.0.1"
 	}
-	options.Host += ":"
+	if !strings.HasSuffix(options.Host, ":") {
+		options.Host += ":"
+	}
 
 	var box *Box
 
