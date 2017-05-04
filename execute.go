@@ -41,7 +41,7 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 		// pass
 	case <-ctx.Done():
 		return &Result{
-			Error:     NewContextError(conn, "Send error", ctx),
+			Error:     NewContextError(ctx, conn, "Send error"),
 			ErrorCode: ErrTimeout,
 		}
 	case <-conn.exit:
@@ -57,7 +57,7 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 		// pass
 	case <-ctx.Done():
 		return &Result{
-			Error:     NewContextError(conn, "Recv error", ctx),
+			Error:     NewContextError(ctx, conn, "Recv error"),
 			ErrorCode: ErrTimeout,
 		}
 	case <-conn.exit:
@@ -88,8 +88,8 @@ func (conn *Connection) Exec(q Query, ctx context.Context) *Result {
 
 func (conn *Connection) ExecuteOptions(q Query, opts *QueryOptions) ([][]interface{}, error) {
 	var res *Result
-	var ctx context.Context = context.Background()
 	var cancel context.CancelFunc = func() {}
+	ctx := context.Background()
 
 	// make options
 	if opts == nil {

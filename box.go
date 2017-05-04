@@ -215,7 +215,7 @@ func (box *Box) StartWithLua(luaTransform func(string) string) error {
 	}
 
 	statusCh := make(chan string, 10)
-	u, err := net.ListenUnixgram("unixgram", &net.UnixAddr{box.notifySock, "unix"})
+	u, err := net.ListenUnixgram("unixgram", &net.UnixAddr{Name:box.notifySock, Net:"unix"})
 	if err != nil {
 		return err
 	}

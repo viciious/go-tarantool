@@ -65,12 +65,7 @@ func TestInsert(t *testing.T) {
 	})
 
 	if assert.NoError(err) {
-		assert.Equal([][]interface{}{
-			[]interface{}{
-				uint64(4),
-				"Hello",
-			},
-		}, data)
+		assert.Equal([][]interface{}{{uint64(4), "Hello"}}, data)
 	}
 
 	data, err = do(&Insert{
@@ -85,7 +80,7 @@ func TestInsert(t *testing.T) {
 
 func BenchmarkInsertPack(b *testing.B) {
 	d, _ := newPackData(42)
-	for i := 0; i < b.N; i += 1 {
+	for i := 0; i < b.N; i++ {
 		pp := packetPool.Get()
 		(&Insert{Tuple: []interface{}{3, "Hello world"}}).Pack(d, &pp.buffer)
 		pp.Release()

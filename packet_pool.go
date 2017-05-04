@@ -4,7 +4,7 @@ type packedPacketPool struct {
 	queue chan *packedPacket
 }
 
-func NewPackedPacketPool() *packedPacketPool {
+func newPackedPacketPool() *packedPacketPool {
 	return &packedPacketPool{
 		queue: make(chan *packedPacket, 1024),
 	}

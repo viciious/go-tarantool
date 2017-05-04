@@ -35,7 +35,7 @@ func NewConnectionError(con *Connection, message string, timeout bool) error {
 }
 
 func ConnectionClosedError(con *Connection) error {
-	var message string = "Connection closed"
+	var message = "Connection closed"
 	_, err := con.IsClosed()
 	if err != nil {
 		message = fmt.Sprintf("Connection error: %s", err)
@@ -43,7 +43,7 @@ func ConnectionClosedError(con *Connection) error {
 	return NewConnectionError(con, message, false)
 }
 
-func NewContextError(con *Connection, message string, ctx context.Context) error {
+func NewContextError(ctx context.Context, con *Connection, message string) error {
 	return &ContextError{
 		error:      fmt.Errorf("%s: %s, remote: %s", message, ctx.Err(), con.dsn.Host()),
 		contextErr: ctx.Err(),

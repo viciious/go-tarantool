@@ -129,11 +129,11 @@ const (
 	ErrSophia                        = iota // %s
 	ErrLocalServerIsNotActive        = iota // Local server is not active
 	ErrUnknownServer                 = iota // Server %s is not registered with the cluster
-	ErrClusterIdMismatch             = iota // Cluster id of the replica %s doesn't match cluster id of the master %s
-	ErrInvalidUuid                   = iota // Invalid UUID: %s
-	ErrClusterIdIsRo                 = iota // Can't reset cluster id: it is already assigned
+	ErrClusterIDMismatch             = iota // Cluster id of the replica %s doesn't match cluster id of the master %s
+	ErrInvalidUUID                   = iota // Invalid UUID: %s
+	ErrClusterIDIsRo                 = iota // Can't reset cluster id: it is already assigned
 	ErrReserved66                    = iota // Reserved66
-	ErrServerIdIsReserved            = iota // Can't initialize server id with a reserved value %u
+	ErrServerIDIsReserved            = iota // Can't initialize server id with a reserved value %u
 	ErrInvalidOrder                  = iota // Invalid LSN order for server %u: previous LSN = %llu, new lsn = %llu
 	ErrMissingRequestField           = iota // Missing mandatory field '%s' in request
 	ErrIdentifier                    = iota // Invalid identifier '%s' (expected letters, digits or an underscore)

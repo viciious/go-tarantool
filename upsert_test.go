@@ -77,11 +77,7 @@ func TestUpsert(t *testing.T) {
 			Key:   1,
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(1),
-				"Hello World",
-				uint64(32),
-			},
+			{uint64(1), "Hello World", uint64(32)},
 		},
 	)
 
@@ -112,11 +108,7 @@ func TestUpsert(t *testing.T) {
 			Key:   2,
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(2),
-				"Second",
-				uint64(16),
-			},
+			{uint64(2), "Second", uint64(16)},
 		},
 	)
 
@@ -125,7 +117,7 @@ func TestUpsert(t *testing.T) {
 func BenchmarkUpsertPack(b *testing.B) {
 	d, _ := newPackData(42)
 
-	for i := 0; i < b.N; i += 1 {
+	for i := 0; i < b.N; i++ {
 		pp := packetPool.Get()
 
 		(&Upsert{

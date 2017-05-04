@@ -14,10 +14,10 @@ type Insert struct {
 
 var _ Query = (*Insert)(nil)
 
-func (s *Insert) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Insert) Pack(data *packData, w io.Writer) (byte, error) {
 	var err error
 
-	if s.Tuple == nil {
+	if q.Tuple == nil {
 		return BadRequest, errors.New("Tuple can not be nil")
 	}
 
@@ -26,14 +26,14 @@ func (s *Insert) Pack(data *packData, w io.Writer) (byte, error) {
 	encoder.EncodeMapLen(2) // Space, Tuple
 
 	// Space
-	if err = data.writeSpace(s.Space, w, encoder); err != nil {
+	if err = data.writeSpace(q.Space, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Tuple
 	encoder.EncodeUint32(KeyTuple)
-	encoder.EncodeArrayLen(len(s.Tuple))
-	for _, value := range s.Tuple {
+	encoder.EncodeArrayLen(len(q.Tuple))
+	for _, value := range q.Tuple {
 		if err = encoder.Encode(value); err != nil {
 			return BadRequest, err
 		}

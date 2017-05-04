@@ -2,8 +2,9 @@ package tarantool
 
 import (
 	"errors"
-	"gopkg.in/vmihailenco/msgpack.v2"
 	"io"
+
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type Result struct {
@@ -83,7 +84,7 @@ func (r *Result) unpack(rr io.Reader) (err error) {
 			}
 			r.Error = NewQueryError(errorMessage)
 		default:
-			if _, err = d.DecodeInterface(); err != nil {
+			if err = d.Skip(); err != nil {
 				return
 			}
 		}

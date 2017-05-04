@@ -2,8 +2,9 @@ package tarantool
 
 import (
 	"errors"
-	"gopkg.in/vmihailenco/msgpack.v2"
 	"io"
+
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type Call struct {
@@ -13,7 +14,7 @@ type Call struct {
 
 var _ Query = (*Call)(nil)
 
-func (s *Call) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Call) Pack(data *packData, w io.Writer) (byte, error) {
 	var err error
 
 	encoder := msgpack.NewEncoder(w)
@@ -22,12 +23,12 @@ func (s *Call) Pack(data *packData, w io.Writer) (byte, error) {
 
 	// Name
 	encoder.EncodeUint32(KeyFunctionName)
-	encoder.EncodeString(s.Name)
+	encoder.EncodeString(q.Name)
 
-	if s.Tuple != nil {
+	if q.Tuple != nil {
 		encoder.EncodeUint32(KeyTuple)
-		encoder.EncodeArrayLen(len(s.Tuple))
-		for _, key := range s.Tuple {
+		encoder.EncodeArrayLen(len(q.Tuple))
+		for _, key := range q.Tuple {
 			if err = encoder.Encode(key); err != nil {
 				return byte(0), err
 			}

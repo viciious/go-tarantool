@@ -87,7 +87,7 @@ func packIprotoOk(requestID uint32) *packedPacket {
 	return pp
 }
 
-func (pp *packedPacket) WriteTo(w io.Writer) (n int, err error) {
+func (pp *packedPacket) WriteTo(w io.Writer) (n int64, err error) {
 	h8 := [...]byte{
 		0xce, 0, 0, 0, 0, // length
 		0x82,       // 2 element map
@@ -133,19 +133,19 @@ func (pp *packedPacket) WriteTo(w io.Writer) (n int, err error) {
 		panic("packIproto: unknown code type")
 	}
 
-	l := uint(len(h) - 5 + len(body))
+	l := uint(len(h) - PacketLengthBytes + len(body))
 	packBigTo(l, 4, h[1:])
 
-	n, err = w.Write(h)
+	m, err := w.Write(h)
+	n += int64(m)
 	if err != nil {
 		return
 	}
 
-	nn, err := w.Write(body)
-	if err != nil {
-		return n + nn, err
-	}
-	return n + nn, nil
+	m, err = w.Write(body)
+	n += int64(m)
+
+	return
 }
 
 func (pp *packedPacket) Release() {
@@ -156,9 +156,9 @@ func (pp *packedPacket) Release() {
 
 func readPacked(r io.Reader) (*packedPacket, error) {
 	var err error
-	var h [5]byte
+	var h [PacketLengthBytes]byte
 
-	if _, err = io.ReadAtLeast(r, h[:], 5); err != nil {
+	if _, err = io.ReadAtLeast(r, h[:], PacketLengthBytes); err != nil {
 		return nil, err
 	}
 

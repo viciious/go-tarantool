@@ -16,7 +16,7 @@ type Update struct {
 
 var _ Query = (*Update)(nil)
 
-func (s *Update) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Update) Pack(data *packData, w io.Writer) (byte, error) {
 	var err error
 
 	encoder := msgpack.NewEncoder(w)
@@ -24,25 +24,25 @@ func (s *Update) Pack(data *packData, w io.Writer) (byte, error) {
 	encoder.EncodeMapLen(4) // Space, Index, Key, Update operators
 
 	// Space
-	if err = data.writeSpace(s.Space, w, encoder); err != nil {
+	if err = data.writeSpace(q.Space, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Index
-	if err = data.writeIndex(s.Space, s.Index, w, encoder); err != nil {
+	if err = data.writeIndex(q.Space, q.Index, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Key
-	if s.Key != nil {
+	if q.Key != nil {
 		w.Write(data.packedSingleKey)
-		if err = encoder.Encode(s.Key); err != nil {
+		if err = encoder.Encode(q.Key); err != nil {
 			return BadRequest, err
 		}
-	} else if s.KeyTuple != nil {
+	} else if q.KeyTuple != nil {
 		encoder.EncodeUint32(KeyKey)
-		encoder.EncodeArrayLen(len(s.KeyTuple))
-		for _, key := range s.KeyTuple {
+		encoder.EncodeArrayLen(len(q.KeyTuple))
+		for _, key := range q.KeyTuple {
 			if err = encoder.Encode(key); err != nil {
 				return BadRequest, err
 			}
@@ -51,8 +51,8 @@ func (s *Update) Pack(data *packData, w io.Writer) (byte, error) {
 
 	// Update
 	encoder.EncodeUint32(KeyTuple)
-	encoder.EncodeArrayLen(len(s.Set))
-	for _, op := range s.Set {
+	encoder.EncodeArrayLen(len(q.Set))
+	for _, op := range q.Set {
 		t := op.AsTuple()
 		encoder.EncodeArrayLen(len(t))
 		for _, value := range t {

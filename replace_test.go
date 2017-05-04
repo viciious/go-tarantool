@@ -87,7 +87,7 @@ func TestReplace(t *testing.T) {
 func BenchmarkReplacePack(b *testing.B) {
 	d, _ := newPackData(42)
 
-	for i := 0; i < b.N; i += 1 {
+	for i := 0; i < b.N; i++ {
 		pp := packetPool.Get()
 		(&Replace{Tuple: []interface{}{3, "Hello world"}}).Pack(d, &pp.buffer)
 		pp.Release()

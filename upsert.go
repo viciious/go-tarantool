@@ -14,7 +14,7 @@ type Upsert struct {
 
 var _ Query = (*Upsert)(nil)
 
-func (s *Upsert) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Upsert) Pack(data *packData, w io.Writer) (byte, error) {
 	var err error
 
 	encoder := msgpack.NewEncoder(w)
@@ -22,14 +22,14 @@ func (s *Upsert) Pack(data *packData, w io.Writer) (byte, error) {
 	encoder.EncodeMapLen(3) // Space, Tuple, Update operators
 
 	// Space
-	if err = data.writeSpace(s.Space, w, encoder); err != nil {
+	if err = data.writeSpace(q.Space, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Tuple (to insert)
 	encoder.EncodeUint32(KeyTuple)
-	encoder.EncodeArrayLen(len(s.Tuple))
-	for _, key := range s.Tuple {
+	encoder.EncodeArrayLen(len(q.Tuple))
+	for _, key := range q.Tuple {
 		if err = encoder.Encode(key); err != nil {
 			return BadRequest, err
 		}
@@ -37,8 +37,8 @@ func (s *Upsert) Pack(data *packData, w io.Writer) (byte, error) {
 
 	// Update ops
 	encoder.EncodeUint32(KeyDefTuple)
-	encoder.EncodeArrayLen(len(s.Set))
-	for _, op := range s.Set {
+	encoder.EncodeArrayLen(len(q.Set))
+	for _, op := range q.Set {
 		t := op.AsTuple()
 		encoder.EncodeArrayLen(len(t))
 		for _, value := range t {

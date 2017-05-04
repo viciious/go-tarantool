@@ -19,7 +19,7 @@ type Select struct {
 
 var _ Query = (*Select)(nil)
 
-func (s *Select) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Select) Pack(data *packData, w io.Writer) (byte, error) {
 	var err error
 
 	encoder := msgpack.NewEncoder(w)
@@ -27,49 +27,49 @@ func (s *Select) Pack(data *packData, w io.Writer) (byte, error) {
 	encoder.EncodeMapLen(6) // Space, Index, Offset, Limit, Iterator, Key
 
 	// Space
-	if err = data.writeSpace(s.Space, w, encoder); err != nil {
+	if err = data.writeSpace(q.Space, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Index
-	if err = data.writeIndex(s.Space, s.Index, w, encoder); err != nil {
+	if err = data.writeIndex(q.Space, q.Index, w, encoder); err != nil {
 		return BadRequest, err
 	}
 
 	// Offset
-	if s.Offset == 0 {
+	if q.Offset == 0 {
 		w.Write(data.packedDefaultOffset)
 	} else {
 		encoder.EncodeUint32(KeyOffset)
-		encoder.EncodeUint32(s.Offset)
+		encoder.EncodeUint32(q.Offset)
 	}
 
 	// Limit
-	if s.Limit == 0 {
+	if q.Limit == 0 {
 		w.Write(data.packedDefaultLimit)
 	} else {
 		encoder.EncodeUint32(KeyLimit)
-		encoder.EncodeUint32(s.Limit)
+		encoder.EncodeUint32(q.Limit)
 	}
 
 	// Iterator
-	if s.Iterator == IterEq {
+	if q.Iterator == IterEq {
 		w.Write(data.packedIterEq)
 	} else {
 		encoder.EncodeUint32(KeyIterator)
-		encoder.EncodeUint8(s.Iterator)
+		encoder.EncodeUint8(q.Iterator)
 	}
 
 	// Key
-	if s.Key != nil {
+	if q.Key != nil {
 		w.Write(data.packedSingleKey)
-		if err = encoder.Encode(s.Key); err != nil {
+		if err = encoder.Encode(q.Key); err != nil {
 			return BadRequest, err
 		}
-	} else if s.KeyTuple != nil {
+	} else if q.KeyTuple != nil {
 		encoder.EncodeUint32(KeyKey)
-		encoder.EncodeArrayLen(len(s.KeyTuple))
-		for _, key := range s.KeyTuple {
+		encoder.EncodeArrayLen(len(q.KeyTuple))
+		for _, key := range q.KeyTuple {
 			if err = encoder.Encode(key); err != nil {
 				return BadRequest, err
 			}

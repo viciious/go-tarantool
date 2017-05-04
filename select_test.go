@@ -91,11 +91,7 @@ func TestSelect(t *testing.T) {
 			Key:   uint64(3),
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(0x3),
-				"Length",
-				uint64(0x5d),
-			},
+			{uint64(0x3), "Length", uint64(0x5d)},
 		},
 	)
 
@@ -106,11 +102,7 @@ func TestSelect(t *testing.T) {
 			Key:   uint64(3),
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(0x3),
-				"Length",
-				uint64(0x5d),
-			},
+			{uint64(0x3), "Length", uint64(0x5d)},
 		},
 	)
 
@@ -122,10 +114,7 @@ func TestSelect(t *testing.T) {
 			Key:   "Music",
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(0x2),
-				"Music",
-			},
+			{uint64(0x2), "Music"},
 		},
 	)
 
@@ -137,10 +126,7 @@ func TestSelect(t *testing.T) {
 			KeyTuple: []interface{}{uint64(2), "Music"},
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(0x2),
-				"Music",
-			},
+			{uint64(0x2), "Music"},
 		},
 	)
 
@@ -160,19 +146,9 @@ func TestSelect(t *testing.T) {
 			Iterator: IterAll,
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(1),
-				"First record",
-			},
-			[]interface{}{
-				uint64(2),
-				"Music",
-			},
-			[]interface{}{
-				uint64(3),
-				"Length",
-				uint64(93),
-			},
+			{uint64(1), "First record"},
+			{uint64(2), "Music"},
+			{uint64(3), "Length", uint64(93)},
 		},
 	)
 	// iterate all using STR index
@@ -183,19 +159,9 @@ func TestSelect(t *testing.T) {
 			Iterator: IterAll,
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(2),
-				"Music",
-			},
-			[]interface{}{
-				uint64(3),
-				"Length",
-				uint64(93),
-			},
-			[]interface{}{
-				uint64(1),
-				"First record",
-			},
+			{uint64(2), "Music"},
+			{uint64(3), "Length", uint64(93)},
+			{uint64(1), "First record"},
 		},
 	)
 	// iterate Eq using STR index
@@ -207,11 +173,7 @@ func TestSelect(t *testing.T) {
 			Iterator: IterEq,
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(3),
-				"Length",
-				uint64(93),
-			},
+			{uint64(3), "Length", uint64(93)},
 		},
 	)
 
@@ -220,7 +182,7 @@ func TestSelect(t *testing.T) {
 func BenchmarkSelectPack(b *testing.B) {
 	d, _ := newPackData(42)
 
-	for i := 0; i < b.N; i += 1 {
+	for i := 0; i < b.N; i++ {
 		pp := packetPool.Get()
 		(&Select{Key: 3}).Pack(d, &pp.buffer)
 		pp.Release()

@@ -84,19 +84,9 @@ func TestCall(t *testing.T) {
 			Name: "sel_all",
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(1),
-				"First record",
-			},
-			[]interface{}{
-				uint64(2),
-				"Music",
-			},
-			[]interface{}{
-				uint64(3),
-				"Length",
-				uint64(93),
-			},
+			{uint64(1), "First record"},
+			{uint64(2), "Music"},
+			{uint64(3), "Length", uint64(93)},
 		},
 	)
 
@@ -107,10 +97,7 @@ func TestCall(t *testing.T) {
 			Tuple: []interface{}{uint64(2), "Music"},
 		},
 		[][]interface{}{
-			[]interface{}{
-				uint64(2),
-				"Music",
-			},
+			{uint64(2), "Music"},
 		},
 	)
 
@@ -118,7 +105,7 @@ func TestCall(t *testing.T) {
 
 func BenchmarkCallPack(b *testing.B) {
 	d, _ := newPackData(42)
-	for i := 0; i < b.N; i += 1 {
+	for i := 0; i < b.N; i++ {
 		pp := packetPool.Get()
 		(&Call{Name: "sel_all"}).Pack(d, &pp.buffer)
 		pp.Release()

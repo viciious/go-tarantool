@@ -54,11 +54,7 @@ func TestUpdate(t *testing.T) {
 
 	if assert.NoError(err) {
 		assert.Equal([][]interface{}{
-			[]interface{}{
-				uint64(1),
-				"Hello World",
-				uint64(32),
-			},
+			{uint64(1), "Hello World", uint64(32)},
 		}, data)
 	}
 
@@ -67,7 +63,7 @@ func TestUpdate(t *testing.T) {
 func BenchmarkUpdatePack(b *testing.B) {
 	d, _ := newPackData(42)
 
-	for i := 0; i < b.N; i += 1 {
+	for i := 0; i < b.N; i++ {
 		pp := packetPool.Get()
 
 		(&Update{

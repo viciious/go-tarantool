@@ -16,5 +16,5 @@ type request struct {
 }
 
 func init() {
-	packetPool = NewPackedPacketPool()
+	packetPool = newPackedPacketPool()
 }

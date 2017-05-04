@@ -61,7 +61,7 @@ func (pack *Packet) decodeHeader(r io.Reader) (err error) {
 				return
 			}
 		default:
-			if _, err = d.DecodeInterface(); err != nil {
+			if err = d.Skip(); err != nil {
 				return
 			}
 		}
@@ -112,14 +112,12 @@ func (pack *Packet) decodeBody(r io.Reader) (err error) {
 	default:
 		return unpackr(OkCode)
 	}
-
-	return
 }
 
 func decodePacket(pp *packedPacket) (*Packet, error) {
-	r := bytes.NewBuffer(pp.body)
+	r := bytes.NewReader(pp.body)
 
-	pack := &Packet{}
+	pack := new(Packet)
 	err := pack.decodeHeader(r)
 	if err != nil {
 		return nil, err
