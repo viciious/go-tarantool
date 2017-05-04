@@ -2,7 +2,6 @@ package tarantool
 
 import (
 	"bytes"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
