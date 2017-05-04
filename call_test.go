@@ -9,9 +9,6 @@ import (
 )
 
 func TestCall(t *testing.T) {
-	if os.Getenv("TARANTOOL16") == "" {
-		t.Skip("skipping tarantool16 tests")
-	}
 	assert := assert.New(t)
 
 	tarantoolConfig := `
