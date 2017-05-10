@@ -4,19 +4,19 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConnect(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 
 	box, err := NewBox("", nil)
-	assert.NoError(err)
+	require.NoError(err)
 	defer box.Close()
 
 	conn, err := Connect(box.Addr(), nil)
-	if !assert.NoError(err) {
-		return
-	}
+	require.NoError(err)
 	defer conn.Close()
 
 	assert.Contains(string(conn.Greeting.Version), "Tarantool")
@@ -24,6 +24,7 @@ func TestConnect(t *testing.T) {
 
 func TestDefaultSpace(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 	config := `
 	s = box.schema.space.create('tester', {id = 42})
 	s:create_index('tester_id', {
@@ -33,22 +34,19 @@ func TestDefaultSpace(t *testing.T) {
 	t = s:insert({1})
 	`
 	box, err := NewBox(config, nil)
-	assert.NoError(err)
+	require.NoError(err)
 	defer box.Close()
 
 	conn, err := Connect(box.Addr(), &Options{
 		DefaultSpace: "tester",
 	})
-
-	assert.NoError(err)
+	require.NoError(err)
 	defer conn.Close()
 
 	tuples, err := conn.Execute(&Select{
 		Key:   1,
 		Index: "tester_id",
 	})
-	assert.NoError(err)
-	assert.Equal([][]interface{}{
-		[]interface{}{uint64(1)},
-	}, tuples)
+	require.NoError(err)
+	assert.Equal([][]interface{}{{uint64(1)}}, tuples)
 }

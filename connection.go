@@ -2,7 +2,6 @@ package tarantool
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/phonkee/godsn"
-	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type Options struct {
@@ -23,6 +21,8 @@ type Options struct {
 	DefaultSpace   string
 	User           string
 	Password       string
+	UUID           string
+	ReplicaSetUUID string
 }
 
 type Greeting struct {
@@ -48,7 +48,42 @@ type Connection struct {
 	firstErrorLock *sync.Mutex
 }
 
+// Connect to tarantool instance with options.
+// Returned Connection could be used to execute queries.
 func Connect(dsnString string, options *Options) (conn *Connection, err error) {
+	// code below had appeared in result of splitting Connect into newConn and pullSchema
+	// newConn should be refactored totally
+	conn, err = newConn(dsnString, options)
+	if err != nil {
+		return
+	}
+
+	// set schema pulling deadline
+	timeout := time.Duration(time.Second)
+	if options != nil {
+		if options.ConnectTimeout.Nanoseconds() != 0 {
+			timeout = options.ConnectTimeout
+		}
+	}
+	deadline := time.Now().Add(timeout)
+	conn.tcpConn.SetDeadline(deadline)
+
+	err = conn.pullSchema()
+	if err != nil {
+		conn.tcpConn.Close()
+		conn = nil
+		return
+	}
+
+	// remove deadline
+	conn.tcpConn.SetDeadline(time.Time{})
+
+	go conn.worker(conn.tcpConn)
+
+	return
+}
+
+func newConn(dsnString string, options *Options) (conn *Connection, err error) {
 	var dsn *godsn.DSN
 
 	defer func() { // close opened connection if error
@@ -146,21 +181,6 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 		return
 	}
 
-	read := func(r io.Reader) (*Packet, error) {
-		pp, rerr := readPacked(r)
-		if rerr != nil {
-			return nil, rerr
-		}
-		defer pp.Release()
-
-		packet, rerr := decodePacket(pp)
-		if rerr != nil {
-			return nil, rerr
-		}
-
-		return packet, nil
-	}
-
 	conn.Greeting = &Greeting{
 		Version: greeting[:64],
 		Auth:    greeting[64:108],
@@ -188,7 +208,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 			return
 		}
 
-		authResponse, err = read(conn.tcpConn)
+		authResponse, err = readPacket(conn.tcpConn)
 		if err != nil {
 			return
 		}
@@ -203,7 +223,12 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 			return
 		}
 	}
+	// remove deadline
+	conn.tcpConn.SetDeadline(time.Time{})
+	return
+}
 
+func (conn *Connection) pullSchema() (err error) {
 	// select space and index schema
 	request := func(req Query) (*Result, error) {
 		var err error
@@ -223,7 +248,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 			return nil, err
 		}
 
-		response, err := read(conn.tcpConn)
+		response, err := readPacket(conn.tcpConn)
 		if err != nil {
 			return nil, err
 		}
@@ -255,11 +280,6 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	for _, space := range res.Data {
 		conn.packData.spaceMap[space[2].(string)] = space[0].(uint64)
 	}
-
-	var defSpaceBuf bytes.Buffer
-	defSpaceEnc := msgpack.NewEncoder(&defSpaceBuf)
-	conn.packData.encodeSpace(opts.DefaultSpace, defSpaceEnc)
-	conn.packData.packedDefaultSpace = defSpaceBuf.Bytes()
 
 	res, err = request(&Select{
 		Space:    ViewIndex,
@@ -296,11 +316,6 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 			}
 		}
 	}
-
-	// remove deadline
-	conn.tcpConn.SetDeadline(time.Time{})
-
-	go conn.worker(conn.tcpConn)
 
 	return
 }
@@ -458,7 +473,7 @@ func (conn *Connection) reader(tcpConn net.Conn) (err error) {
 	var pp *packedPacket
 	var req *request
 
-	r := bufio.NewReaderSize(tcpConn, 128*1024)
+	r := bufio.NewReaderSize(tcpConn, DefaultReaderBufSize)
 
 READER_LOOP:
 	for {
@@ -495,4 +510,19 @@ READER_LOOP:
 		pp.Release()
 	}
 	return
+}
+
+func readPacket(r io.Reader) (p *Packet, err error) {
+	pp, err := readPacked(r)
+	if err != nil {
+		return nil, err
+	}
+	defer pp.Release()
+
+	p, err = decodePacket(pp)
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }

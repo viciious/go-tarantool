@@ -15,6 +15,12 @@ type request struct {
 	replyChan chan *Result
 }
 
+// ReplicaSet is an alias for the map to store Instance IDs of the Replica Set
+type ReplicaSet map[uint32]string
+
+// VectorClock is an alias for the map to store Vector Clock
+type VectorClock map[uint32]int64
+
 func init() {
 	packetPool = newPackedPacketPool()
 }

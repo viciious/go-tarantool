@@ -28,6 +28,8 @@ type QueryError struct {
 var _ Error = (*ConnectionError)(nil)
 var _ Error = (*QueryError)(nil)
 
+var ErrNotInReplicaSet = NewQueryError("Full Replica Set params hasn't been set")
+
 func NewConnectionError(con *Connection, message string, timeout bool) error {
 	return &ConnectionError{
 		error: fmt.Errorf("%s, remote: %s", message, con.dsn.Host()),

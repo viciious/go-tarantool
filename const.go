@@ -16,24 +16,28 @@ const (
 	EvalRequest      = byte(8)
 	UpsertRequest    = byte(9)
 	PingRequest      = byte(64)
+	JoinCommand      = byte(65)
 	SubscribeRequest = byte(66)
 
-	KeyCode         = 0x00
-	KeySync         = 0x01
-	KeySchemaID     = 0x05
-	KeySpaceNo      = 0x10
-	KeyIndexNo      = 0x11
-	KeyLimit        = 0x12
-	KeyOffset       = 0x13
-	KeyIterator     = 0x14
-	KeyKey          = 0x20
-	KeyTuple        = 0x21
-	KeyFunctionName = 0x22
-	KeyUserName     = 0x23
-	KeyExpression   = 0x27
-	KeyDefTuple     = 0x28
-	KeyData         = 0x30
-	KeyError        = 0x31
+	KeyCode           = 0x00
+	KeySync           = 0x01
+	KeySchemaID       = 0x05
+	KeySpaceNo        = 0x10
+	KeyIndexNo        = 0x11
+	KeyLimit          = 0x12
+	KeyOffset         = 0x13
+	KeyIterator       = 0x14
+	KeyKey            = 0x20
+	KeyTuple          = 0x21
+	KeyFunctionName   = 0x22
+	KeyUserName       = 0x23
+	KeyInstanceUUID   = 0x24
+	KeyReplicaSetUUID = 0x25
+	KeyVClock         = 0x26
+	KeyExpression     = 0x27
+	KeyDefTuple       = 0x28
+	KeyData           = 0x30
+	KeyError          = 0x31
 
 	// https://github.com/fl00r/go-tarantool-1.6/issues/2
 	IterEq            = uint8(0) // key == x ASC order
@@ -50,6 +54,9 @@ const (
 	OkCode            = 0
 	PacketLengthBytes = 5
 	ErrorFlag         = 0x8000
+
+	SchemaKeyClusterUUID = "cluster"
+	ReplicaSetMaxSize    = 32
 )
 
 const (
