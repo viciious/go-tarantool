@@ -171,7 +171,7 @@ READER_LOOP:
 				if code == PingRequest {
 					s.output <- packIprotoOk(packet.requestID)
 				} else {
-					res := s.handler(packet.request.(Query))
+					res := s.handler(packet.Request)
 					outBody, _ := res.pack(packet.requestID)
 					s.output <- outBody
 				}

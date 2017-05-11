@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"errors"
 	"fmt"
 
 	"io"
@@ -21,6 +22,13 @@ func (q *VClock) String() string {
 		q.RequestID, q.InstanceID, q.VClock)
 }
 
+// Pack implements a part of the Query interface
+func (q *VClock) Pack(r io.Reader) (err error) {
+	// TODO: support Subscribe Unpack
+	return errors.New("Not supported yet")
+}
+
+// Unpack implements a part of the Query interface
 func (q *VClock) Unpack(r io.Reader) (err error) {
 	var count int
 

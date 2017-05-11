@@ -4,36 +4,40 @@ import (
 	"bytes"
 	"io"
 
+	"time"
+
+	"fmt"
+
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type Packet struct {
-	code      int
-	requestID uint32
-	request   interface{}
-	result    *Result
+	code       int
+	requestID  uint32
+	LSN        int64
+	InstanceID uint32
+	Timestamp  time.Time
+	Request    Query
+	result     *Result
 }
 
-func msgpackDecodeBody(d *msgpack.Decoder) ([][]interface{}, error) {
-	n, err := d.DecodeSliceLen()
-	if err != nil {
-		return nil, err
+func (pack *Packet) String() string {
+	switch {
+	// response to client
+	case pack.result != nil:
+		return fmt.Sprintf("Packet Type:%v, ReqID:%v\nResult:%#v\n",
+			pack.code, pack.requestID, pack.result)
+	// request to server
+	case pack.requestID != 0:
+		return fmt.Sprintf("Packet Type:%v, ReqID:%v\nRequest:%#v\n",
+			pack.code, pack.requestID, pack.Request)
+	// response from master
+	case pack.LSN != 0:
+		return fmt.Sprintf("Packet LSN:%v, InstanceID:%v, Timestamp:%v\nRequest:%#v\n",
+			pack.LSN, pack.InstanceID, pack.Timestamp.Format(time.RFC3339), pack.Request)
+	default:
+		return fmt.Sprintf("Packet %#v", pack)
 	}
-
-	if n == -1 {
-		return nil, nil
-	}
-
-	s := make([][]interface{}, n)
-	for i := 0; i < n; i++ {
-		v, err := d.DecodeSlice()
-		if err != nil {
-			return nil, err
-		}
-		s[i] = v
-	}
-
-	return s, nil
 }
 
 func (pack *Packet) decodeHeader(r io.Reader) (err error) {
@@ -60,6 +64,21 @@ func (pack *Packet) decodeHeader(r io.Reader) (err error) {
 			if _, err = d.DecodeUint32(); err != nil {
 				return
 			}
+		case KeyLSN:
+			if pack.LSN, err = d.DecodeInt64(); err != nil {
+				return
+			}
+		case KeyInstanceID:
+			if pack.InstanceID, err = d.DecodeUint32(); err != nil {
+				return
+			}
+		case KeyTimestamp:
+			var ts float64
+			if ts, err = d.DecodeFloat64(); err != nil {
+				return
+			}
+			ts = ts * 1e9
+			pack.Timestamp = time.Unix(0, int64(ts))
 		default:
 			if err = d.Skip(); err != nil {
 				return
@@ -74,7 +93,7 @@ func (pack *Packet) decodeBody(r io.Reader) (err error) {
 		if err := q.Unpack(r); err != nil {
 			return err
 		}
-		pack.request = q
+		pack.Request = q
 		return nil
 	}
 

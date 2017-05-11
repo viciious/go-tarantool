@@ -7,12 +7,14 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
+// Join is the JOIN command
 type Join struct {
 	UUID string
 }
 
 var _ Query = (*Join)(nil)
 
+// Pack implements a part of the Query interface
 func (q *Join) Pack(data *packData, w io.Writer) (byte, error) {
 	enc := msgpack.NewEncoder(w)
 
@@ -22,6 +24,7 @@ func (q *Join) Pack(data *packData, w io.Writer) (byte, error) {
 	return JoinCommand, nil
 }
 
+// Unpack implements a part of the Query interface
 func (q *Join) Unpack(r io.Reader) (err error) {
 	// TODO: support Join Unpack
 	return errors.New("Not supported yet")

@@ -28,7 +28,10 @@ type QueryError struct {
 var _ Error = (*ConnectionError)(nil)
 var _ Error = (*QueryError)(nil)
 
-var ErrNotInReplicaSet = NewQueryError("Full Replica Set params hasn't been set")
+var (
+	// ErrNotInReplicaSet means there aren't full enough params to join replica set
+	ErrNotInReplicaSet = NewQueryError("Full Replica Set params hasn't been set")
+)
 
 func NewConnectionError(con *Connection, message string, timeout bool) error {
 	return &ConnectionError{

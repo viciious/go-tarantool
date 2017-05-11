@@ -21,6 +21,9 @@ const (
 
 	KeyCode           = 0x00
 	KeySync           = 0x01
+	KeyInstanceID     = 0x02
+	KeyLSN            = 0x03
+	KeyTimestamp      = 0x04
 	KeySchemaID       = 0x05
 	KeySpaceNo        = 0x10
 	KeyIndexNo        = 0x11
@@ -60,15 +63,16 @@ const (
 )
 
 const (
-	SpaceSchema  = 272
-	SpaceSpace   = 280
-	ViewSpace    = 281
-	SpaceIndex   = 288
-	ViewIndex    = 289
-	SpaceFunc    = 296
-	SpaceUser    = 304
-	SpacePriv    = 312
-	SpaceCluster = 320
+	SpaceSchema    = 272
+	SpaceSpace     = 280
+	ViewSpace      = 281
+	SpaceIndex     = 288
+	ViewIndex      = 289
+	SpaceFunc      = 296
+	SpaceUser      = 304
+	SpacePriv      = 312
+	SpaceCluster   = 320
+	SpaceSystemMax = 511
 )
 
 // Tarantool server error codes

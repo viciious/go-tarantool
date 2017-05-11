@@ -218,67 +218,65 @@ func TestShadowAttach(t *testing.T) {
 	require.NoError(err)
 }
 
-//func TestShadowComplex(t *testing.T) {
-//	if testing.Short() {
-//		t.SkipNow()
-//	}
-//	require := require.New(t)
-//
-//	// setup TestBox
-//	box, err := newTntBox()
-//	require.NoError(err)
-//	defer box.Close()
-//
-//	// setup Shadow
-//	s, _ := New(box.Listen, Options{
-//		User: tnt16User,
-//		Pass: tnt16Pass,
-//	})
-//	respc, err := s.Attach(2)
-//	require.NoError(err)
-//	defer s.Detach()
-//
-//	out := make(chan *Insert, 32)
-//	go func(in <-chan *Response, out chan *Insert) {
-//		for resp := range in {
-//			switch resp.Type {
-//			case protocol.Insert:
-//				q := new(Insert)
-//				q.Unmarshal(resp.Raw)
-//				out <- q
-//			}
-//		}
-//	}(respc, out)
-//
-//	// add new data to TestBox
-//	tnt, err := tnt16.Connect(box.Listen, &tnt16.Options{})
-//	require.NoError(err)
-//	defer tnt.Close()
-//	expected := []interface{}{uint64(2), "Client inserted #2"}
-//	res, err := tnt.Execute(&tnt16.Insert{
-//		Space: "tester",
-//		Tuple: expected,
-//	})
-//	require.NoError(err)
-//	require.Len(res, 1)
-//	require.Equal(expected, res[0])
-//
-//	// check
-//	timeout := time.After(10 * time.Second)
-//	for {
-//		select {
-//		case qi := <-out:
-//			if qi.Space > protocol.BoxSystemMax {
-//				if num, ok := qi.Tuple[0].(uint64); ok && num > 1 {
-//					require.EqualValues(expected, qi.Tuple)
-//					return
-//				}
-//			}
-//		case <-timeout:
-//			t.Fatal("Timeout: there is no necessary Insert")
-//		}
-//	}
-//}
+func TestShadowComplex(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	require := require.New(t)
+
+	// setup TestBox
+	box, err := newTntBox()
+	require.NoError(err)
+	defer box.Close()
+
+	// setup Shadow
+	s, _ := NewShadow(box.Listen, Options{
+		User:     tnt16User,
+		Password: tnt16Pass,
+	})
+	respc, err := s.Attach(2)
+	require.NoError(err)
+	defer s.Detach()
+
+	out := make(chan *Insert, 32)
+	go func(in <-chan *Packet, out chan *Insert) {
+		for packet := range in {
+			switch q := packet.Request.(type) {
+			case *Insert:
+				out <- q
+			}
+		}
+	}(respc, out)
+
+	// add new data to TestBox
+	tnt, err := Connect(box.Listen, &Options{})
+	require.NoError(err)
+	defer tnt.Close()
+	expected := []interface{}{uint64(2), "Client inserted #2"}
+	res, err := tnt.Execute(&Insert{
+		Space: "tester",
+		Tuple: expected,
+	})
+	require.NoError(err)
+	require.Len(res, 1)
+	require.Equal(expected, res[0])
+
+	// check
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case qi := <-out:
+			if qi.Space.(int) > SpaceSystemMax {
+				if num, ok := qi.Tuple[0].(uint64); ok && num > 1 {
+					require.EqualValues(expected, qi.Tuple)
+					return
+				}
+			}
+		case <-timeout:
+			t.Fatal("Timeout: there is no necessary Insert")
+		}
+	}
+}
 
 func TestShadowParseOptionsRSParams(t *testing.T) {
 	require := require.New(t)

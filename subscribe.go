@@ -42,6 +42,7 @@ func (q *Subscribe) Pack(data *packData, w io.Writer) (byte, error) {
 	return SubscribeRequest, nil
 }
 
+// Unpack implements a part of the Query interface
 func (q *Subscribe) Unpack(r io.Reader) (err error) {
 	// TODO: support Subscribe Unpack
 	return errors.New("Not supported yet")

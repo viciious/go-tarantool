@@ -146,7 +146,7 @@ func (s *Shadow) join(out chan<- *Packet) (err error) {
 
 		switch uint32(p.code) {
 		case uint32(InsertRequest):
-			q := p.request.(*Insert)
+			q := p.Request.(*Insert)
 			switch q.Space {
 			case SpaceSchema:
 				// assert space _schema always has str index on field one
