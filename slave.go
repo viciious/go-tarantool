@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 
+	"io"
+
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -20,6 +22,8 @@ type Slave struct {
 		UUID      string
 		Instances ReplicaSet
 	}
+	p   *Packet // p is a Packet which has just been read.
+	err error   // err is an error which has just been gotten.
 }
 
 // NewSlave instance of Slave with tarantool master uri
@@ -61,12 +65,12 @@ func (s *Slave) parseOptions(uri string, options Options) (err error) {
 }
 
 // Attach Slave to Replica Set and subscribe for DML requests, starting from lsn.
-// Join replica set, receive snapshot (inserts requests), subscribe for xlogs (all dml requests)
-func (s *Slave) Attach(lsn int64, out ...chan *Packet) (<-chan *Packet, error) {
+// Use out chan for asynchronous packet receiving or synchronous Consume method otherwise.
+func (s *Slave) Attach(lsn int64, out ...chan *Packet) error {
 	if err := s.Join(); err != nil {
-		return nil, err
+		return err
 	}
-	return s.consume(lsn, out...)
+	return s.Subscribe(lsn, out...)
 }
 
 // Detach Slave from Master
@@ -75,34 +79,81 @@ func (s *Slave) Detach() error {
 }
 
 // Join the Replica Set using Master instance
-func (s *Slave) Join(out ...chan *Packet) (err error) {
-	var respc chan *Packet
-	if len(out) > 0 && out[0] != nil {
-		respc = out[0]
-	} else {
-		// empty chan cause it is useless
-		respc = make(chan *Packet, 1)
-		go func(ch chan *Packet) {
-			for range ch {
-			}
-		}(respc)
+func (s *Slave) Join() (err error) {
+
+	if _, err = s.JoinWithSnap(); err != nil {
+		return err
 	}
 
-	err = s.join(respc)
-	close(respc)
-	return
+	for s.NextSnap() {
+	}
+
+	return s.Err()
 }
 
-// Subscribe for every DML request (insert, update, delete, replace, upsert) from master
-// Replica Set and self params (UUID, IDs) should be set before call subscribe.
-// Use options in New or Join before.
-func (s *Slave) Subscribe(lsn int64, out ...chan *Packet) (r <-chan *Packet, err error) {
-	//don't call subscribe if there are no options had been set or before join request
-	if !s.IsInReplicaSet() {
-		return nil, ErrNotInReplicaSet
+// JoinWithSnap the Replica Set using Master instance.
+// Snapshot logs is available through the given out channel or
+// returned snapshot log iterator - Snapshoter. Use NextSnap, Packet, Err methods of the latter.
+// (In truth, Slave itself is returned in Snapshoter wrapper)
+func (s *Slave) JoinWithSnap(out ...chan *Packet) (it Snapshoter, err error) {
+
+	if err = s.join(); err != nil {
+		return nil, err
 	}
 
-	return s.consume(lsn, out...)
+	// reset internal error
+	s.setErr(nil)
+
+	if s.isEmptyChan(out...) {
+		// no chan means synchronous snapshot scanning
+		return s, nil
+	}
+
+	respc := out[0]
+	defer close(respc)
+
+	for s.NextSnap() {
+		respc <- s.Packet()
+	}
+
+	return nil, s.Err()
+}
+
+func (s *Slave) isEmptyChan(out ...chan *Packet) bool {
+	return len(out) == 0 || out[0] == nil
+}
+
+// Subscribe for every DML request (insert, update, delete, replace, upsert) from master since lsn.
+// Replica Set and self UUID should be set before call subscribe. Use options in New or Join for it.
+// Subscribe sends requests asynchronously to out channel specified or
+// use synchronous Consume method otherwise.
+func (s *Slave) Subscribe(lsn int64, out ...chan *Packet) (err error) {
+	//don't call subscribe if there are no options had been set or before join request
+	if !s.IsInReplicaSet() {
+		return ErrNotInReplicaSet
+	}
+
+	if err = s.subscribe(lsn); err != nil {
+		return err
+	}
+
+	// reset internal error
+	s.setErr(nil)
+
+	if s.isEmptyChan(out...) {
+		// no chan means synchronous dml request receiving
+		return nil
+	}
+
+	// consuming new DML requests asynchronously
+	go func(out chan *Packet) {
+		defer close(out)
+		for s.Consume() {
+			out <- s.Packet()
+		}
+	}(out[0])
+
+	return nil
 }
 
 // IsInReplicaSet checks whether Slave has Replica Set params or not
@@ -110,81 +161,23 @@ func (s *Slave) IsInReplicaSet() bool {
 	return len(s.UUID) > 0 && len(s.ReplicaSet.UUID) > 0
 }
 
-// join send JOIN request and parse responses till OK/Error response will be received
-func (s *Slave) join(out chan<- *Packet) (err error) {
-
+// join send JOIN request.
+func (s *Slave) join() (err error) {
 	pp, err := s.newPacket(&Join{UUID: s.UUID})
 	if err != nil {
 		return
 	}
-	defer func() {
-		if pp != nil {
-			pp.Release()
-		}
-	}()
 
 	if err = s.send(pp); err != nil {
 		return err
 	}
+
 	pp.Release()
-
-	var p *Packet
-	// this response error type means that UUID had been joined Replica Set already
-	joined := ErrorFlag | ErrTupleFound
-	for {
-		pp, err = s.receive()
-		if err != nil {
-			return err
-		}
-
-		p, err = decodePacket(pp)
-		if err != nil {
-			return err
-		}
-
-		// we have to parse snapshot logs to find replica set instances, UUID,
-
-		switch p.code {
-		case InsertRequest:
-			q := p.Request.(*Insert)
-			switch q.Space {
-			case SpaceSchema:
-				// assert space _schema always has str index on field one
-				// and in "cluster" tuple uuid is string too
-				// {"cluster", "ea74fc91-54fe-4f64-adae-ad2bc3eb4194"}
-				key := q.Tuple[0].(string)
-				if key == SchemaKeyClusterUUID {
-					s.ReplicaSet.UUID = q.Tuple[1].(string)
-				}
-
-			case SpaceCluster:
-				// fill in Replica Set from _cluster space; format:
-				// {0x1, "89b1203b-acda-4ff1-ae76-8069145344b8"}
-				// {0x2, "7c025e42-2394-11e7-aacf-0242ac110002"}
-
-				// in reality _cluster key field is decoded to uint64
-				// but we know exactly that it can be casted to uint8 without loosing data
-				instanceID := uint32(q.Tuple[0].(uint64))
-				// uuid
-				s.ReplicaSet.Instances[instanceID] = q.Tuple[1].(string)
-			}
-		case OKRequest:
-			q := new(VClock)
-			r := bytes.NewReader(pp.body)
-			q.Unpack(r)
-			s.VClock = q.VClock
-			return nil
-		case joined:
-			// already joined
-			return nil
-		}
-		pp.Release()
-		out <- p
-	}
+	return nil
 }
 
 // subscribe sends SUBSCRIBE request and waits for VCLOCK response
-func (s *Slave) subscribe(lsn int64) (err error) {
+func (s *Slave) subscribe(lsn int64) error {
 
 	pp, err := s.newPacket(&Subscribe{
 		UUID:           s.UUID,
@@ -192,91 +185,140 @@ func (s *Slave) subscribe(lsn int64) (err error) {
 		LSN:            lsn,
 	})
 	if err != nil {
-		return
+		return err
 	}
-	defer func() {
-		if pp != nil {
-			pp.Release()
-		}
-	}()
 
 	if err = s.send(pp); err != nil {
 		return err
 	}
 	pp.Release()
 
-	pp, err = s.receive()
-	if err != nil {
-		return
-	}
-
-	p, err := decodePacket(pp)
-	if err != nil {
+	if pp, err = s.receive(); err != nil {
 		return err
 	}
-	if p.code == OKRequest {
-		q := new(VClock)
-		r := bytes.NewReader(pp.body)
-		q.Unpack(r)
-		s.VClock = q.VClock
-		return nil
-	}
-
-	return p.result.Error
-}
-
-// consume makes subscribe procedure and launch consumer worker with
-// provided out channel or with made one.
-func (s *Slave) consume(lsn int64, out ...chan *Packet) (r <-chan *Packet, err error) {
-
-	var respc chan *Packet
-	if len(out) > 0 && out[0] != nil {
-		respc = out[0]
-	} else {
-		respc = make(chan *Packet, 1)
-	}
-
-	if err = s.subscribe(lsn); err != nil {
-		return
-	}
-
-	// start consuming new DML requests
-	go s.consumer(respc)
-
-	return respc, nil
-}
-
-// consumer is a worker that receive responses from tarantool instance infinitely.
-// Close (s.Detach) connection to stop consuming.
-// There is no "stop subscribing" command in protocol anyway.
-func (s *Slave) consumer(out chan<- *Packet) {
-	var p *Packet
-	var pp *packedPacket
-	var err error
-
 	defer func() {
 		if pp != nil {
 			pp.Release()
 		}
 	}()
 
-	defer close(out)
-
-	for {
-		pp, err = s.receive()
-		if err != nil {
-			return
-		}
-
-		p, err = decodePacket(pp)
-		if err != nil {
-			return
-		}
-
-		out <- p
-
-		pp.Release()
+	p, err := decodePacket(pp)
+	if err != nil {
+		return err
 	}
+	if p.code != OKRequest {
+		return p.result.Error
+	}
+
+	q := new(VClock)
+	r := bytes.NewReader(pp.body)
+	q.Unpack(r)
+	s.VClock = q.VClock
+
+	return nil
+}
+
+// Consume new packets (responses on SUBSCRIBE request), which then be available through the Packet method.
+// It returns false when the scan stops, by reaching an error.
+// After Scan returns false, the Err method will return any error that occurred during scanning.
+func (s *Slave) Consume() bool {
+
+	pp, err := s.receive()
+	if err != nil {
+		s.setErr(err)
+		return false
+	}
+
+	s.p, err = decodePacket(pp)
+	if err != nil {
+		s.setErr(err)
+		return false
+	}
+	pp.Release()
+
+	return true
+}
+
+// NextSnap parses response on JOIN request, which then be available through the Packet method.
+// It returns false when the scan stops, either by reaching the end of the input or an error.
+// After Scan returns false, the Err method will return any error that occurred during scanning,
+// except that if it was io.EOF, Err will return nil.
+func (s *Slave) NextSnap() bool {
+
+	pp, err := s.receive()
+	if err != nil {
+		s.setErr(err)
+		return false
+	}
+
+	s.p, err = decodePacket(pp)
+	if err != nil {
+		s.setErr(err)
+		return false
+	}
+
+	// we have to parse snapshot logs to find replica set instances, UUID,
+
+	// this response error type means that UUID had been joined Replica Set already
+	joined := ErrorFlag | ErrTupleFound
+
+	switch s.p.code {
+	case InsertRequest:
+		q := s.p.Request.(*Insert)
+		switch q.Space {
+		case SpaceSchema:
+			// assert space _schema always has str index on field one
+			// and in "cluster" tuple uuid is string too
+			// {"cluster", "ea74fc91-54fe-4f64-adae-ad2bc3eb4194"}
+			key := q.Tuple[0].(string)
+			if key == SchemaKeyClusterUUID {
+				s.ReplicaSet.UUID = q.Tuple[1].(string)
+			}
+
+		case SpaceCluster:
+			// fill in Replica Set from _cluster space; format:
+			// {0x1, "89b1203b-acda-4ff1-ae76-8069145344b8"}
+			// {0x2, "7c025e42-2394-11e7-aacf-0242ac110002"}
+
+			// in reality _cluster key field is decoded to uint64
+			// but we know exactly that it can be casted to uint8 without loosing data
+			instanceID := uint32(q.Tuple[0].(uint64))
+			// uuid
+			s.ReplicaSet.Instances[instanceID] = q.Tuple[1].(string)
+		}
+	case OKRequest:
+		q := new(VClock)
+		r := bytes.NewReader(pp.body)
+		q.Unpack(r)
+		s.VClock = q.VClock
+		s.setErr(io.EOF)
+		return false
+	case joined:
+		// already joined
+		s.setErr(io.EOF)
+		return false
+	}
+	pp.Release()
+
+	return true
+}
+
+// Packet returns last received packet.
+func (s *Slave) Packet() *Packet {
+	return s.p
+}
+
+// Err returns first occured error while iterating snapshot or consuming requests.
+func (s *Slave) Err() error {
+	if s.err == io.EOF {
+		return nil
+	}
+	return s.err
+}
+
+// setErr sets internal error which are published by Err method.
+func (s *Slave) setErr(err error) {
+	s.err = err
 }
 
 // connect to tarantool instance (dial + handshake + auth)
@@ -320,4 +362,11 @@ func (s *Slave) newPacket(q Query) (pp *packedPacket, err error) {
 		pp = nil
 	}
 	return
+}
+
+// Snapshoter is a set of methods to iterate over received snapshot's requests.
+type Snapshoter interface {
+	NextSnap() bool
+	Packet() *Packet
+	Err() error
 }

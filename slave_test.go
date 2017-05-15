@@ -105,6 +105,127 @@ func TestSlaveConnect(t *testing.T) {
 	s.c.stop()
 }
 
+func TestSlaveJoinWithSnapSync(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	box, err := newTntBox()
+	require.NoError(err)
+	defer box.Close()
+
+	expected := struct {
+		UUID          string
+		ReplicaSetLen int
+	}{tnt16UUID, 1}
+	// setup
+	s, _ := NewSlave(box.Listen, Options{
+		User:     tnt16User,
+		Password: tnt16Pass,
+		UUID:     expected.UUID})
+	defer s.Detach()
+
+	it, err := s.JoinWithSnap()
+	require.NoError(err)
+
+	resultChan := make(chan bool, 1)
+	go func(iter Snapshoter, rch chan bool) {
+		var p *Packet
+		for iter.NextSnap() {
+			p = iter.Packet()
+			if p == nil {
+				rch <- false
+				return
+			}
+		}
+		rch <- true
+	}(it, resultChan)
+
+	// check
+	timeout := time.After(10 * time.Second)
+	select {
+	case success := <-resultChan:
+		require.True(success, "There is nil packet has been received.")
+	case <-timeout:
+		t.Fatal("Timeout: there is no necessary xlog.")
+	}
+	assert.NoError(it.Err())
+	assert.NotZero(s.ReplicaSet.UUID)
+	assert.Len(s.ReplicaSet.Instances, expected.ReplicaSetLen)
+}
+
+func TestSlaveIsEmptyChan(t *testing.T) {
+	s := &Slave{}
+
+	ch := make(chan *Packet)
+	assert.True(t, s.isEmptyChan(), "case empty params")
+	assert.False(t, s.isEmptyChan(ch), "case one param")
+
+	tt := []struct {
+		in       []chan *Packet
+		expected bool
+	}{
+		{nil, true},
+		{[]chan *Packet{}, true},
+		{[]chan *Packet{nil}, true},
+		{[]chan *Packet{nil, ch}, true},
+		{[]chan *Packet{ch}, false},
+		{[]chan *Packet{ch, nil}, false},
+		{[]chan *Packet{ch, ch}, false},
+	}
+	for tc, item := range tt {
+		actual := s.isEmptyChan(item.in...)
+		assert.EqualValues(t, item.expected, actual, "case %v", tc+1)
+	}
+}
+
+func TestSlaveJoinWithSnapAsync(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	box, err := newTntBox()
+	require.NoError(err)
+	defer box.Close()
+
+	expected := struct {
+		UUID          string
+		ReplicaSetLen int
+	}{tnt16UUID, 1}
+
+	// setup
+	s, _ := NewSlave(box.Listen, Options{
+		User:     tnt16User,
+		Password: tnt16Pass,
+		UUID:     expected.UUID})
+	defer s.Detach()
+
+	respc := make(chan *Packet, 1)
+
+	var it Snapshoter
+	go func() {
+		it, err = s.JoinWithSnap(respc)
+	}()
+
+	// drain channel and fatal on timeout
+	timeout := time.After(10 * time.Second)
+loop:
+	for {
+		select {
+		case _, open := <-respc:
+			if !open {
+				break loop
+			}
+		case <-timeout:
+			t.Fatal("Timeout: there is no necessary xlog.")
+		}
+	}
+
+	// check
+	assert.Nil(it)
+	assert.NoError(err)
+	assert.NotZero(s.ReplicaSet.UUID)
+	assert.Len(s.ReplicaSet.Instances, expected.ReplicaSetLen)
+}
+
 func TestSlaveJoin(t *testing.T) {
 	require := require.New(t)
 
@@ -153,8 +274,9 @@ func TestSlaveDoubleDetach(t *testing.T) {
 	require.NoError(err)
 }
 
-func TestSlaveSubscribe(t *testing.T) {
+func TestSlaveSubscribeSync(t *testing.T) {
 	require := require.New(t)
+	assert := assert.New(t)
 
 	// setup TestBox
 	box, err := newTntBox()
@@ -178,21 +300,105 @@ func TestSlaveSubscribe(t *testing.T) {
 		UUID:           s.UUID,
 		ReplicaSetUUID: s.ReplicaSet.UUID,
 	})
-	respc, err := ns.Subscribe(0)
+	defer ns.Detach()
+
+	err = ns.Subscribe(0)
 	require.NoError(err)
+
+	resultChan := make(chan bool, 1)
+	go func(s *Slave, rch chan bool) {
+		var p *Packet
+		var res bool
+		for s.Consume() {
+			p = s.Packet()
+			if p == nil {
+				res = false
+				break
+			}
+			if isUUIDinReplicaSet(p, s.UUID) {
+				res = true
+				break
+			}
+		}
+		if s.Err() != nil {
+			res = false
+		}
+		rch <- res
+	}(ns, resultChan)
 
 	// check
 	timeout := time.After(10 * time.Second)
 	select {
-	case <-respc:
-		break
+	case success := <-resultChan:
+		assert.True(success, "there is no packet with insert UUID in cluster space")
 	case <-timeout:
-		t.Fatal("Timeout: there is no necessary xlog.")
+		t.Fatal("timeout")
 	}
+}
 
-	// shutdown
-	err = ns.Detach()
+func TestSlaveSubscribeAsync(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	// setup TestBox
+	box, err := newTntBox()
 	require.NoError(err)
+	defer box.Close()
+
+	s, _ := NewSlave(box.Listen, Options{
+		User:     tnt16User,
+		Password: tnt16Pass,
+	})
+	// register in replica set
+	err = s.Join()
+	require.NoError(err)
+	err = s.Detach()
+	require.NoError(err)
+
+	// new instance for the purity of the test
+	ns, _ := NewSlave(box.Listen, Options{
+		User:           tnt16User,
+		Password:       tnt16Pass,
+		UUID:           s.UUID,
+		ReplicaSetUUID: s.ReplicaSet.UUID,
+	})
+	defer ns.Detach()
+	respc := make(chan *Packet, 1)
+	err = ns.Subscribe(0, respc)
+	require.NoError(err)
+
+	// check
+	timeout := time.After(10 * time.Second)
+loop:
+	for {
+		select {
+		case p := <-respc:
+			assert.NotNil(p)
+			if isUUIDinReplicaSet(p, s.UUID) {
+				break loop
+			}
+		case <-timeout:
+			t.Fatal("Timeout: there is no necessary xlog.")
+			break loop
+		}
+	}
+}
+
+func isUUIDinReplicaSet(p *Packet, uuid string) bool {
+	if p == nil || len(uuid) == 0 {
+		return false
+	}
+	switch p.code {
+	case InsertRequest:
+		q := p.Request.(*Insert)
+		switch q.Space {
+		case SpaceCluster:
+			if uuid == q.Tuple[1].(string) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func TestSlaveAttach(t *testing.T) {
@@ -210,7 +416,7 @@ func TestSlaveAttach(t *testing.T) {
 		UUID:     tnt16UUID})
 
 	// check
-	_, err = s.Attach(0)
+	err = s.Attach(0)
 	require.NoError(err)
 
 	// shutdown
@@ -234,7 +440,8 @@ func TestSlaveComplex(t *testing.T) {
 		User:     tnt16User,
 		Password: tnt16Pass,
 	})
-	respc, err := s.Attach(2)
+	respc := make(chan *Packet, 1)
+	err = s.Attach(2, respc)
 	require.NoError(err)
 	defer s.Detach()
 
