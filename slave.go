@@ -7,10 +7,10 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-// Shadow connects to Tarantool 1.6 instance and subscribes for changes.
-// Tarantool instance acting as a master sees Shadow like any replica in replication set.
-// Shadow can't be used concurrently, route responses from returned channel instead.
-type Shadow struct {
+// Slave connects to Tarantool 1.6 instance and subscribes for changes.
+// Tarantool instance acting as a master sees Slave like any replica in replication set.
+// Slave can't be used concurrently, route responses from returned channel instead.
+type Slave struct {
 	c          *Connection
 	cr         *bufio.Reader
 	cw         *bufio.Writer
@@ -22,12 +22,12 @@ type Shadow struct {
 	}
 }
 
-// NewShadow instance of Shadow with tarantool master uri
+// NewSlave instance of Slave with tarantool master uri
 // URI is parsed by url package and therefore should contains
 // any scheme supported by net.Dial
-func NewShadow(uri string, opts ...Options) (s *Shadow, err error) {
+func NewSlave(uri string, opts ...Options) (s *Slave, err error) {
 
-	s = new(Shadow)
+	s = new(Slave)
 	options := Options{}
 	if len(opts) > 0 {
 		options = opts[0]
@@ -47,7 +47,7 @@ func NewShadow(uri string, opts ...Options) (s *Shadow, err error) {
 	return s, nil
 }
 
-func (s *Shadow) parseOptions(uri string, options Options) (err error) {
+func (s *Slave) parseOptions(uri string, options Options) (err error) {
 
 	if len(options.UUID) == 0 {
 		s.UUID = uuid.NewV1().String()
@@ -60,22 +60,22 @@ func (s *Shadow) parseOptions(uri string, options Options) (err error) {
 	return nil
 }
 
-// Attach Shadow to Replica Set and subscribe for DML requests, starting from lsn.
+// Attach Slave to Replica Set and subscribe for DML requests, starting from lsn.
 // Join replica set, receive snapshot (inserts requests), subscribe for xlogs (all dml requests)
-func (s *Shadow) Attach(lsn int64, out ...chan *Packet) (<-chan *Packet, error) {
+func (s *Slave) Attach(lsn int64, out ...chan *Packet) (<-chan *Packet, error) {
 	if err := s.Join(); err != nil {
 		return nil, err
 	}
 	return s.consume(lsn, out...)
 }
 
-// Detach Shadow from Master
-func (s *Shadow) Detach() error {
+// Detach Slave from Master
+func (s *Slave) Detach() error {
 	return s.disconnect()
 }
 
 // Join the Replica Set using Master instance
-func (s *Shadow) Join(out ...chan *Packet) (err error) {
+func (s *Slave) Join(out ...chan *Packet) (err error) {
 	var respc chan *Packet
 	if len(out) > 0 && out[0] != nil {
 		respc = out[0]
@@ -96,7 +96,7 @@ func (s *Shadow) Join(out ...chan *Packet) (err error) {
 // Subscribe for every DML request (insert, update, delete, replace, upsert) from master
 // Replica Set and self params (UUID, IDs) should be set before call subscribe.
 // Use options in New or Join before.
-func (s *Shadow) Subscribe(lsn int64, out ...chan *Packet) (r <-chan *Packet, err error) {
+func (s *Slave) Subscribe(lsn int64, out ...chan *Packet) (r <-chan *Packet, err error) {
 	//don't call subscribe if there are no options had been set or before join request
 	if !s.IsInReplicaSet() {
 		return nil, ErrNotInReplicaSet
@@ -105,13 +105,13 @@ func (s *Shadow) Subscribe(lsn int64, out ...chan *Packet) (r <-chan *Packet, er
 	return s.consume(lsn, out...)
 }
 
-// IsInReplicaSet checks whether Shadow has Replica Set params or not
-func (s *Shadow) IsInReplicaSet() bool {
+// IsInReplicaSet checks whether Slave has Replica Set params or not
+func (s *Slave) IsInReplicaSet() bool {
 	return len(s.UUID) > 0 && len(s.ReplicaSet.UUID) > 0
 }
 
 // join send JOIN request and parse responses till OK/Error response will be received
-func (s *Shadow) join(out chan<- *Packet) (err error) {
+func (s *Slave) join(out chan<- *Packet) (err error) {
 
 	pp, err := s.newPacket(&Join{UUID: s.UUID})
 	if err != nil {
@@ -130,7 +130,7 @@ func (s *Shadow) join(out chan<- *Packet) (err error) {
 
 	var p *Packet
 	// this response error type means that UUID had been joined Replica Set already
-	joined := ErrorFlag + ErrTupleFound
+	joined := ErrorFlag | ErrTupleFound
 	for {
 		pp, err = s.receive()
 		if err != nil {
@@ -144,8 +144,8 @@ func (s *Shadow) join(out chan<- *Packet) (err error) {
 
 		// we have to parse snapshot logs to find replica set instances, UUID,
 
-		switch uint32(p.code) {
-		case uint32(InsertRequest):
+		switch p.code {
+		case InsertRequest:
 			q := p.Request.(*Insert)
 			switch q.Space {
 			case SpaceSchema:
@@ -168,14 +168,13 @@ func (s *Shadow) join(out chan<- *Packet) (err error) {
 				// uuid
 				s.ReplicaSet.Instances[instanceID] = q.Tuple[1].(string)
 			}
-		// TODO: change name from BadRequest to OKRequest
-		case uint32(BadRequest):
+		case OKRequest:
 			q := new(VClock)
 			r := bytes.NewReader(pp.body)
 			q.Unpack(r)
 			s.VClock = q.VClock
 			return nil
-		case uint32(joined):
+		case joined:
 			// already joined
 			return nil
 		}
@@ -185,7 +184,7 @@ func (s *Shadow) join(out chan<- *Packet) (err error) {
 }
 
 // subscribe sends SUBSCRIBE request and waits for VCLOCK response
-func (s *Shadow) subscribe(lsn int64) (err error) {
+func (s *Slave) subscribe(lsn int64) (err error) {
 
 	pp, err := s.newPacket(&Subscribe{
 		UUID:           s.UUID,
@@ -215,7 +214,7 @@ func (s *Shadow) subscribe(lsn int64) (err error) {
 	if err != nil {
 		return err
 	}
-	if uint32(p.code) == uint32(BadRequest) {
+	if p.code == OKRequest {
 		q := new(VClock)
 		r := bytes.NewReader(pp.body)
 		q.Unpack(r)
@@ -228,7 +227,7 @@ func (s *Shadow) subscribe(lsn int64) (err error) {
 
 // consume makes subscribe procedure and launch consumer worker with
 // provided out channel or with made one.
-func (s *Shadow) consume(lsn int64, out ...chan *Packet) (r <-chan *Packet, err error) {
+func (s *Slave) consume(lsn int64, out ...chan *Packet) (r <-chan *Packet, err error) {
 
 	var respc chan *Packet
 	if len(out) > 0 && out[0] != nil {
@@ -250,7 +249,7 @@ func (s *Shadow) consume(lsn int64, out ...chan *Packet) (r <-chan *Packet, err 
 // consumer is a worker that receive responses from tarantool instance infinitely.
 // Close (s.Detach) connection to stop consuming.
 // There is no "stop subscribing" command in protocol anyway.
-func (s *Shadow) consumer(out chan<- *Packet) {
+func (s *Slave) consumer(out chan<- *Packet) {
 	var p *Packet
 	var pp *packedPacket
 	var err error
@@ -281,7 +280,7 @@ func (s *Shadow) consumer(out chan<- *Packet) {
 }
 
 // connect to tarantool instance (dial + handshake + auth)
-func (s *Shadow) connect(uri string, opts *Options) (err error) {
+func (s *Slave) connect(uri string, opts *Options) (err error) {
 	conn, err := newConn(uri, opts)
 	if err != nil {
 		return
@@ -294,13 +293,13 @@ func (s *Shadow) connect(uri string, opts *Options) (err error) {
 }
 
 // disconnect call stop on shadow connection instance
-func (s *Shadow) disconnect() (err error) {
+func (s *Slave) disconnect() (err error) {
 	s.c.stop()
 	return
 }
 
 // send packed packet to the connection buffer, flush buffer and release packet
-func (s *Shadow) send(pp *packedPacket) (err error) {
+func (s *Slave) send(pp *packedPacket) (err error) {
 	if _, err = pp.WriteTo(s.cw); err != nil {
 		return
 	}
@@ -308,12 +307,12 @@ func (s *Shadow) send(pp *packedPacket) (err error) {
 }
 
 // receive new response packet
-func (s *Shadow) receive() (*packedPacket, error) {
+func (s *Slave) receive() (*packedPacket, error) {
 	return readPacked(s.cr)
 }
 
 // newPacket compose packet from body
-func (s *Shadow) newPacket(q Query) (pp *packedPacket, err error) {
+func (s *Slave) newPacket(q Query) (pp *packedPacket, err error) {
 	pp = packIproto(0, s.c.nextID())
 	pp.code, err = q.Pack(s.c.packData, &pp.buffer)
 	if err != nil {

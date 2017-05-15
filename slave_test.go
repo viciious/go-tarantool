@@ -51,7 +51,7 @@ func newTntBox() (*Box, error) {
 
 func TestTntBoxStart(t *testing.T) {
 	if testing.Short() {
-		t.Skip("Start this test if Shadow Connect will be failed")
+		t.Skip("Start this test if Slave Connect will be failed")
 	}
 	// setup TestBox
 	box, err := newTntBox()
@@ -62,7 +62,7 @@ func TestTntBoxStart(t *testing.T) {
 
 func TestTntBoxGuestWrite(t *testing.T) {
 	if testing.Short() {
-		t.Skip("Start this test if Shadow Complex will be failed")
+		t.Skip("Start this test if Slave Complex will be failed")
 	}
 	require := require.New(t)
 
@@ -88,7 +88,7 @@ func TestTntBoxGuestWrite(t *testing.T) {
 	require.Equal(tuple, res[0])
 }
 
-func TestShadowConnect(t *testing.T) {
+func TestSlaveConnect(t *testing.T) {
 	require := require.New(t)
 	box, err := newTntBox()
 	require.NoError(err)
@@ -96,7 +96,7 @@ func TestShadowConnect(t *testing.T) {
 
 	// setup
 	opts := Options{User: tnt16User, Password: tnt16Pass}
-	s, err := NewShadow(box.Listen, opts)
+	s, err := NewSlave(box.Listen, opts)
 	require.NoError(err)
 
 	// check
@@ -105,7 +105,7 @@ func TestShadowConnect(t *testing.T) {
 	s.c.stop()
 }
 
-func TestShadowJoin(t *testing.T) {
+func TestSlaveJoin(t *testing.T) {
 	require := require.New(t)
 
 	box, err := newTntBox()
@@ -117,7 +117,7 @@ func TestShadowJoin(t *testing.T) {
 		ReplicaSetLen int
 	}{tnt16UUID, 1}
 
-	s, _ := NewShadow(box.Listen, Options{
+	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
 		UUID:     expected.UUID})
@@ -131,13 +131,13 @@ func TestShadowJoin(t *testing.T) {
 	require.Len(s.ReplicaSet.Instances, expected.ReplicaSetLen)
 }
 
-func TestShadowDoubleDetach(t *testing.T) {
+func TestSlaveDoubleDetach(t *testing.T) {
 	require := require.New(t)
 	box, err := newTntBox()
 	require.NoError(err)
 	defer box.Close()
 
-	s, _ := NewShadow(box.Listen, Options{
+	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
 	})
@@ -153,7 +153,7 @@ func TestShadowDoubleDetach(t *testing.T) {
 	require.NoError(err)
 }
 
-func TestShadowSubscribe(t *testing.T) {
+func TestSlaveSubscribe(t *testing.T) {
 	require := require.New(t)
 
 	// setup TestBox
@@ -161,7 +161,7 @@ func TestShadowSubscribe(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
-	s, _ := NewShadow(box.Listen, Options{
+	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
 	})
@@ -172,7 +172,7 @@ func TestShadowSubscribe(t *testing.T) {
 	require.NoError(err)
 
 	// new instance for the purity of the test
-	ns, _ := NewShadow(box.Listen, Options{
+	ns, _ := NewSlave(box.Listen, Options{
 		User:           tnt16User,
 		Password:       tnt16Pass,
 		UUID:           s.UUID,
@@ -195,7 +195,7 @@ func TestShadowSubscribe(t *testing.T) {
 	require.NoError(err)
 }
 
-func TestShadowAttach(t *testing.T) {
+func TestSlaveAttach(t *testing.T) {
 	require := require.New(t)
 
 	// setup TestBox
@@ -204,7 +204,7 @@ func TestShadowAttach(t *testing.T) {
 	defer box.Close()
 
 	// setup
-	s, _ := NewShadow(box.Listen, Options{
+	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
 		UUID:     tnt16UUID})
@@ -218,7 +218,7 @@ func TestShadowAttach(t *testing.T) {
 	require.NoError(err)
 }
 
-func TestShadowComplex(t *testing.T) {
+func TestSlaveComplex(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
@@ -229,8 +229,8 @@ func TestShadowComplex(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
-	// setup Shadow
-	s, _ := NewShadow(box.Listen, Options{
+	// setup Slave
+	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
 	})
@@ -278,7 +278,7 @@ func TestShadowComplex(t *testing.T) {
 	}
 }
 
-func TestShadowParseOptionsRSParams(t *testing.T) {
+func TestSlaveParseOptionsRSParams(t *testing.T) {
 	require := require.New(t)
 
 	box, err := newTntBox()
@@ -296,11 +296,11 @@ func TestShadowParseOptionsRSParams(t *testing.T) {
 		{Options{UUID: "uuid1", ReplicaSetUUID: "uuid2"}, false, true},
 	}
 	for tc, item := range tt {
-		s, err := NewShadow(uri, item.opts)
+		s, err := NewSlave(uri, item.opts)
 		if item.isParseErr {
 			require.Error(err, "case %v", tc+1)
 			// prepare handmade for second check
-			s = &Shadow{UUID: item.opts.UUID}
+			s = &Slave{UUID: item.opts.UUID}
 			s.ReplicaSet.UUID = item.opts.ReplicaSetUUID
 		} else {
 			require.NoError(err, "case %v", tc+1)
