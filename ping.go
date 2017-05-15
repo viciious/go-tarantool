@@ -7,7 +7,7 @@ type Ping struct {
 
 var _ Query = (*Ping)(nil)
 
-func (q *Ping) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Ping) Pack(data *packData, w io.Writer) (uint32, error) {
 	return PingRequest, nil
 }
 

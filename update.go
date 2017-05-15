@@ -16,7 +16,7 @@ type Update struct {
 
 var _ Query = (*Update)(nil)
 
-func (q *Update) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Update) Pack(data *packData, w io.Writer) (uint32, error) {
 	var err error
 
 	encoder := msgpack.NewEncoder(w)
@@ -25,26 +25,26 @@ func (q *Update) Pack(data *packData, w io.Writer) (byte, error) {
 
 	// Space
 	if err = data.writeSpace(q.Space, w, encoder); err != nil {
-		return BadRequest, err
+		return ErrorFlag, err
 	}
 
 	// Index
 	if err = data.writeIndex(q.Space, q.Index, w, encoder); err != nil {
-		return BadRequest, err
+		return ErrorFlag, err
 	}
 
 	// Key
 	if q.Key != nil {
 		w.Write(data.packedSingleKey)
 		if err = encoder.Encode(q.Key); err != nil {
-			return BadRequest, err
+			return ErrorFlag, err
 		}
 	} else if q.KeyTuple != nil {
 		encoder.EncodeUint32(KeyKey)
 		encoder.EncodeArrayLen(len(q.KeyTuple))
 		for _, key := range q.KeyTuple {
 			if err = encoder.Encode(key); err != nil {
-				return BadRequest, err
+				return ErrorFlag, err
 			}
 		}
 	}
@@ -57,7 +57,7 @@ func (q *Update) Pack(data *packData, w io.Writer) (byte, error) {
 		encoder.EncodeArrayLen(len(t))
 		for _, value := range t {
 			if err = encoder.Encode(value); err != nil {
-				return BadRequest, err
+				return ErrorFlag, err
 			}
 		}
 	}

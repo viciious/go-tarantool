@@ -14,7 +14,7 @@ type Call struct {
 
 var _ Query = (*Call)(nil)
 
-func (q *Call) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Call) Pack(data *packData, w io.Writer) (uint32, error) {
 	var err error
 
 	encoder := msgpack.NewEncoder(w)
@@ -30,7 +30,7 @@ func (q *Call) Pack(data *packData, w io.Writer) (byte, error) {
 		encoder.EncodeArrayLen(len(q.Tuple))
 		for _, key := range q.Tuple {
 			if err = encoder.Encode(key); err != nil {
-				return byte(0), err
+				return ErrorFlag, err
 			}
 		}
 	} else {

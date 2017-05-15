@@ -19,7 +19,7 @@ type Select struct {
 
 var _ Query = (*Select)(nil)
 
-func (q *Select) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Select) Pack(data *packData, w io.Writer) (uint32, error) {
 	var err error
 
 	encoder := msgpack.NewEncoder(w)
@@ -28,12 +28,12 @@ func (q *Select) Pack(data *packData, w io.Writer) (byte, error) {
 
 	// Space
 	if err = data.writeSpace(q.Space, w, encoder); err != nil {
-		return BadRequest, err
+		return ErrorFlag, err
 	}
 
 	// Index
 	if err = data.writeIndex(q.Space, q.Index, w, encoder); err != nil {
-		return BadRequest, err
+		return ErrorFlag, err
 	}
 
 	// Offset
@@ -64,14 +64,14 @@ func (q *Select) Pack(data *packData, w io.Writer) (byte, error) {
 	if q.Key != nil {
 		w.Write(data.packedSingleKey)
 		if err = encoder.Encode(q.Key); err != nil {
-			return BadRequest, err
+			return ErrorFlag, err
 		}
 	} else if q.KeyTuple != nil {
 		encoder.EncodeUint32(KeyKey)
 		encoder.EncodeArrayLen(len(q.KeyTuple))
 		for _, key := range q.KeyTuple {
 			if err = encoder.Encode(key); err != nil {
-				return BadRequest, err
+				return ErrorFlag, err
 			}
 		}
 	} else {

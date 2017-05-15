@@ -17,7 +17,7 @@ type Subscribe struct {
 var _ Query = (*Subscribe)(nil)
 
 // Pack implements a part of the Query interface
-func (q *Subscribe) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Subscribe) Pack(data *packData, w io.Writer) (uint32, error) {
 	enc := msgpack.NewEncoder(w)
 
 	enc.EncodeMapLen(3)

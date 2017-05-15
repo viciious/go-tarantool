@@ -5,7 +5,7 @@ import "io"
 var packetPool *packedPacketPool
 
 type Query interface {
-	Pack(data *packData, w io.Writer) (byte, error)
+	Pack(data *packData, w io.Writer) (uint32, error)
 	Unpack(r io.Reader) error
 }
 

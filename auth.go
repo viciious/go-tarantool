@@ -56,10 +56,10 @@ func xor(left, right []byte, size int) []byte {
 	return result
 }
 
-func (auth *Auth) Pack(data *packData, w io.Writer) (byte, error) {
+func (auth *Auth) Pack(data *packData, w io.Writer) (uint32, error) {
 	scr, err := scramble(auth.GreetingAuth, auth.Password)
 	if err != nil {
-		return BadRequest, fmt.Errorf("auth: scrambling failure: %s", err.Error())
+		return ErrorFlag, fmt.Errorf("auth: scrambling failure: %s", err.Error())
 	}
 
 	encoder := msgpack.NewEncoder(w)

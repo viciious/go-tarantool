@@ -111,7 +111,7 @@ func (pack *Packet) decodeBody(r io.Reader) (err error) {
 		return unpackr(pack.code - ErrorFlag)
 	}
 
-	switch byte(pack.code) {
+	switch pack.code {
 	case SelectRequest:
 		return unpackq(&Select{})
 	case AuthRequest:

@@ -1,24 +1,27 @@
 package tarantool
 
 /*
-Copy-Paste from https://github.com/tarantool/go-tarantool/blob/master/const.go
+Forked from https://github.com/tarantool/go-tarantool/blob/master/const.go
 */
 
 const (
-	BadRequest       = byte(0)
-	SelectRequest    = byte(1)
-	InsertRequest    = byte(2)
-	ReplaceRequest   = byte(3)
-	UpdateRequest    = byte(4)
-	DeleteRequest    = byte(5)
-	CallRequest      = byte(6)
-	AuthRequest      = byte(7)
-	EvalRequest      = byte(8)
-	UpsertRequest    = byte(9)
-	PingRequest      = byte(64)
-	JoinCommand      = byte(65)
-	SubscribeRequest = byte(66)
+	OKRequest        = 0
+	SelectRequest    = 1
+	InsertRequest    = 2
+	ReplaceRequest   = 3
+	UpdateRequest    = 4
+	DeleteRequest    = 5
+	CallRequest      = 6
+	AuthRequest      = 7
+	EvalRequest      = 8
+	UpsertRequest    = 9
+	PingRequest      = 64
+	JoinCommand      = 65
+	SubscribeRequest = 66
+	ErrorFlag        = 0x8000
+)
 
+const (
 	KeyCode           = 0x00
 	KeySync           = 0x01
 	KeyInstanceID     = 0x02
@@ -41,7 +44,9 @@ const (
 	KeyDefTuple       = 0x28
 	KeyData           = 0x30
 	KeyError          = 0x31
+)
 
+const (
 	// https://github.com/fl00r/go-tarantool-1.6/issues/2
 	IterEq            = uint8(0) // key == x ASC order
 	IterReq           = uint8(1) // key == x DESC order
@@ -53,10 +58,11 @@ const (
 	IterBitsAllSet    = uint8(7) // all bits from x are set in key
 	IterBitsAnySet    = uint8(8) // at least one x's bit is set
 	IterBitsAllNotSet = uint8(9) // all bits are not set
+)
 
+const (
 	OkCode            = 0
 	PacketLengthBytes = 5
-	ErrorFlag         = 0x8000
 
 	SchemaKeyClusterUUID = "cluster"
 	ReplicaSetMaxSize    = 32

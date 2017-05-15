@@ -14,11 +14,11 @@ type Replace struct {
 
 var _ Query = (*Replace)(nil)
 
-func (q *Replace) Pack(data *packData, w io.Writer) (byte, error) {
+func (q *Replace) Pack(data *packData, w io.Writer) (uint32, error) {
 	var err error
 
 	if q.Tuple == nil {
-		return BadRequest, errors.New("Tuple can not be nil")
+		return ErrorFlag, errors.New("Tuple can not be nil")
 	}
 
 	encoder := msgpack.NewEncoder(w)
@@ -27,7 +27,7 @@ func (q *Replace) Pack(data *packData, w io.Writer) (byte, error) {
 
 	// Space
 	if err = data.writeSpace(q.Space, w, encoder); err != nil {
-		return BadRequest, err
+		return ErrorFlag, err
 	}
 
 	// Tuple
@@ -35,7 +35,7 @@ func (q *Replace) Pack(data *packData, w io.Writer) (byte, error) {
 	encoder.EncodeArrayLen(len(q.Tuple))
 	for _, value := range q.Tuple {
 		if err = encoder.Encode(value); err != nil {
-			return BadRequest, err
+			return ErrorFlag, err
 		}
 	}
 
