@@ -8,7 +8,7 @@ import (
 	"io"
 )
 
-var packedOkBody = []byte{0x80}
+var emptyBody = []byte{0x80}
 
 type packedPacket struct {
 	code      interface{}
@@ -82,8 +82,8 @@ func packIprotoError(code int, requestID uint32) *packedPacket {
 }
 
 func packIprotoOk(requestID uint32) *packedPacket {
-	pp := packIproto(OkCode, requestID)
-	pp.buffer.Write(packedOkBody)
+	pp := packIproto(OKRequest, requestID)
+	pp.buffer.Write(emptyBody)
 	return pp
 }
 
@@ -104,31 +104,30 @@ func (pp *packedPacket) WriteTo(w io.Writer) (n int64, err error) {
 	}
 	var h []byte
 
-	code := pp.code
-	requestID := pp.requestID
+	requestID := uint(pp.requestID)
 	body := pp.buffer.Bytes()
 
-	switch code.(type) {
+	switch code := pp.code.(type) {
 	case byte:
 		h = h8[:]
-		h[7] = code.(byte)
-		packBigTo(uint(requestID), 4, h[10:])
+		h[7] = code
+		packBigTo(requestID, 4, h[10:])
 	case uint:
 		h = h32[:]
-		packBigTo(code.(uint), 4, h[8:])
-		packBigTo(uint(requestID), 4, h[14:])
+		packBigTo(code, 4, h[8:])
+		packBigTo(requestID, 4, h[14:])
 	case int:
 		h = h32[:]
-		packBigTo(uint(code.(int)), 4, h[8:])
-		packBigTo(uint(requestID), 4, h[14:])
+		packBigTo(uint(code), 4, h[8:])
+		packBigTo(requestID, 4, h[14:])
 	case uint32:
 		h = h32[:]
-		packBigTo(uint(code.(uint32)), 4, h[8:])
-		packBigTo(uint(requestID), 4, h[14:])
+		packBigTo(uint(code), 4, h[8:])
+		packBigTo(requestID, 4, h[14:])
 	case int32:
 		h = h32[:]
-		packBigTo(uint(code.(int32)), 4, h[8:])
-		packBigTo(uint(requestID), 4, h[14:])
+		packBigTo(uint(code), 4, h[8:])
+		packBigTo(requestID, 4, h[14:])
 	default:
 		panic("packIproto: unknown code type")
 	}

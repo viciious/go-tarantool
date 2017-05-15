@@ -230,7 +230,7 @@ func newConn(dsnString string, options *Options) (conn *Connection, err error) {
 
 func (conn *Connection) pullSchema() (err error) {
 	// select space and index schema
-	request := func(req Query) (*Result, error) {
+	request := func(q Query) (*Result, error) {
 		var err error
 
 		requestID := conn.nextID()
@@ -238,7 +238,7 @@ func (conn *Connection) pullSchema() (err error) {
 		pp := packIproto(0, requestID)
 		defer pp.Release()
 
-		pp.code, err = (req).Pack(conn.packData, &pp.buffer)
+		pp.code, err = q.Pack(conn.packData, &pp.buffer)
 		if err != nil {
 			return nil, err
 		}

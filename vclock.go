@@ -9,26 +9,27 @@ import (
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
-// VClock response
+// VClock response (in OK).
+// Similar to Result struct
 type VClock struct {
 	RequestID  uint64 // RequestID is SYNC field;
 	InstanceID uint32
 	VClock     VectorClock
 }
 
-// String implements Stringer interface
+// String implements Stringer interface.
 func (q *VClock) String() string {
 	return fmt.Sprintf("VClock ReqID:%v Replica:%v, VClock:%#v",
 		q.RequestID, q.InstanceID, q.VClock)
 }
 
-// Pack implements a part of the Query interface
-func (q *VClock) Pack(r io.Reader) (err error) {
-	// TODO: support Subscribe Unpack
+// Pack implements a part of the Query interface.
+func (q *VClock) Pack(requestID uint32) (err error) {
+	// TODO: support VClock Pack
 	return errors.New("Not supported yet")
 }
 
-// Unpack implements a part of the Query interface
+// Unpack implements a part of the Query interface.
 func (q *VClock) Unpack(r io.Reader) (err error) {
 	var count int
 
