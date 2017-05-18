@@ -9,6 +9,8 @@ import (
 
 	"time"
 
+	"io"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -128,27 +130,31 @@ func TestSlaveJoinWithSnapSync(t *testing.T) {
 	require.NoError(err)
 
 	resultChan := make(chan bool, 1)
-	go func(iter Snapshoter, rch chan bool) {
+	go func(it PacketIterator, rch chan bool) {
 		var p *Packet
-		for iter.NextSnap() {
-			p = iter.Packet()
-			if p == nil {
+		var err error
+		for {
+			p, err = it.Next()
+			if err == io.EOF {
+				break
+			}
+			if err != nil || p == nil {
 				rch <- false
 				return
 			}
 		}
-		rch <- true
+		// after io.EOF p should be nil
+		rch <- p == nil
 	}(it, resultChan)
 
 	// check
 	timeout := time.After(10 * time.Second)
 	select {
 	case success := <-resultChan:
-		require.True(success, "There is nil packet has been received.")
+		require.True(success, "There is nil packet or error has been happened")
 	case <-timeout:
 		t.Fatal("Timeout: there is no necessary xlog.")
 	}
-	assert.NoError(it.Err())
 	assert.NotZero(s.ReplicaSet.UUID)
 	assert.Len(s.ReplicaSet.Instances, expected.ReplicaSetLen)
 }
@@ -200,7 +206,7 @@ func TestSlaveJoinWithSnapAsync(t *testing.T) {
 
 	respc := make(chan *Packet, 1)
 
-	var it Snapshoter
+	var it PacketIterator
 	go func() {
 		it, err = s.JoinWithSnap(respc)
 	}()
@@ -210,10 +216,11 @@ func TestSlaveJoinWithSnapAsync(t *testing.T) {
 loop:
 	for {
 		select {
-		case _, open := <-respc:
+		case p, open := <-respc:
 			if !open {
 				break loop
 			}
+			require.NotNil(p, "There is nil packet has been received.")
 		case <-timeout:
 			t.Fatal("Timeout: there is no necessary xlog.")
 		}
@@ -252,7 +259,7 @@ func TestSlaveJoin(t *testing.T) {
 	require.Len(s.ReplicaSet.Instances, expected.ReplicaSetLen)
 }
 
-func TestSlaveDoubleDetach(t *testing.T) {
+func TestSlaveDoubleClose(t *testing.T) {
 	require := require.New(t)
 	box, err := newTntBox()
 	require.NoError(err)
@@ -302,29 +309,27 @@ func TestSlaveSubscribeSync(t *testing.T) {
 	})
 	defer ns.Close()
 
-	err = ns.Subscribe(0)
+	it, err := ns.Subscribe(0)
 	require.NoError(err)
 
 	resultChan := make(chan bool, 1)
-	go func(s *Slave, rch chan bool) {
+	go func(it PacketIterator, rch chan bool) {
 		var p *Packet
-		var res bool
-		for s.Consume() {
-			p = s.Packet()
-			if p == nil {
-				res = false
-				break
+		var err error
+		for err != io.EOF {
+			p, err = it.Next()
+			if err == nil && p != nil {
+				if isUUIDinReplicaSet(p, s.UUID) {
+					rch <- true
+					return
+				}
+				continue
 			}
-			if isUUIDinReplicaSet(p, s.UUID) {
-				res = true
-				break
-			}
+			// if we are here something is going wrong
+			break
 		}
-		if s.Err() != nil {
-			res = false
-		}
-		rch <- res
-	}(ns, resultChan)
+		rch <- false
+	}(it, resultChan)
 
 	// check
 	timeout := time.After(10 * time.Second)
@@ -364,7 +369,7 @@ func TestSlaveSubscribeAsync(t *testing.T) {
 	})
 	defer ns.Close()
 	respc := make(chan *Packet, 1)
-	err = ns.Subscribe(0, respc)
+	it, err := ns.Subscribe(0, respc)
 	require.NoError(err)
 
 	// check
@@ -373,7 +378,7 @@ loop:
 	for {
 		select {
 		case p := <-respc:
-			assert.NotNil(p)
+			require.NotNil(p)
 			if isUUIDinReplicaSet(p, s.UUID) {
 				break loop
 			}
@@ -382,6 +387,7 @@ loop:
 			break loop
 		}
 	}
+	assert.Nil(it)
 }
 
 func isUUIDinReplicaSet(p *Packet, uuid string) bool {
@@ -416,8 +422,9 @@ func TestSlaveAttach(t *testing.T) {
 		UUID:     tnt16UUID})
 
 	// check
-	err = s.Attach(0)
+	it, err := s.Attach(0)
 	require.NoError(err)
+	assert.NotNil(t, it)
 
 	// shutdown
 	err = s.Close()
@@ -441,7 +448,7 @@ func TestSlaveComplex(t *testing.T) {
 		Password: tnt16Pass,
 	})
 	respc := make(chan *Packet, 1)
-	err = s.Attach(2, respc)
+	_, err = s.Attach(2, respc)
 	require.NoError(err)
 	defer s.Close()
 

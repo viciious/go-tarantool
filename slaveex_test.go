@@ -4,6 +4,8 @@ import (
 	"log"
 	"strings"
 
+	"io"
+
 	"sync"
 
 	tnt16 "gitlab.corp.mail.ru/rb/go/helper/tarantool"
@@ -24,12 +26,12 @@ func ExampleSlave_subscribeExisted() {
 		log.Printf("Tnt Slave creating error:%v", err)
 		return
 	}
-	// always detach slave to preserve socket descriptor
+	// always close slave to preserve socket descriptor
 	defer s.Close()
 
 	// let's start from the beginning
 	var lsn int64 = 0
-	err = s.Subscribe(lsn)
+	it, err := s.Subscribe(lsn)
 	if err != nil {
 		log.Printf("Tnt Slave subscribing error:%v", err)
 		return
@@ -38,14 +40,15 @@ func ExampleSlave_subscribeExisted() {
 	// print snapshot
 	var p *tnt16.Packet
 	var hr = strings.Repeat("-", 80)
-	// consume master's changes permanently
-	for s.Consume() {
-		p = s.Packet()
+	// iterate over master's changes permanently
+	for {
+		p, err = it.Next()
+		if err != nil {
+			log.Printf("Tnt Slave iterating error:%v", err)
+			return
+		}
 		log.Println(p)
 		log.Println(hr)
-	}
-	if s.Err() != nil {
-		log.Printf("Tnt Slave consuming error:%v", err)
 	}
 }
 
@@ -60,12 +63,12 @@ func ExampleSlave_subscribeNew() {
 		log.Printf("Tnt Slave creating error:%v", err)
 		return
 	}
-	// always detach slave to preserve socket descriptor
+	// always close slave to preserve socket descriptor
 	defer s.Close()
 
 	// let's start from the beginning
 	var lsn int64 = 0
-	err = s.Attach(lsn)
+	it, err := s.Attach(lsn)
 	if err != nil {
 		log.Printf("Tnt Slave subscribing error:%v", err)
 		return
@@ -74,14 +77,15 @@ func ExampleSlave_subscribeNew() {
 	// print snapshot
 	var p *tnt16.Packet
 	var hr = strings.Repeat("-", 80)
-	// consume master's changes permanently
-	for s.Consume() {
-		p = s.Packet()
+	// iterate over master's changes permanently
+	for {
+		p, err = it.Next()
+		if err != nil {
+			log.Printf("Tnt Slave iterating error:%v", err)
+			return
+		}
 		log.Println(p)
 		log.Println(hr)
-	}
-	if s.Err() != nil {
-		log.Printf("Tnt Slave consuming error:%v", err)
 	}
 }
 
@@ -96,7 +100,7 @@ func ExampleSlave_Join() {
 		log.Printf("Tnt Slave creating error:%v", err)
 		return
 	}
-	// always detach slave to preserve socket descriptor
+	// always close slave to preserve socket descriptor
 	defer s.Close()
 
 	if err = s.Join(); err != nil {
@@ -118,7 +122,7 @@ func ExampleSlave_JoinWithSnap_sync() {
 		log.Printf("Tnt Slave creating error:%v", err)
 		return
 	}
-	// always detach slave to preserve socket descriptor
+	// always close slave to preserve socket descriptor
 	defer s.Close()
 
 	// get iterator on snapshot
@@ -131,8 +135,15 @@ func ExampleSlave_JoinWithSnap_sync() {
 	// print snapshot
 	var p *tnt16.Packet
 	var hr = strings.Repeat("-", 80)
-	for it.NextSnap() {
-		p = it.Packet()
+	for {
+		p, err = it.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Printf("Tnt Slave joining error:%v", err)
+			return
+		}
 		// print request
 		log.Println(hr)
 		switch q := p.Request.(type) {
@@ -149,11 +160,6 @@ func ExampleSlave_JoinWithSnap_sync() {
 			log.Printf("%v", p)
 		}
 	}
-	// always check error after iterator!
-	if it.Err() != nil {
-		log.Printf("Tnt Slave joining error:%v", err)
-		return
-	}
 
 	log.Printf("UUID=%#v Replica Set UUID=%#v\n", s.UUID, s.ReplicaSet.UUID)
 }
@@ -169,7 +175,7 @@ func ExampleSlave_JoinWithSnap_async() {
 		log.Printf("Tnt Slave creating error:%v", err)
 		return
 	}
-	// always detach slave to preserve socket descriptor
+	// always close slave to preserve socket descriptor
 	defer s.Close()
 
 	// chan for snapshot's packets
@@ -227,12 +233,12 @@ func ExampleSlave_Subscribe_sync() {
 		log.Printf("Tnt Slave creating error:%v", err)
 		return
 	}
-	// always detach slave to preserve socket descriptor
+	// always close slave to preserve socket descriptor
 	defer s.Close()
 
 	// let's start from the beginning
 	var lsn int64 = 0
-	err = s.Subscribe(lsn)
+	it, err := s.Subscribe(lsn)
 	if err != nil {
 		log.Printf("Tnt Slave subscribing error:%v", err)
 		return
@@ -242,8 +248,12 @@ func ExampleSlave_Subscribe_sync() {
 	var p *tnt16.Packet
 	var hr = strings.Repeat("-", 80)
 	// consume master's changes permanently
-	for s.Consume() {
-		p = s.Packet()
+	for {
+		p, err = it.Next()
+		if err != nil {
+			log.Printf("Tnt Slave consuming error:%v", err)
+			return
+		}
 		log.Println(hr)
 		switch q := p.Request.(type) {
 		case *tnt16.Insert:
@@ -258,10 +268,6 @@ func ExampleSlave_Subscribe_sync() {
 		default:
 			log.Printf("%v", p)
 		}
-	}
-	if s.Err() != nil {
-		log.Printf("Tnt Slave consuming error:%v", err)
-		return
 	}
 }
 
@@ -280,7 +286,7 @@ func ExampleSlave_Subscribe_async() {
 		log.Printf("Tnt Slave creating error:%v", err)
 		return
 	}
-	// always detach slave to preserve socket descriptor
+	// always close slave to preserve socket descriptor
 	defer s.Close()
 
 	// chan for snapshot's packets
@@ -314,7 +320,7 @@ func ExampleSlave_Subscribe_async() {
 
 	// let's start from the beginning
 	var lsn int64 = 0
-	err = s.Subscribe(lsn, xlogChan)
+	_, err = s.Subscribe(lsn, xlogChan)
 	if err != nil {
 		log.Printf("Tnt Slave subscribing error:%v", err)
 		return
@@ -335,12 +341,12 @@ func ExampleSlave_Attach_sync() {
 		log.Printf("Tnt Slave creating error:%v", err)
 		return
 	}
-	// always detach slave to preserve socket descriptor
+	// always close slave to preserve socket descriptor
 	defer s.Close()
 
 	// let's start from the beginning
 	var lsn int64 = 0
-	err = s.Attach(lsn)
+	it, err := s.Attach(lsn)
 	if err != nil {
 		log.Printf("Tnt Slave subscribing error:%v", err)
 		return
@@ -350,8 +356,12 @@ func ExampleSlave_Attach_sync() {
 	var p *tnt16.Packet
 	var hr = strings.Repeat("-", 80)
 	// consume master's changes permanently
-	for s.Consume() {
-		p = s.Packet()
+	for {
+		p, err = it.Next()
+		if err != nil {
+			log.Printf("Tnt Slave consuming error:%v", err)
+			return
+		}
 		log.Println(hr)
 		switch q := p.Request.(type) {
 		case *tnt16.Insert:
@@ -367,10 +377,6 @@ func ExampleSlave_Attach_sync() {
 			log.Printf("%v", p)
 		}
 	}
-	if s.Err() != nil {
-		log.Printf("Tnt Slave consuming error:%v", err)
-		return
-	}
 }
 
 func ExampleSlave_Attach_async() {
@@ -384,7 +390,7 @@ func ExampleSlave_Attach_async() {
 		log.Printf("Tnt Slave creating error:%v", err)
 		return
 	}
-	// always detach slave to preserve socket descriptor
+	// always close slave to preserve socket descriptor
 	defer s.Close()
 
 	// chan for snapshot's packets
@@ -418,7 +424,7 @@ func ExampleSlave_Attach_async() {
 
 	// let's start from the beginning
 	var lsn int64 = 0
-	err = s.Attach(lsn, xlogChan)
+	_, err = s.Attach(lsn, xlogChan)
 	if err != nil {
 		log.Printf("Tnt Slave subscribing error:%v", err)
 		return

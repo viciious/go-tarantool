@@ -9,6 +9,11 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+// PacketIterator is a wrapper around Slave provided iteration over new Packets functionality.
+type PacketIterator interface {
+	Next() (*Packet, error)
+}
+
 // Slave connects to Tarantool 1.6 instance and subscribes for changes.
 // Tarantool instance acting as a master sees Slave like any replica in replication set.
 // Slave can't be used concurrently, route responses from returned channel instead.
@@ -22,8 +27,7 @@ type Slave struct {
 		UUID      string
 		Instances ReplicaSet
 	}
-	p   *Packet // p is a Packet which has just been read.
-	err error   // err is an error which has just been gotten.
+	next func() (*Packet, error) // next stores current iterator
 }
 
 // NewSlave instance of Slave with tarantool master uri
@@ -47,6 +51,8 @@ func NewSlave(uri string, opts ...Options) (s *Slave, err error) {
 	if err = s.connect(uri, &options); err != nil {
 		return nil, err
 	}
+	// prevent from NPE in Next method
+	s.next = s.nextEOF
 
 	return s, nil
 }
@@ -65,10 +71,10 @@ func (s *Slave) parseOptions(uri string, options Options) (err error) {
 }
 
 // Attach Slave to Replica Set and subscribe for DML requests, starting from lsn.
-// Use out chan for asynchronous packet receiving or synchronous Consume method otherwise.
-func (s *Slave) Attach(lsn int64, out ...chan *Packet) error {
+// Use out chan for asynchronous packet receiving or synchronous PacketIterator otherwise.
+func (s *Slave) Attach(lsn int64, out ...chan *Packet) (PacketIterator, error) {
 	if err := s.Join(); err != nil {
-		return err
+		return nil, err
 	}
 	return s.Subscribe(lsn, out...)
 }
@@ -81,28 +87,36 @@ func (s *Slave) Close() error {
 // Join the Replica Set using Master instance
 func (s *Slave) Join() (err error) {
 
-	if _, err = s.JoinWithSnap(); err != nil {
+	it, err := s.JoinWithSnap()
+	if err != nil {
 		return err
 	}
 
-	for s.NextSnap() {
+	for {
+		_, err = it.Next()
+		if err != nil {
+			break
+		}
 	}
 
-	return s.Err()
+	if err == io.EOF {
+		return nil
+	}
+
+	return
 }
 
 // JoinWithSnap the Replica Set using Master instance.
-// Snapshot logs is available through the given out channel or
-// returned snapshot log iterator - Snapshoter. Use NextSnap, Packet, Err methods of the latter.
-// (In truth, Slave itself is returned in Snapshoter wrapper)
-func (s *Slave) JoinWithSnap(out ...chan *Packet) (it Snapshoter, err error) {
+// Snapshot logs is available through the given out channel or returned PacketIterator.
+// (In truth, Slave itself is returned in PacketIterator wrapper)
+func (s *Slave) JoinWithSnap(out ...chan *Packet) (it PacketIterator, err error) {
 
 	if err = s.join(); err != nil {
 		return nil, err
 	}
 
-	// reset internal error
-	s.setErr(nil)
+	// set iterator for the Next method
+	s.next = s.nextSnap
 
 	if s.isEmptyChan(out...) {
 		// no chan means synchronous snapshot scanning
@@ -112,48 +126,60 @@ func (s *Slave) JoinWithSnap(out ...chan *Packet) (it Snapshoter, err error) {
 	respc := out[0]
 	defer close(respc)
 
-	for s.NextSnap() {
-		respc <- s.Packet()
+	for {
+		p, err := s.Next()
+		if err != nil {
+			break
+		}
+		respc <- p
 	}
 
-	return nil, s.Err()
+	if err == io.EOF {
+		return nil, nil
+	}
+
+	return nil, err
 }
 
+// isEmptyChan parses channels option.
 func (s *Slave) isEmptyChan(out ...chan *Packet) bool {
 	return len(out) == 0 || out[0] == nil
 }
 
 // Subscribe for every DML request (insert, update, delete, replace, upsert) from master since lsn.
 // Replica Set and self UUID should be set before call subscribe. Use options in New or Join for it.
-// Subscribe sends requests asynchronously to out channel specified or
-// use synchronous Consume method otherwise.
-func (s *Slave) Subscribe(lsn int64, out ...chan *Packet) (err error) {
+// Subscribe sends requests asynchronously to out channel specified or use synchronous PacketIterator otherwise.
+func (s *Slave) Subscribe(lsn int64, out ...chan *Packet) (it PacketIterator, err error) {
 	//don't call subscribe if there are no options had been set or before join request
 	if !s.IsInReplicaSet() {
-		return ErrNotInReplicaSet
+		return nil, ErrNotInReplicaSet
 	}
 
 	if err = s.subscribe(lsn); err != nil {
-		return err
+		return nil, err
 	}
 
-	// reset internal error
-	s.setErr(nil)
+	// set iterator for the Next method
+	s.next = s.nextXlog
 
 	if s.isEmptyChan(out...) {
 		// no chan means synchronous dml request receiving
-		return nil
+		return s, nil
 	}
 
 	// consuming new DML requests asynchronously
 	go func(out chan *Packet) {
 		defer close(out)
-		for s.Consume() {
-			out <- s.Packet()
+		for {
+			p, err := s.Next()
+			if err != nil {
+				break
+			}
+			out <- p
 		}
 	}(out[0])
 
-	return nil
+	return nil, nil
 }
 
 // IsInReplicaSet checks whether Slave has Replica Set params or not
@@ -171,8 +197,8 @@ func (s *Slave) join() (err error) {
 	if err = s.send(pp); err != nil {
 		return err
 	}
-
 	pp.Release()
+
 	return nil
 }
 
@@ -196,11 +222,7 @@ func (s *Slave) subscribe(lsn int64) error {
 	if pp, err = s.receive(); err != nil {
 		return err
 	}
-	defer func() {
-		if pp != nil {
-			pp.Release()
-		}
-	}()
+	defer pp.Release()
 
 	p, err := decodePacket(pp)
 	if err != nil {
@@ -218,43 +240,50 @@ func (s *Slave) subscribe(lsn int64) error {
 	return nil
 }
 
-// Consume new packets (responses on SUBSCRIBE request), which then be available through the Packet method.
-// It returns false when the scan stops, by reaching an error.
-// After Scan returns false, the Err method will return any error that occurred during scanning.
-func (s *Slave) Consume() bool {
+// Next implements PacketIterator interface.
+func (s *Slave) Next() (*Packet, error) {
+	// Next wraps unexported "next" fields.
+	// Because of exported Next field can't implements needed interface itself.
 
-	pp, err := s.receive()
+	p, err := s.next()
 	if err != nil {
-		s.setErr(err)
-		return false
+		// don't iterate after error has been occurred
+		s.next = s.nextEOF
 	}
-
-	s.p, err = decodePacket(pp)
-	if err != nil {
-		s.setErr(err)
-		return false
-	}
-	pp.Release()
-
-	return true
+	return p, err
 }
 
-// NextSnap parses response on JOIN request, which then be available through the Packet method.
-// It returns false when the scan stops, either by reaching the end of the input or an error.
-// After Scan returns false, the Err method will return any error that occurred during scanning,
-// except that if it was io.EOF, Err will return nil.
-func (s *Slave) NextSnap() bool {
+// nextXlog iterates new packets (responses on SUBSCRIBE request).
+func (s *Slave) nextXlog() (p *Packet, err error) {
 
 	pp, err := s.receive()
 	if err != nil {
-		s.setErr(err)
-		return false
+		return nil, err
+	}
+	defer pp.Release()
+
+	p, err = decodePacket(pp)
+	if err != nil {
+		return nil, err
 	}
 
-	s.p, err = decodePacket(pp)
+	return p, nil
+}
+
+// nextSnap iterates responses on JOIN request.
+// At the end it returns io.EOF error and nil packet.
+// While iterating all
+func (s *Slave) nextSnap() (p *Packet, err error) {
+
+	pp, err := s.receive()
 	if err != nil {
-		s.setErr(err)
-		return false
+		return nil, err
+	}
+	defer pp.Release()
+
+	p, err = decodePacket(pp)
+	if err != nil {
+		return nil, err
 	}
 
 	// we have to parse snapshot logs to find replica set instances, UUID,
@@ -262,9 +291,9 @@ func (s *Slave) NextSnap() bool {
 	// this response error type means that UUID had been joined Replica Set already
 	joined := ErrorFlag | ErrTupleFound
 
-	switch s.p.code {
+	switch p.code {
 	case InsertRequest:
-		q := s.p.Request.(*Insert)
+		q := p.Request.(*Insert)
 		switch q.Space {
 		case SpaceSchema:
 			// assert space _schema always has str index on field one
@@ -291,34 +320,18 @@ func (s *Slave) NextSnap() bool {
 		r := bytes.NewReader(pp.body)
 		q.Unpack(r)
 		s.VClock = q.VClock
-		s.setErr(io.EOF)
-		return false
+		return nil, io.EOF
 	case joined:
 		// already joined
-		s.setErr(io.EOF)
-		return false
+		return nil, io.EOF
 	}
-	pp.Release()
 
-	return true
+	return p, nil
 }
 
-// Packet returns last received packet.
-func (s *Slave) Packet() *Packet {
-	return s.p
-}
-
-// Err returns first occured error while iterating snapshot or consuming requests.
-func (s *Slave) Err() error {
-	if s.err == io.EOF {
-		return nil
-	}
-	return s.err
-}
-
-// setErr sets internal error which are published by Err method.
-func (s *Slave) setErr(err error) {
-	s.err = err
+// nextEOF is empty iterator to avoid calling others in inappropriate cases
+func (s *Slave) nextEOF() (*Packet, error) {
+	return nil, io.EOF
 }
 
 // connect to tarantool instance (dial + handshake + auth)
@@ -340,7 +353,7 @@ func (s *Slave) disconnect() (err error) {
 	return
 }
 
-// send packed packet to the connection buffer, flush buffer and release packet
+// send packed packet to the connection buffer, flush buffer.
 func (s *Slave) send(pp *packedPacket) (err error) {
 	if _, err = pp.WriteTo(s.cw); err != nil {
 		return
@@ -362,11 +375,4 @@ func (s *Slave) newPacket(q Query) (pp *packedPacket, err error) {
 		pp = nil
 	}
 	return
-}
-
-// Snapshoter is a set of methods to iterate over received snapshot's requests.
-type Snapshoter interface {
-	NextSnap() bool
-	Packet() *Packet
-	Err() error
 }
