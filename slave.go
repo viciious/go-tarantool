@@ -73,8 +73,8 @@ func (s *Slave) Attach(lsn int64, out ...chan *Packet) error {
 	return s.Subscribe(lsn, out...)
 }
 
-// Detach Slave from Master
-func (s *Slave) Detach() error {
+// Close Slave connection to Master
+func (s *Slave) Close() error {
 	return s.disconnect()
 }
 

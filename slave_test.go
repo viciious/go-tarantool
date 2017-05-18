@@ -122,7 +122,7 @@ func TestSlaveJoinWithSnapSync(t *testing.T) {
 		User:     tnt16User,
 		Password: tnt16Pass,
 		UUID:     expected.UUID})
-	defer s.Detach()
+	defer s.Close()
 
 	it, err := s.JoinWithSnap()
 	require.NoError(err)
@@ -196,7 +196,7 @@ func TestSlaveJoinWithSnapAsync(t *testing.T) {
 		User:     tnt16User,
 		Password: tnt16Pass,
 		UUID:     expected.UUID})
-	defer s.Detach()
+	defer s.Close()
 
 	respc := make(chan *Packet, 1)
 
@@ -244,7 +244,7 @@ func TestSlaveJoin(t *testing.T) {
 		UUID:     expected.UUID})
 	err = s.Join()
 	require.NoError(err)
-	err = s.Detach()
+	err = s.Close()
 	require.NoError(err)
 
 	// check
@@ -266,10 +266,10 @@ func TestSlaveDoubleDetach(t *testing.T) {
 	require.NoError(err)
 
 	// check
-	err = s.Detach()
+	err = s.Close()
 	require.NoError(err)
 	require.NotPanics(assert.PanicTestFunc(func() {
-		err = s.Detach()
+		err = s.Close()
 	}))
 	require.NoError(err)
 }
@@ -290,7 +290,7 @@ func TestSlaveSubscribeSync(t *testing.T) {
 	// register in replica set
 	err = s.Join()
 	require.NoError(err)
-	err = s.Detach()
+	err = s.Close()
 	require.NoError(err)
 
 	// new instance for the purity of the test
@@ -300,7 +300,7 @@ func TestSlaveSubscribeSync(t *testing.T) {
 		UUID:           s.UUID,
 		ReplicaSetUUID: s.ReplicaSet.UUID,
 	})
-	defer ns.Detach()
+	defer ns.Close()
 
 	err = ns.Subscribe(0)
 	require.NoError(err)
@@ -352,7 +352,7 @@ func TestSlaveSubscribeAsync(t *testing.T) {
 	// register in replica set
 	err = s.Join()
 	require.NoError(err)
-	err = s.Detach()
+	err = s.Close()
 	require.NoError(err)
 
 	// new instance for the purity of the test
@@ -362,7 +362,7 @@ func TestSlaveSubscribeAsync(t *testing.T) {
 		UUID:           s.UUID,
 		ReplicaSetUUID: s.ReplicaSet.UUID,
 	})
-	defer ns.Detach()
+	defer ns.Close()
 	respc := make(chan *Packet, 1)
 	err = ns.Subscribe(0, respc)
 	require.NoError(err)
@@ -420,7 +420,7 @@ func TestSlaveAttach(t *testing.T) {
 	require.NoError(err)
 
 	// shutdown
-	err = s.Detach()
+	err = s.Close()
 	require.NoError(err)
 }
 
@@ -443,7 +443,7 @@ func TestSlaveComplex(t *testing.T) {
 	respc := make(chan *Packet, 1)
 	err = s.Attach(2, respc)
 	require.NoError(err)
-	defer s.Detach()
+	defer s.Close()
 
 	out := make(chan *Insert, 32)
 	go func(in <-chan *Packet, out chan *Insert) {

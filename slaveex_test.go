@@ -25,7 +25,7 @@ func ExampleSlave_subscribeExisted() {
 		return
 	}
 	// always detach slave to preserve socket descriptor
-	defer s.Detach()
+	defer s.Close()
 
 	// let's start from the beginning
 	var lsn int64 = 0
@@ -61,7 +61,7 @@ func ExampleSlave_subscribeNew() {
 		return
 	}
 	// always detach slave to preserve socket descriptor
-	defer s.Detach()
+	defer s.Close()
 
 	// let's start from the beginning
 	var lsn int64 = 0
@@ -97,7 +97,7 @@ func ExampleSlave_Join() {
 		return
 	}
 	// always detach slave to preserve socket descriptor
-	defer s.Detach()
+	defer s.Close()
 
 	if err = s.Join(); err != nil {
 		log.Printf("Tnt Slave joining error:%v", err)
@@ -119,7 +119,7 @@ func ExampleSlave_JoinWithSnap_sync() {
 		return
 	}
 	// always detach slave to preserve socket descriptor
-	defer s.Detach()
+	defer s.Close()
 
 	// get iterator on snapshot
 	it, err := s.JoinWithSnap()
@@ -170,7 +170,7 @@ func ExampleSlave_JoinWithSnap_async() {
 		return
 	}
 	// always detach slave to preserve socket descriptor
-	defer s.Detach()
+	defer s.Close()
 
 	// chan for snapshot's packets
 	snapChan := make(chan *tnt16.Packet, 128)
@@ -228,7 +228,7 @@ func ExampleSlave_Subscribe_sync() {
 		return
 	}
 	// always detach slave to preserve socket descriptor
-	defer s.Detach()
+	defer s.Close()
 
 	// let's start from the beginning
 	var lsn int64 = 0
@@ -281,7 +281,7 @@ func ExampleSlave_Subscribe_async() {
 		return
 	}
 	// always detach slave to preserve socket descriptor
-	defer s.Detach()
+	defer s.Close()
 
 	// chan for snapshot's packets
 	xlogChan := make(chan *tnt16.Packet, 128)
@@ -336,7 +336,7 @@ func ExampleSlave_Attach_sync() {
 		return
 	}
 	// always detach slave to preserve socket descriptor
-	defer s.Detach()
+	defer s.Close()
 
 	// let's start from the beginning
 	var lsn int64 = 0
@@ -385,7 +385,7 @@ func ExampleSlave_Attach_async() {
 		return
 	}
 	// always detach slave to preserve socket descriptor
-	defer s.Detach()
+	defer s.Close()
 
 	// chan for snapshot's packets
 	xlogChan := make(chan *tnt16.Packet, 128)
