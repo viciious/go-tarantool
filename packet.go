@@ -128,6 +128,8 @@ func (pack *Packet) decodeBody(r io.Reader) (err error) {
 		return unpackq(&Update{})
 	case UpsertRequest:
 		return unpackq(&Upsert{})
+	case PingRequest:
+		return unpackq(&Ping{})
 	default:
 		return unpackr(OkCode)
 	}
