@@ -162,25 +162,25 @@ func readPacked(r io.Reader) (*packedPacket, error) {
 		return nil, err
 	}
 
-	if h[0] == 0xce {
-		if _, err = io.ReadAtLeast(r, h[1:5], 4); err != nil {
-			return nil, err
-		}
-		bodyLength = int(binary.BigEndian.Uint32(h[1:5]))
-	} else if h[0] == 0xcd {
-		if _, err = io.ReadAtLeast(r, h[1:3], 2); err != nil {
-			return nil, err
-		}
-		bodyLength = int(binary.BigEndian.Uint16(h[1:3]))
+	if h[0] <= 0x7f {
+		bodyLength = int(h[0])
 	} else if h[0] == 0xcc {
 		if _, err = io.ReadAtLeast(r, h[1:2], 1); err != nil {
 			return nil, err
 		}
 		bodyLength = int(h[1])
-	} else if h[0] <= 0x7f {
-		bodyLength = int(h[0])
+	} else if h[0] == 0xcd {
+		if _, err = io.ReadAtLeast(r, h[1:3], 2); err != nil {
+			return nil, err
+		}
+		bodyLength = int(binary.BigEndian.Uint16(h[1:3]))
+	} else if h[0] == 0xce {
+		if _, err = io.ReadAtLeast(r, h[1:5], 4); err != nil {
+			return nil, err
+		}
+		bodyLength = int(binary.BigEndian.Uint32(h[1:5]))
 	} else {
-		return nil, fmt.Errorf("Wrong response header: %#v", h)
+		return nil, fmt.Errorf("Wrong packet header: %#v", h)
 	}
 
 	if bodyLength == 0 {
