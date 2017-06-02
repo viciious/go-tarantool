@@ -10,10 +10,7 @@ import (
 	"sync"
 )
 
-const greetingSize = 128
 const saltSize = 32
-const tarantoolVersion = "Tarantool 1.6.8 (Binary)"
-const connBufSize = 2 * 1024 * 1024
 
 type QueryHandler func(query Query) *Result
 type OnCloseCallback func(err error)
@@ -46,8 +43,8 @@ func NewIprotoServer(uuid string, handler QueryHandler, onClose OnCloseCallback)
 
 func (s *IprotoServer) Accept(conn net.Conn) {
 	s.conn = conn
-	s.reader = bufio.NewReaderSize(conn, connBufSize)
-	s.writer = bufio.NewWriterSize(conn, connBufSize)
+	s.reader = bufio.NewReaderSize(conn, DefaultReaderBufSize)
+	s.writer = bufio.NewWriterSize(conn, DefaultWriterBufSize)
 	s.quit = make(chan bool)
 	s.output = make(chan *packedPacket, 1024)
 
@@ -121,15 +118,15 @@ func (s *IprotoServer) greet() (err error) {
 
 	s.salt = []byte(base64.StdEncoding.EncodeToString(salt))
 
-	line1 = fmt.Sprintf("%s %s", tarantoolVersion, s.uuid)
+	line1 = fmt.Sprintf("%s %s", ServerIdent, s.uuid)
 	line2 = fmt.Sprintf("%s", s.salt)
 
-	format = fmt.Sprintf("%%-%ds\n%%-%ds\n", greetingSize/2-1, greetingSize/2-1)
+	format = fmt.Sprintf("%%-%ds\n%%-%ds\n", GreetingSize/2-1, GreetingSize/2-1)
 	greeting = fmt.Sprintf(format, line1, line2)
 
 	// send greeting
 	n, err = fmt.Fprintf(s.writer, "%s", greeting)
-	if err != nil || n != greetingSize {
+	if err != nil || n != GreetingSize {
 		return
 	}
 

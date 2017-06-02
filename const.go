@@ -195,3 +195,11 @@ const (
 	ErrWrongSchemaVaersion           = iota // Wrong schema version, current: %d, in request: %u
 	ErrSlabAllocMax                  = iota // Failed to allocate %u bytes for tuple in the slab allocator: tuple is too large. Check 'slab_alloc_maximal' configuration option.
 )
+
+const (
+	GreetingSize = 128
+)
+
+const (
+	ServerIdent = "Tarantool 1.6.8 (Binary)"
+)
