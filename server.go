@@ -43,8 +43,8 @@ func NewIprotoServer(uuid string, handler QueryHandler, onClose OnCloseCallback)
 
 func (s *IprotoServer) Accept(conn net.Conn) {
 	s.conn = conn
-	s.reader = bufio.NewReaderSize(conn, DefaultReaderBufSize)
-	s.writer = bufio.NewWriterSize(conn, DefaultWriterBufSize)
+	s.reader = bufio.NewReader(conn)
+	s.writer = bufio.NewWriter(conn)
 	s.quit = make(chan bool)
 	s.output = make(chan *packedPacket, 1024)
 
