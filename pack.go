@@ -11,7 +11,7 @@ import (
 var emptyBody = []byte{0x80}
 
 type packedPacket struct {
-	code      interface{}
+	code      uint32
 	requestID uint32
 	body      []byte // for incoming packets
 	buffer    bytes.Buffer
@@ -70,15 +70,15 @@ func Uint64(value uint64) []byte {
 	return result
 }
 
-func packIproto(code interface{}, requestID uint32) *packedPacket {
+func packIproto(code int, requestID uint32) *packedPacket {
 	pp := packetPool.Get()
 	pp.requestID = requestID
-	pp.code = code
+	pp.code = uint32(code)
 	return pp
 }
 
-func packIprotoError(code int, requestID uint32) *packedPacket {
-	return packIproto(ErrorFlag|code, requestID)
+func packIprotoError(errCode int, requestID uint32) *packedPacket {
+	return packIproto(ErrorFlag|errCode, requestID)
 }
 
 func packIprotoOk(requestID uint32) *packedPacket {
@@ -88,52 +88,21 @@ func packIprotoOk(requestID uint32) *packedPacket {
 }
 
 func (pp *packedPacket) WriteTo(w io.Writer) (n int64, err error) {
-	h8 := [...]byte{
-		0xce, 0, 0, 0, 0, // length
-		0x82,       // 2 element map
-		KeyCode, 0, // code
-		KeySync, 0xce,
-		0, 0,
-		0, 0,
-	}
+
 	h32 := [...]byte{
-		0xce, 0, 0, 0, 0, // length
-		0x82,                      // 2 element map
-		KeyCode, 0xce, 0, 0, 0, 0, // code
-		KeySync, 0xce, 0, 0, 0, 0,
+		codes.Uint32, 0, 0, 0, 0, // length
+		0x82,                              // 2 element map (codes.FixedMapLow+2)
+		KeyCode, codes.Uint32, 0, 0, 0, 0, // code
+		KeySync, codes.Uint32, 0, 0, 0, 0,
 	}
-	var h []byte
+	h := h32[:]
 
-	requestID := uint(pp.requestID)
+	binary.BigEndian.PutUint32(h[8:], pp.code)
+	binary.BigEndian.PutUint32(h[14:], pp.requestID)
+
 	body := pp.buffer.Bytes()
-
-	switch code := pp.code.(type) {
-	case byte:
-		h = h8[:]
-		h[7] = code
-		packBigTo(requestID, 4, h[10:])
-	case uint:
-		h = h32[:]
-		packBigTo(code, 4, h[8:])
-		packBigTo(requestID, 4, h[14:])
-	case int:
-		h = h32[:]
-		packBigTo(uint(code), 4, h[8:])
-		packBigTo(requestID, 4, h[14:])
-	case uint32:
-		h = h32[:]
-		packBigTo(uint(code), 4, h[8:])
-		packBigTo(requestID, 4, h[14:])
-	case int32:
-		h = h32[:]
-		packBigTo(uint(code), 4, h[8:])
-		packBigTo(requestID, 4, h[14:])
-	default:
-		panic("packIproto: unknown code type")
-	}
-
-	l := uint(len(h) - PacketLengthBytes + len(body))
-	packBigTo(l, 4, h[1:])
+	l := len(h) - PacketLengthBytes + len(body)
+	binary.BigEndian.PutUint32(h[1:], uint32(l))
 
 	m, err := w.Write(h)
 	n += int64(m)
