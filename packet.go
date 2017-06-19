@@ -2,11 +2,9 @@ package tarantool
 
 import (
 	"bytes"
-	"io"
-
-	"time"
-
 	"fmt"
+	"io"
+	"time"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
 )

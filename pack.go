@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"gopkg.in/vmihailenco/msgpack.v2/codes"
 )
 
-var emptyBody = []byte{0x80}
+var emptyBody = []byte{codes.FixedMapLow}
 
 type packedPacket struct {
 	code      uint32
@@ -18,55 +20,17 @@ type packedPacket struct {
 	pool      *packedPacketPool
 }
 
-func packLittle(value uint, bytes int) []byte {
-	b := value
-	result := make([]byte, bytes)
-	for i := 0; i < bytes; i++ {
-		result[i] = uint8(b & 0xFF)
-		b >>= 8
-	}
-	return result
-}
-
-func packBig(value uint, bytes int) []byte {
-	b := value
-	result := make([]byte, bytes)
-	for i := bytes - 1; i >= 0; i-- {
-		result[i] = uint8(b & 0xFF)
-		b >>= 8
-	}
-	return result
-}
-
-func packLittleTo(value uint, bytes int, dest []byte) {
-	b := value
-	for i := 0; i < bytes; i++ {
-		dest[i] = uint8(b & 0xFF)
-		b >>= 8
-	}
-}
-
-func packBigTo(value uint, bytes int, dest []byte) {
-	b := value
-	for i := bytes - 1; i >= 0; i-- {
-		dest[i] = uint8(b & 0xFF)
-		b >>= 8
-	}
-}
-
 // Uint32 is an alias for PackL
 func Uint32(value uint32) []byte {
-	return packLittle(uint(value), 4)
+	result := make([]byte, 4)
+	binary.LittleEndian.PutUint32(result, value)
+	return result
 }
 
-// Uint64 is an alias for PackQ (returns unpacked uint64 btyes in little-endian order)
+// Uint64 is an alias for PackQ (returns unpacked uint64 bytes in little-endian order)
 func Uint64(value uint64) []byte {
-	b := value
 	result := make([]byte, 8)
-	for i := 0; i < 8; i++ {
-		result[i] = uint8(b & 0xFF)
-		b >>= 8
-	}
+	binary.LittleEndian.PutUint64(result, value)
 	return result
 }
 
@@ -131,24 +95,25 @@ func readPacked(r io.Reader) (*packedPacket, error) {
 		return nil, err
 	}
 
-	if h[0] <= 0x7f {
+	switch {
+	case h[0] <= codes.PosFixedNumHigh:
 		bodyLength = int(h[0])
-	} else if h[0] == 0xcc {
+	case h[0] == codes.Uint8:
 		if _, err = io.ReadAtLeast(r, h[1:2], 1); err != nil {
 			return nil, err
 		}
 		bodyLength = int(h[1])
-	} else if h[0] == 0xcd {
+	case h[0] == codes.Uint16:
 		if _, err = io.ReadAtLeast(r, h[1:3], 2); err != nil {
 			return nil, err
 		}
 		bodyLength = int(binary.BigEndian.Uint16(h[1:3]))
-	} else if h[0] == 0xce {
+	case h[0] == codes.Uint32:
 		if _, err = io.ReadAtLeast(r, h[1:5], 4); err != nil {
 			return nil, err
 		}
 		bodyLength = int(binary.BigEndian.Uint32(h[1:5]))
-	} else {
+	default:
 		return nil, fmt.Errorf("Wrong packet header: %#v", h)
 	}
 

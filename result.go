@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"encoding/binary"
 	"errors"
 	"io"
 
@@ -46,9 +47,9 @@ func (r *Result) pack(requestID uint32) (*packedPacket, error) {
 
 		b := pp.buffer.Bytes()
 		if r.Data != nil {
-			packBigTo(uint(len(r.Data)), 4, b[3:])
+			binary.BigEndian.PutUint32(b[3:], uint32(len(r.Data)))
 		} else {
-			packBigTo(uint(0), 4, b[3:])
+			binary.BigEndian.PutUint32(b[3:], 0)
 		}
 	}
 
