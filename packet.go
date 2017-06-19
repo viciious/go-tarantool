@@ -18,15 +18,20 @@ type Packet struct {
 	InstanceID uint32
 	Timestamp  time.Time
 	Request    Query
-	result     *Result
+	Result     *Result
 }
 
 func (pack *Packet) String() string {
 	switch {
 	// response to client
-	case pack.result != nil:
-		return fmt.Sprintf("Packet Type:%v, ReqID:%v\nResult:%#v\n",
-			pack.code, pack.requestID, pack.result)
+	case pack.Result != nil:
+		if pack.Result.Error != nil {
+			return fmt.Sprintf("Packet Type:%v, ReqID:%v\nResult:%#v\nErr:%v\n",
+				pack.code, pack.requestID, pack.Result, pack.Result.Error)
+		} else {
+			return fmt.Sprintf("Packet Type:%v, ReqID:%v\nResult:%#v\nData:%v\n",
+				pack.code, pack.requestID, pack.Result, pack.Result.Data)
+		}
 	// request to server
 	case pack.requestID != 0:
 		return fmt.Sprintf("Packet Type:%v, ReqID:%v\nRequest:%#v\n",
@@ -102,7 +107,7 @@ func (pack *Packet) decodeBody(r io.Reader) (err error) {
 		if err := res.unpack(r); err != nil {
 			return err
 		}
-		pack.result = res
+		pack.Result = res
 		return nil
 	}
 

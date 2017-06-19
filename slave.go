@@ -229,7 +229,7 @@ func (s *Slave) subscribe(lsn int64) error {
 		return err
 	}
 	if p.code != OKRequest {
-		return p.result.Error
+		return p.Result.Error
 	}
 
 	q := new(VClock)

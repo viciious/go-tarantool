@@ -218,8 +218,8 @@ func newConn(dsnString string, options *Options) (conn *Connection, err error) {
 			return
 		}
 
-		if authResponse.result != nil && authResponse.result.Error != nil {
-			err = authResponse.result.Error
+		if authResponse.Result != nil && authResponse.Result.Error != nil {
+			err = authResponse.Result.Error
 			return
 		}
 	}
@@ -257,15 +257,15 @@ func (conn *Connection) pullSchema() (err error) {
 			return nil, errors.New("Bad response requestID")
 		}
 
-		if response.result == nil {
+		if response.Result == nil {
 			return nil, errors.New("Nil response result")
 		}
 
-		if response.result.Error != nil {
-			return nil, response.result.Error
+		if response.Result.Error != nil {
+			return nil, response.Result.Error
 		}
 
-		return response.result, nil
+		return response.Result, nil
 	}
 
 	res, err := request(&Select{
@@ -494,8 +494,8 @@ READER_LOOP:
 
 			if err != nil {
 				res.Error = err
-			} else if packet.result != nil {
-				res = packet.result
+			} else if packet.Result != nil {
+				res = packet.Result
 			}
 
 			req.replyChan <- res
