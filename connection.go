@@ -3,16 +3,24 @@ package tarantool
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+)
 
-	"github.com/phonkee/godsn"
+const (
+	defaultConnectTimeout time.Duration = time.Duration(time.Second)
+	defaultQueryTimeout   time.Duration = time.Duration(time.Second)
+)
+
+var (
+	ErrEmptyDefaultSpace = errors.New("zero-length default space or unnecessary slash in dsn.path")
+	ErrSyncFailed        = errors.New("SYNC failed")
 )
 
 type Options struct {
@@ -31,7 +39,6 @@ type Greeting struct {
 }
 
 type Connection struct {
-	dsn       *godsn.DSN
 	requestID uint32
 	requests  *requestMap
 	writeChan chan *packedPacket // packed messages with header
@@ -51,21 +58,19 @@ type Connection struct {
 // Connect to tarantool instance with options.
 // Returned Connection could be used to execute queries.
 func Connect(dsnString string, options *Options) (conn *Connection, err error) {
-	// code below had appeared in result of splitting Connect into newConn and pullSchema
-	// newConn should be refactored totally
-	conn, err = newConn(dsnString, options)
+
+	dsn, opts, err := parseOptions(dsnString, options)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err = newConn(dsn.Scheme, dsn.Host, opts)
 	if err != nil {
 		return
 	}
 
 	// set schema pulling deadline
-	timeout := time.Duration(time.Second)
-	if options != nil {
-		if options.ConnectTimeout.Nanoseconds() != 0 {
-			timeout = options.ConnectTimeout
-		}
-	}
-	deadline := time.Now().Add(timeout)
+	deadline := time.Now().Add(opts.ConnectTimeout)
 	conn.tcpConn.SetDeadline(deadline)
 
 	err = conn.pullSchema()
@@ -83,8 +88,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	return
 }
 
-func newConn(dsnString string, options *Options) (conn *Connection, err error) {
-	var dsn *godsn.DSN
+func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 
 	defer func() { // close opened connection if error
 		if err != nil && conn != nil {
@@ -95,86 +99,28 @@ func newConn(dsnString string, options *Options) (conn *Connection, err error) {
 		}
 	}()
 
-	// remove schema, if present
-	if strings.HasPrefix(dsnString, "tcp://") {
-		dsn, err = godsn.Parse(strings.Split(dsnString, "tcp:")[1])
-	} else if strings.HasPrefix(dsnString, "unix://") {
-		dsn, err = godsn.Parse(strings.Split(dsnString, "unix:")[1])
-	} else {
-		dsn, err = godsn.Parse("//" + dsnString)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
 	conn = &Connection{
-		dsn:            dsn,
+		remoteAddr:     addr,
 		requests:       newRequestMap(),
 		writeChan:      make(chan *packedPacket, 256),
 		exit:           make(chan bool),
 		closed:         make(chan bool),
 		firstErrorLock: &sync.Mutex{},
+		packData:       newPackData(opts.DefaultSpace),
+		queryTimeout:   opts.QueryTimeout,
 	}
 
-	if options == nil {
-		options = &Options{}
-	}
-
-	opts := *options // copy to new object
-
-	if opts.ConnectTimeout.Nanoseconds() == 0 {
-		opts.ConnectTimeout = time.Duration(time.Second)
-	}
-
-	if opts.QueryTimeout.Nanoseconds() == 0 {
-		opts.QueryTimeout = time.Duration(time.Second)
-	}
-
-	if options.User == "" {
-		user := dsn.User()
-		if user != nil {
-			username := user.Username()
-			pass, _ := user.Password()
-			options.User = username
-			options.Password = pass
-		}
-	}
-
-	remoteAddr := dsn.Host()
-	path := dsn.Path()
-
-	if opts.DefaultSpace == "" {
-		if len(path) > 0 {
-			splitPath := strings.Split(path, "/")
-			if len(splitPath) > 1 {
-				if splitPath[1] == "" {
-					return nil, fmt.Errorf("Wrong space: %s", splitPath[1])
-				}
-				opts.DefaultSpace = splitPath[1]
-			}
-		}
-	}
-
-	d, err := newPackData(opts.DefaultSpace)
-	if err != nil {
-		return nil, err
-	}
-	conn.packData = d
-
-	conn.queryTimeout = opts.QueryTimeout
-
-	connectDeadline := time.Now().Add(opts.ConnectTimeout)
-
-	conn.remoteAddr = remoteAddr
-	conn.tcpConn, err = net.DialTimeout("tcp", remoteAddr, opts.ConnectTimeout)
+	conn.tcpConn, err = net.DialTimeout(scheme, conn.remoteAddr, opts.ConnectTimeout)
 	if err != nil {
 		return nil, err
 	}
 
 	greeting := make([]byte, 128)
 
+	connectDeadline := time.Now().Add(opts.ConnectTimeout)
 	conn.tcpConn.SetDeadline(connectDeadline)
+	// removing deadline deferred
+	defer conn.tcpConn.SetDeadline(time.Time{})
 
 	_, err = io.ReadFull(conn.tcpConn, greeting)
 	if err != nil {
@@ -186,7 +132,8 @@ func newConn(dsnString string, options *Options) (conn *Connection, err error) {
 		Auth:    greeting[64:108],
 	}
 
-	if options.User != "" {
+	// try to authenticate if user have been provided
+	if len(opts.User) > 0 {
 		var authResponse *Packet
 
 		requestID := conn.nextID()
@@ -195,8 +142,8 @@ func newConn(dsnString string, options *Options) (conn *Connection, err error) {
 		defer pp.Release()
 
 		pp.code, err = (&Auth{
-			User:         options.User,
-			Password:     options.Password,
+			User:         opts.User,
+			Password:     opts.Password,
 			GreetingAuth: conn.Greeting.Auth,
 		}).Pack(conn.packData, &pp.buffer)
 		if err != nil {
@@ -214,7 +161,7 @@ func newConn(dsnString string, options *Options) (conn *Connection, err error) {
 		}
 
 		if authResponse.requestID != requestID {
-			err = errors.New("Bad auth responseID")
+			err = ErrSyncFailed
 			return
 		}
 
@@ -223,9 +170,63 @@ func newConn(dsnString string, options *Options) (conn *Connection, err error) {
 			return
 		}
 	}
-	// remove deadline
-	conn.tcpConn.SetDeadline(time.Time{})
+
 	return
+}
+
+func parseOptions(dsnString string, options *Options) (*url.URL, Options, error) {
+	if options == nil {
+		options = &Options{}
+	}
+	opts := *options // copy to new object
+
+	// remove schema, if present
+
+	// === for backward compatibility (only tcp despite of user wishes :)
+	dsnString = strings.TrimPrefix(dsnString, "unix:")
+	// ===
+
+	// tcp is the default scheme
+	switch {
+	case strings.HasPrefix(dsnString, "tcp://"):
+	case strings.HasPrefix(dsnString, "//"):
+		dsnString = "tcp:" + dsnString
+	default:
+		dsnString = "tcp://" + dsnString
+	}
+	dsn, err := url.Parse(dsnString)
+	if err != nil {
+		return dsn, opts, err
+	}
+
+	if opts.ConnectTimeout.Nanoseconds() == 0 {
+		opts.ConnectTimeout = defaultConnectTimeout
+	}
+	if opts.QueryTimeout.Nanoseconds() == 0 {
+		opts.QueryTimeout = defaultQueryTimeout
+	}
+
+	if len(opts.User) == 0 {
+		if user := dsn.User; user != nil {
+			opts.User = user.Username()
+			opts.Password, _ = user.Password()
+		}
+	}
+
+	if len(opts.DefaultSpace) == 0 && len(dsn.Path) > 0 {
+		path := strings.TrimPrefix(dsn.Path, "/")
+		// check it if it is necessary
+		switch {
+		case len(path) == 0:
+			return nil, opts, ErrEmptyDefaultSpace
+		//case strings.IndexAny(path, "/ ,") != -1:
+		//	return nil, opts, ErrBadDSNPath
+		default:
+			opts.DefaultSpace = path
+		}
+	}
+
+	return dsn, opts, nil
 }
 
 func (conn *Connection) pullSchema() (err error) {
@@ -340,17 +341,17 @@ func (conn *Connection) GetPrimaryKeyFields(space interface{}) ([]int, bool) {
 	}
 
 	var spaceID uint64
-	switch space.(type) {
+	switch space := space.(type) {
 	case int:
-		spaceID = uint64(space.(int))
+		spaceID = uint64(space)
 	case uint:
-		spaceID = uint64(space.(uint))
+		spaceID = uint64(space)
 	case uint32:
-		spaceID = uint64(space.(uint32))
+		spaceID = uint64(space)
 	case uint64:
-		spaceID = space.(uint64)
+		spaceID = space
 	case string:
-		spaceID = conn.packData.spaceMap[space.(string)]
+		spaceID = conn.packData.spaceMap[space]
 	default:
 		return nil, false
 	}

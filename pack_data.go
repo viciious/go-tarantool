@@ -38,15 +38,12 @@ func packSelectSingleKey() []byte {
 	return buf.Bytes()
 }
 
-func newPackData(defaultSpace interface{}) (*packData, error) {
+func newPackData(defaultSpace interface{}) *packData {
 	var packedDefaultSpace []byte
 	if spaceNo, ok := defaultSpace.(uint64); ok {
 		packedDefaultSpace = encodeValues2(KeySpaceNo, spaceNo)
-	} else {
-		packedDefaultSpace = nil
 	}
-
-	d := &packData{
+	return &packData{
 		defaultSpace:        defaultSpace,
 		packedDefaultSpace:  packedDefaultSpace,
 		packedDefaultIndex:  encodeValues2(KeyIndexNo, uint32(0)),
@@ -58,8 +55,6 @@ func newPackData(defaultSpace interface{}) (*packData, error) {
 		indexMap:            make(map[uint64](map[string]uint64)),
 		primaryKeyMap:       make(map[uint64]([]int)),
 	}
-
-	return d, nil
 }
 
 func (data *packData) spaceNo(space interface{}) (uint64, error) {

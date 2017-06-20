@@ -3,7 +3,6 @@ package tarantool
 import (
 	"io"
 
-	"github.com/pkg/errors"
 	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
@@ -26,6 +25,5 @@ func (q *Join) Pack(data *packData, w io.Writer) (uint32, error) {
 
 // Unpack implements a part of the Query interface
 func (q *Join) Unpack(r io.Reader) (err error) {
-	// TODO: support Join Unpack
-	return errors.New("Not supported yet")
+	return ErrNotSupported
 }

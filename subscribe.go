@@ -1,7 +1,6 @@
 package tarantool
 
 import (
-	"errors"
 	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -44,6 +43,5 @@ func (q *Subscribe) Pack(data *packData, w io.Writer) (uint32, error) {
 
 // Unpack implements a part of the Query interface
 func (q *Subscribe) Unpack(r io.Reader) (err error) {
-	// TODO: support Subscribe Unpack
-	return errors.New("Not supported yet")
+	return ErrNotSupported
 }

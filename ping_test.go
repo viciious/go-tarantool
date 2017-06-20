@@ -31,7 +31,7 @@ func TestPing(t *testing.T) {
 }
 
 func BenchmarkPingPack(b *testing.B) {
-	d, _ := newPackData(42)
+	d := newPackData(42)
 
 	for i := 0; i < b.N; i++ {
 		(&Ping{}).Pack(d, nil)

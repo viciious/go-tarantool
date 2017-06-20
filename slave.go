@@ -286,7 +286,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 		return nil, err
 	}
 
-	// we have to parse snapshot logs to find replica set instances, UUID,
+	// we have to parse snapshot logs to find replica set instances, UUID
 
 	// this response error type means that UUID had been joined Replica Set already
 	joined := ErrorFlag | ErrTupleFound
@@ -335,8 +335,12 @@ func (s *Slave) nextEOF() (*Packet, error) {
 }
 
 // connect to tarantool instance (dial + handshake + auth)
-func (s *Slave) connect(uri string, opts *Options) (err error) {
-	conn, err := newConn(uri, opts)
+func (s *Slave) connect(uri string, options *Options) (err error) {
+	dsn, opts, err := parseOptions(uri, options)
+	if err != nil {
+		return
+	}
+	conn, err := newConn(dsn.Scheme, dsn.Host, opts)
 	if err != nil {
 		return
 	}

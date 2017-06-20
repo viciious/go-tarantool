@@ -79,7 +79,7 @@ func TestInsert(t *testing.T) {
 }
 
 func BenchmarkInsertPack(b *testing.B) {
-	d, _ := newPackData(42)
+	d := newPackData(42)
 	for i := 0; i < b.N; i++ {
 		pp := packetPool.Get()
 		(&Insert{Tuple: []interface{}{3, "Hello world"}}).Pack(d, &pp.buffer)

@@ -85,7 +85,7 @@ func TestReplace(t *testing.T) {
 }
 
 func BenchmarkReplacePack(b *testing.B) {
-	d, _ := newPackData(42)
+	d := newPackData(42)
 
 	for i := 0; i < b.N; i++ {
 		pp := packetPool.Get()

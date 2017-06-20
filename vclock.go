@@ -1,9 +1,7 @@
 package tarantool
 
 import (
-	"errors"
 	"fmt"
-
 	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -25,8 +23,7 @@ func (q *VClock) String() string {
 
 // Pack implements a part of the Query interface.
 func (q *VClock) Pack(requestID uint32) (err error) {
-	// TODO: support VClock Pack
-	return errors.New("Not supported yet")
+	return ErrNotSupported
 }
 
 // Unpack implements a part of the Query interface.

@@ -29,13 +29,15 @@ var _ Error = (*ConnectionError)(nil)
 var _ Error = (*QueryError)(nil)
 
 var (
+	// ErrNotSupported yet
+	ErrNotSupported = errors.New("not supported yet")
 	// ErrNotInReplicaSet means there aren't full enough params to join replica set
 	ErrNotInReplicaSet = NewQueryError("Full Replica Set params hasn't been set")
 )
 
 func NewConnectionError(con *Connection, message string, timeout bool) error {
 	return &ConnectionError{
-		error: fmt.Errorf("%s, remote: %s", message, con.dsn.Host()),
+		error: fmt.Errorf("%s, remote: %s", message, con.remoteAddr),
 	}
 }
 
@@ -50,7 +52,7 @@ func ConnectionClosedError(con *Connection) error {
 
 func NewContextError(ctx context.Context, con *Connection, message string) error {
 	return &ContextError{
-		error:      fmt.Errorf("%s: %s, remote: %s", message, ctx.Err(), con.dsn.Host()),
+		error:      fmt.Errorf("%s: %s, remote: %s", message, ctx.Err(), con.remoteAddr),
 		contextErr: ctx.Err(),
 	}
 }
