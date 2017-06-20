@@ -6,14 +6,14 @@ import (
 
 type Connector struct {
 	sync.Mutex
-	remoteAddr string
+	RemoteAddr string
 	options    *Options
 	conn       *Connection
 }
 
 func New(remoteAddr string, option *Options) *Connector {
 	return &Connector{
-		remoteAddr: remoteAddr,
+		RemoteAddr: remoteAddr,
 		options:    option,
 	}
 }
@@ -28,7 +28,7 @@ func (c *Connector) Connect() (*Connection, error) {
 		isClosed, _ = c.conn.IsClosed()
 	}
 	if isClosed {
-		c.conn, err = Connect(c.remoteAddr, c.options)
+		c.conn, err = Connect(c.RemoteAddr, c.options)
 	}
 	conn = c.conn
 	c.Unlock()
