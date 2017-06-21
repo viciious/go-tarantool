@@ -26,6 +26,8 @@ type Slave struct {
 		Instances ReplicaSet
 	}
 	next func() (*Packet, error) // next stores current iterator
+	p    *Packet                 // p stores last packet for Packet method
+	err  error                   // err stores last error for Err method
 }
 
 // NewSlave instance of Slave with tarantool master uri
@@ -239,6 +241,28 @@ func (s *Slave) subscribe(lsn int64) error {
 	s.VClock = v.VClock
 
 	return nil
+}
+
+// HasNext implements bufio.Scanner Scan style iterator.
+func (s *Slave) HasNext() bool {
+	s.p, s.err = s.Next()
+	if s.err != nil {
+		if s.err == io.EOF {
+			s.err = nil
+		}
+		return false
+	}
+	return true
+}
+
+// Packet has been got by HasNext method.
+func (s *Slave) Packet() *Packet {
+	return s.p
+}
+
+// Err has been got by HasNext method.
+func (s *Slave) Err() error {
+	return s.err
 }
 
 // Next implements PacketIterator interface.

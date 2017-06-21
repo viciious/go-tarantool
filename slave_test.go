@@ -155,7 +155,53 @@ func TestSlaveJoinWithSnapSync(t *testing.T) {
 	case success := <-resultChan:
 		require.True(success, "There is nil packet or error has been happened")
 	case <-timeout:
-		t.Fatal("Timeout: there is no necessary xlog.")
+		t.Fatal("Timeout: there is no necessary snaplogs.")
+	}
+	assert.NotZero(s.ReplicaSet.UUID)
+	assert.Len(s.ReplicaSet.Instances, expected.ReplicaSetLen)
+}
+
+func TestSlaveHasNextOnJoin(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	box, err := newTntBox()
+	require.NoError(err)
+	defer box.Close()
+
+	expected := struct {
+		UUID          string
+		ReplicaSetLen int
+	}{tnt16UUID, 1}
+	// setup
+	s, _ := NewSlave(box.Listen, Options{
+		User:     tnt16User,
+		Password: tnt16Pass,
+		UUID:     expected.UUID})
+	defer s.Close()
+
+	_, err = s.JoinWithSnap()
+	require.NoError(err)
+
+	resultChan := make(chan bool, 1)
+	go func(s *Slave, rch chan bool) {
+		for s.HasNext() {
+			if s.Err() != nil || s.Packet() == nil {
+				rch <- false
+				return
+			}
+		}
+		// after io.EOF p should be nil
+		rch <- s.Err() == nil && s.Packet() == nil
+	}(s, resultChan)
+
+	// check
+	timeout := time.After(10 * time.Second)
+	select {
+	case success := <-resultChan:
+		require.True(success, "There is nil packet or error has been happened")
+	case <-timeout:
+		t.Fatal("Timeout: there is no necessary snaplogs.")
 	}
 	assert.NotZero(s.ReplicaSet.UUID)
 	assert.Len(s.ReplicaSet.Instances, expected.ReplicaSetLen)
@@ -332,6 +378,58 @@ func TestSlaveSubscribeSync(t *testing.T) {
 		}
 		rch <- false
 	}(it, resultChan)
+
+	// check
+	timeout := time.After(10 * time.Second)
+	select {
+	case success := <-resultChan:
+		assert.True(success, "there is no packet with insert UUID in cluster space")
+	case <-timeout:
+		t.Fatal("timeout")
+	}
+}
+
+func TestSlaveHasNextOnSubscribe(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	// setup TestBox
+	box, err := newTntBox()
+	require.NoError(err)
+	defer box.Close()
+
+	s, _ := NewSlave(box.Listen, Options{
+		User:     tnt16User,
+		Password: tnt16Pass,
+	})
+	// register in replica set
+	err = s.Join()
+	require.NoError(err)
+	err = s.Close()
+	require.NoError(err)
+
+	// new instance for the purity of the test
+	ns, _ := NewSlave(box.Listen, Options{
+		User:           tnt16User,
+		Password:       tnt16Pass,
+		UUID:           s.UUID,
+		ReplicaSetUUID: s.ReplicaSet.UUID,
+	})
+	defer ns.Close()
+
+	_, err = ns.Subscribe(0)
+	require.NoError(err)
+
+	resultChan := make(chan bool, 1)
+	go func(ns *Slave, rch chan bool) {
+		for ns.HasNext() {
+			if isUUIDinReplicaSet(ns.Packet(), ns.UUID) {
+				rch <- true
+				return
+			}
+		}
+		rch <- false
+	}(ns, resultChan)
 
 	// check
 	timeout := time.After(10 * time.Second)
