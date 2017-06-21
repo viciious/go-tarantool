@@ -35,9 +35,11 @@ func replicatorConfig(user, pass string) string {
 
 func spaceTester() string {
 	return `
-	s = box.schema.space.create('tester')
-	i = s:create_index('primary', {})
-	s:insert{1, 'Initial tuple #1'}
+	box.once('space:tester', function()
+		s = box.schema.space.create('tester')
+		i = s:create_index('primary', {})
+		s:insert{1, 'Initial tuple #1'}
+		end)
 	box.once('guest:write_tester', function()
 		box.schema.user.grant('guest','write', 'space', 'tester', {if_not_exists = true})
 		end)

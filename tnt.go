@@ -21,6 +21,15 @@ type ReplicaSet map[uint32]string
 // VectorClock is an alias for the map to store Vector Clock
 type VectorClock map[uint32]int64
 
+// LSN is the sum of the VectorClock
+func (vc VectorClock) LSN() int64 {
+	result := int64(0)
+	for _, lsn := range vc {
+		result += lsn
+	}
+	return result
+}
+
 func init() {
 	packetPool = newPackedPacketPool()
 }

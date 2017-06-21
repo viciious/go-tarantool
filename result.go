@@ -3,6 +3,7 @@ package tarantool
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 
 	"gopkg.in/vmihailenco/msgpack.v2"
@@ -91,4 +92,17 @@ func (r *Result) unpack(rr io.Reader) (err error) {
 		}
 	}
 	return
+}
+
+func (r *Result) String() string {
+	switch {
+	case r == nil:
+		return "Result <nil>"
+	case r.Error != nil:
+		return fmt.Sprintf("Result ErrCode:%v, Err: %v", r.ErrorCode, r.Error)
+	case r.Data != nil:
+		return fmt.Sprintf("Result Data:%#v", r.Data)
+	default:
+		return ""
+	}
 }

@@ -23,20 +23,15 @@ func (pack *Packet) String() string {
 	switch {
 	// response to client
 	case pack.Result != nil:
-		if pack.Result.Error != nil {
-			return fmt.Sprintf("Packet Type:%v, ReqID:%v\nResult:%#v\nErr:%v\n",
-				pack.code, pack.requestID, pack.Result, pack.Result.Error)
-		} else {
-			return fmt.Sprintf("Packet Type:%v, ReqID:%v\nResult:%#v\nData:%v\n",
-				pack.code, pack.requestID, pack.Result, pack.Result.Data)
-		}
+		return fmt.Sprintf("Packet Type:%v, ReqID:%v\n%v",
+			pack.code, pack.requestID, pack.Result)
 	// request to server
 	case pack.requestID != 0:
-		return fmt.Sprintf("Packet Type:%v, ReqID:%v\nRequest:%#v\n",
+		return fmt.Sprintf("Packet Type:%v, ReqID:%v\nRequest:%#v",
 			pack.code, pack.requestID, pack.Request)
 	// response from master
 	case pack.LSN != 0:
-		return fmt.Sprintf("Packet LSN:%v, InstanceID:%v, Timestamp:%v\nRequest:%#v\n",
+		return fmt.Sprintf("Packet LSN:%v, InstanceID:%v, Timestamp:%v\nRequest:%#v",
 			pack.LSN, pack.InstanceID, pack.Timestamp.Format(time.RFC3339), pack.Request)
 	default:
 		return fmt.Sprintf("Packet %#v", pack)

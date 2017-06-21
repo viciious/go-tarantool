@@ -2,8 +2,6 @@ package tarantool
 
 import (
 	"bufio"
-	"bytes"
-
 	"io"
 
 	uuid "github.com/satori/go.uuid"
@@ -232,10 +230,13 @@ func (s *Slave) subscribe(lsn int64) error {
 		return p.Result.Error
 	}
 
-	q := new(VClock)
-	r := bytes.NewReader(pp.body)
-	q.Unpack(r)
-	s.VClock = q.VClock
+	v := new(VClock)
+	err = v.UnmarshalBinary(pp.body)
+	if err != nil {
+		return err
+	}
+
+	s.VClock = v.VClock
 
 	return nil
 }
@@ -316,10 +317,12 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 			s.ReplicaSet.Instances[instanceID] = q.Tuple[1].(string)
 		}
 	case OKRequest:
-		q := new(VClock)
-		r := bytes.NewReader(pp.body)
-		q.Unpack(r)
-		s.VClock = q.VClock
+		v := new(VClock)
+		err = v.UnmarshalBinary(pp.body)
+		if err != nil {
+			return nil, err
+		}
+		s.VClock = v.VClock
 		return nil, io.EOF
 	case joined:
 		// already joined

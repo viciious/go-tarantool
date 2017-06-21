@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -16,18 +17,62 @@ type VClock struct {
 }
 
 // String implements Stringer interface.
-func (q *VClock) String() string {
+func (p *VClock) String() string {
 	return fmt.Sprintf("VClock ReqID:%v Replica:%v, VClock:%#v",
-		q.RequestID, q.InstanceID, q.VClock)
+		p.RequestID, p.InstanceID, p.VClock)
 }
 
-// Pack implements a part of the Query interface.
-func (q *VClock) Pack(requestID uint32) (err error) {
-	return ErrNotSupported
+func (p *VClock) UnmarshalBinary(data []byte) (err error) {
+	r := bytes.NewReader(data)
+	if err = p.decodeHeader(r); err != nil {
+		return err
+	}
+
+	if r.Len() == 0 {
+		return nil
+	}
+
+	if err = p.decodeBody(r); err != nil {
+		return err
+	}
+	return nil
 }
 
-// Unpack implements a part of the Query interface.
-func (q *VClock) Unpack(r io.Reader) (err error) {
+func (p *VClock) decodeHeader(r io.Reader) (err error) {
+	var l int
+	d := msgpack.NewDecoder(r)
+	if l, err = d.DecodeMapLen(); err != nil {
+		return
+	}
+	for ; l > 0; l-- {
+		var cd int
+		if cd, err = d.DecodeInt(); err != nil {
+			return
+		}
+		switch cd {
+		case KeySync:
+			if p.RequestID, err = d.DecodeUint64(); err != nil {
+				return
+			}
+		case KeySchemaID:
+			if _, err = d.DecodeUint32(); err != nil {
+				return
+			}
+		case KeyInstanceID:
+			if p.InstanceID, err = d.DecodeUint32(); err != nil {
+				return
+			}
+		default:
+			if err = d.Skip(); err != nil {
+				return
+			}
+		}
+	}
+	return nil
+}
+
+// r should read full packet bytes, not only body
+func (p *VClock) decodeBody(r io.Reader) (err error) {
 	var count int
 
 	d := msgpack.NewDecoder(r)
@@ -46,7 +91,7 @@ func (q *VClock) Unpack(r io.Reader) (err error) {
 			if n, err = d.DecodeMapLen(); err != nil {
 				return err
 			}
-			q.VClock = make(VectorClock, n)
+			p.VClock = make(VectorClock, n)
 			for ; n > 0; n-- {
 				mk, err := d.DecodeUint32()
 				if err != nil {
@@ -56,7 +101,7 @@ func (q *VClock) Unpack(r io.Reader) (err error) {
 				if err != nil {
 					return err
 				}
-				q.VClock[mk] = mv
+				p.VClock[mk] = mv
 			}
 		default:
 			if err = d.Skip(); err != nil {
