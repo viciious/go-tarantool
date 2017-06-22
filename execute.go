@@ -9,7 +9,7 @@ type QueryOptions struct {
 	Timeout time.Duration
 }
 
-func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
+func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 	var err error
 
 	requestID := conn.nextID()
@@ -70,7 +70,7 @@ func (conn *Connection) doExecute(r *request, ctx context.Context) *Result {
 	return res
 }
 
-func (conn *Connection) Exec(q Query, ctx context.Context) *Result {
+func (conn *Connection) Exec(ctx context.Context, q Query) *Result {
 	var cancel context.CancelFunc = func() {}
 
 	request := &request{
@@ -81,7 +81,7 @@ func (conn *Connection) Exec(q Query, ctx context.Context) *Result {
 	if _, ok := ctx.Deadline(); !ok && conn.queryTimeout != 0 {
 		ctx, cancel = context.WithTimeout(ctx, conn.queryTimeout)
 	}
-	result := conn.doExecute(request, ctx)
+	result := conn.doExecute(ctx, request)
 	cancel()
 	return result
 }
@@ -100,7 +100,7 @@ func (conn *Connection) ExecuteOptions(q Query, opts *QueryOptions) ([][]interfa
 		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
 	}
 
-	res = conn.Exec(q, ctx)
+	res = conn.Exec(ctx, q)
 	cancel()
 
 	return res.Data, res.Error
