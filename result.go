@@ -77,7 +77,12 @@ func (r *Result) unpack(rr io.Reader) (err error) {
 			v := value.([]interface{})
 			r.Data = make([]([]interface{}), len(v))
 			for i := 0; i < len(v); i++ {
-				r.Data[i] = v[i].([]interface{})
+				switch vi := v[i].(type) {
+				case []interface{}:
+					r.Data[i] = vi
+				default:
+					r.Data[i] = []interface{}{vi}
+				}
 			}
 		case KeyError:
 			errorMessage, err := d.DecodeString()
