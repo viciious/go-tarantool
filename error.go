@@ -8,7 +8,7 @@ import (
 
 type Error interface {
 	error
-	Connection() bool // Is the error temporary?
+	Connection() bool // Connection true if the error is temporary
 }
 
 type ConnectionError struct {
@@ -29,10 +29,12 @@ var _ Error = (*ConnectionError)(nil)
 var _ Error = (*QueryError)(nil)
 
 var (
-	// ErrNotSupported yet
+	// ErrNotSupported yet.
 	ErrNotSupported = errors.New("not supported yet")
-	// ErrNotInReplicaSet means there aren't full enough params to join replica set
+	// ErrNotInReplicaSet means there aren't full enough params to join replica set.
 	ErrNotInReplicaSet = NewQueryError("Full Replica Set params hasn't been set")
+	// ErrBadResult is such as non-expecting type or length or value.
+	ErrBadResult = NewQueryError("invalid result")
 )
 
 func NewConnectionError(con *Connection, message string, timeout bool) error {

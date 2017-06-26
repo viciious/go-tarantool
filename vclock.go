@@ -22,6 +22,7 @@ func (p *VClock) String() string {
 		p.RequestID, p.InstanceID, p.VClock)
 }
 
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (p *VClock) UnmarshalBinary(data []byte) (err error) {
 	r := bytes.NewReader(data)
 	if err = p.decodeHeader(r); err != nil {

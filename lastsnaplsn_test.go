@@ -56,5 +56,4 @@ func TestCallLastSnapLSN(t *testing.T) {
 	default:
 		t.Fatalf("NaN LSN:%#v", res)
 	}
-
 }

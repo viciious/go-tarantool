@@ -21,7 +21,7 @@ var (
 	tnt16UUID = "7c025e42-2394-11e7-aacf-0242ac110002"
 )
 
-func replicatorConfig(user, pass string) string {
+func schemeNewReplicator(user, pass string) string {
 	tmpl := `
 	box.once('{user}:role_replication', function()
 		box.schema.user.create('{user}', {password = '{pass}'})
@@ -33,7 +33,7 @@ func replicatorConfig(user, pass string) string {
 	return tmpl
 }
 
-func spaceTester() string {
+func schemeSpaceTester() string {
 	return `
 	box.once('space:tester', function()
 		s = box.schema.space.create('tester')
@@ -47,8 +47,8 @@ func spaceTester() string {
 }
 
 func newTntBox() (*Box, error) {
-	config := replicatorConfig(tnt16User, tnt16Pass)
-	config += spaceTester()
+	config := schemeNewReplicator(tnt16User, tnt16Pass)
+	config += schemeSpaceTester()
 
 	return NewBox(config, &BoxOptions{})
 }
@@ -621,4 +621,45 @@ func TestSlaveParseOptionsRSParams(t *testing.T) {
 		}
 		require.Equal(item.inReplica, s.IsInReplicaSet(), "case %v", tc+1)
 	}
+}
+
+func TestSlaveLastSnapLSN(t *testing.T) {
+	require := require.New(t)
+
+	// setup
+	user := "guest"
+	dirLUA := "lua"
+	config := schemeNewReplicator(tnt16User, tnt16Pass)
+	config += schemeGrantLastSnapLSN(tnt16User)
+	config += schemeGrantEval(user)
+
+	box, err := NewBox(config, &BoxOptions{WorkDir: dirLUA})
+	require.NoError(err)
+	defer box.Close()
+
+	s, err := NewSlave(box.Listen, Options{User: tnt16User, Password: tnt16Pass})
+	require.NoError(err)
+
+	// check init snapshot
+	lsn, err := s.LastSnapLSN()
+	require.NoError(err)
+	defer s.Close()
+
+	assert.EqualValues(t, 0, lsn, "init snapshot")
+
+	// prepare another one snapshot
+	tnt, err := Connect(box.Listen, &Options{})
+	require.NoError(err)
+	defer tnt.Close()
+
+	makesnapshot := &Eval{Expression: "local box = require('box') box.snapshot()"}
+	res, err := tnt.Execute(makesnapshot)
+	require.NoError(err)
+	require.Len(res, 0, "response to make snapshot request contains error")
+
+	// check newly generated snapshot
+	lsn, err = s.LastSnapLSN()
+	require.NoError(err)
+
+	assert.NotZero(t, lsn, "newly generated snapshot has zero lsn")
 }

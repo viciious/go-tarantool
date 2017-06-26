@@ -7,6 +7,10 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+const (
+	procLUALastSnapLSN = "lastsnaplsn"
+)
+
 // PacketIterator is a wrapper around Slave provided iteration over new Packets functionality.
 type PacketIterator interface {
 	Next() (*Packet, error)
@@ -129,6 +133,7 @@ func (s *Slave) JoinWithSnap(out ...chan *Packet) (it PacketIterator, err error)
 	for {
 		p, err := s.Next()
 		if err != nil {
+			// TODO: one should close chan out and save p and err
 			break
 		}
 		respc <- p
@@ -173,6 +178,7 @@ func (s *Slave) Subscribe(lsn int64, out ...chan *Packet) (it PacketIterator, er
 		for {
 			p, err := s.Next()
 			if err != nil {
+				// TODO: one should close chan out and save p and err
 				break
 			}
 			out <- p
@@ -185,6 +191,44 @@ func (s *Slave) Subscribe(lsn int64, out ...chan *Packet) (it PacketIterator, er
 // IsInReplicaSet checks whether Slave has Replica Set params or not
 func (s *Slave) IsInReplicaSet() bool {
 	return len(s.UUID) > 0 && len(s.ReplicaSet.UUID) > 0
+}
+
+func (s *Slave) LastSnapLSN() (uint64, error) {
+	pp, err := s.newPacket(&Call{Name: procLUALastSnapLSN})
+	if err != nil {
+		return 0, err
+	}
+
+	if err = s.send(pp); err != nil {
+		return 0, err
+	}
+	pp.Release()
+
+	if pp, err = s.receive(); err != nil {
+		return 0, err
+	}
+	defer pp.Release()
+
+	p, err := decodePacket(pp)
+	if err != nil {
+		return 0, err
+	}
+	if p.code != OKRequest {
+		s.p = p
+		s.err = p.Result.Error
+		return 0, s.err
+	}
+
+	res := p.Result.Data
+	if len(res) == 0 || len(res[0]) == 0 {
+		return 0, ErrBadResult
+	}
+
+	lsn, ok := res[0][0].(uint64)
+	if !ok {
+		return 0, ErrBadResult
+	}
+	return lsn, nil
 }
 
 // join send JOIN request.
@@ -229,6 +273,8 @@ func (s *Slave) subscribe(lsn int64) error {
 		return err
 	}
 	if p.code != OKRequest {
+		// TODO: little hack for complex attach
+		s.p = p
 		return p.Result.Error
 	}
 
