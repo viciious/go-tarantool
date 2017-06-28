@@ -193,7 +193,7 @@ func (s *Slave) IsInReplicaSet() bool {
 	return len(s.UUID) > 0 && len(s.ReplicaSet.UUID) > 0
 }
 
-func (s *Slave) LastSnapLSN() (uint64, error) {
+func (s *Slave) LastSnapLSN() (int64, error) {
 	pp, err := s.newPacket(&Call{Name: procLUALastSnapLSN})
 	if err != nil {
 		return 0, err
@@ -228,7 +228,7 @@ func (s *Slave) LastSnapLSN() (uint64, error) {
 	if !ok {
 		return 0, ErrBadResult
 	}
-	return lsn, nil
+	return int64(lsn), nil
 }
 
 // join send JOIN request.
