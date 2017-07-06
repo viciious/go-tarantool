@@ -1,15 +1,13 @@
 package tarantool
 
 import (
-	"testing"
-
-	"strings"
-
 	"fmt"
-
-	"time"
-
 	"io"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +22,7 @@ var (
 func schemeNewReplicator(user, pass string) string {
 	tmpl := `
 	box.once('{user}:role_replication', function()
-		box.schema.user.create('{user}', {password = '{pass}'})
+		box.schema.user.create('{user}', {password = '{pass}', if_not_exists = true})
 		box.schema.user.grant('{user}','execute','role','replication', {if_not_exists = true})
 		end)
 	`
@@ -627,13 +625,16 @@ func TestSlaveLastSnapLSN(t *testing.T) {
 	require := require.New(t)
 
 	// setup
-	user := "guest"
-	dirLUA := "lua"
-	config := schemeNewReplicator(tnt16User, tnt16Pass)
-	config += schemeGrantLastSnapLSN(tnt16User)
+	user, luaDir, role := "guest", "lua", "replication"
+	luaInit, err := ioutil.ReadFile(filepath.Join(luaDir, "init.lua"))
+	require.NoError(err)
+	config := string(luaInit)
+	config += schemeGrantRoleLastSnapLSN(role)
+	config += schemeNewReplicator(tnt16User, tnt16Pass)
+	// for making snapshot
 	config += schemeGrantEval(user)
 
-	box, err := NewBox(config, &BoxOptions{WorkDir: dirLUA})
+	box, err := NewBox(config, &BoxOptions{WorkDir: luaDir})
 	require.NoError(err)
 	defer box.Close()
 
@@ -641,11 +642,12 @@ func TestSlaveLastSnapLSN(t *testing.T) {
 	require.NoError(err)
 
 	// check init snapshot
+	expected := 0
 	lsn, err := s.LastSnapLSN()
 	require.NoError(err)
 	defer s.Close()
 
-	assert.EqualValues(t, 0, lsn, "init snapshot")
+	assert.EqualValues(t, expected, lsn, "init snapshot")
 
 	// prepare another one snapshot
 	tnt, err := Connect(box.Listen, &Options{})

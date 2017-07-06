@@ -133,7 +133,6 @@ func (s *Slave) JoinWithSnap(out ...chan *Packet) (it PacketIterator, err error)
 	for {
 		p, err := s.Next()
 		if err != nil {
-			// TODO: one should close chan out and save p and err
 			break
 		}
 		respc <- p
@@ -178,7 +177,7 @@ func (s *Slave) Subscribe(lsn int64, out ...chan *Packet) (it PacketIterator, er
 		for {
 			p, err := s.Next()
 			if err != nil {
-				// TODO: one should close chan out and save p and err
+				s.err = err
 				break
 			}
 			out <- p
