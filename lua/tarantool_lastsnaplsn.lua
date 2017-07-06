@@ -1,5 +1,5 @@
 -- version comment below is used for system.d spec file
--- VERSION = '0.1.2'
+-- VERSION = '1.0.0'
 
 local box = require('box')
 local fio = require('fio')
