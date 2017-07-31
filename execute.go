@@ -38,8 +38,8 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 
 	select {
 	case conn.writeChan <- pp:
-		// pass
 	case <-ctx.Done():
+		conn.requests.Pop(requestID)
 		return &Result{
 			Error:     NewContextError(ctx, conn, "Send error"),
 			ErrorCode: ErrTimeout,
@@ -54,7 +54,6 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 	var res *Result
 	select {
 	case res = <-r.replyChan:
-		// pass
 	case <-ctx.Done():
 		return &Result{
 			Error:     NewContextError(ctx, conn, "Recv error"),

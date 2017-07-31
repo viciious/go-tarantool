@@ -1,1 +1,1 @@
-Tarantool 1.6+ connector for Go language
+Go-библиотека к тарантулу 1.6

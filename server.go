@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -12,8 +13,8 @@ import (
 
 const saltSize = 32
 
-type QueryHandler func(query Query) *Result
-type OnCloseCallback func(err error)
+type QueryHandler func(queryContext context.Context, query Query) *Result
+type OnShutdownCallback func(err error)
 
 type IprotoServer struct {
 	sync.Mutex
@@ -22,22 +23,23 @@ type IprotoServer struct {
 	writer     *bufio.Writer
 	uuid       string
 	salt       []byte // base64-encoded salt
-	quit       chan bool
+	ctx        context.Context
+	cancel     context.CancelFunc
 	handler    QueryHandler
-	onClose    OnCloseCallback
+	onShutdown OnShutdownCallback
 	output     chan *packedPacket
 	closeOnce  sync.Once
 	firstError error
 }
 
-func NewIprotoServer(uuid string, handler QueryHandler, onClose OnCloseCallback) *IprotoServer {
+func NewIprotoServer(uuid string, handler QueryHandler, onShutdown OnShutdownCallback) *IprotoServer {
 	return &IprotoServer{
-		conn:    nil,
-		reader:  nil,
-		writer:  nil,
-		handler: handler,
-		onClose: onClose,
-		uuid:    uuid,
+		conn:       nil,
+		reader:     nil,
+		writer:     nil,
+		handler:    handler,
+		onShutdown: onShutdown,
+		uuid:       uuid,
 	}
 }
 
@@ -45,12 +47,12 @@ func (s *IprotoServer) Accept(conn net.Conn) {
 	s.conn = conn
 	s.reader = bufio.NewReader(conn)
 	s.writer = bufio.NewWriter(conn)
-	s.quit = make(chan bool)
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.output = make(chan *packedPacket, 1024)
 
 	err := s.greet()
 	if err != nil {
-		s.Close()
+		s.Shutdown()
 		return
 	}
 
@@ -91,14 +93,14 @@ func (s *IprotoServer) getError() error {
 	return s.firstError
 }
 
-func (s *IprotoServer) Close() error {
+func (s *IprotoServer) Shutdown() error {
 	err := s.getError()
 
 	s.closeOnce.Do(func() {
-		if s.onClose != nil {
-			s.onClose(err)
+		s.cancel()
+		if s.onShutdown != nil {
+			s.onShutdown(err)
 		}
-		close(s.quit)
 		s.conn.Close()
 	})
 
@@ -147,7 +149,7 @@ func (s *IprotoServer) read() {
 READER_LOOP:
 	for {
 		select {
-		case <-s.quit:
+		case <-s.ctx.Done():
 			break READER_LOOP
 		default:
 			// read raw bytes
@@ -160,17 +162,28 @@ READER_LOOP:
 				packet, err := decodePacket(pp)
 				if err != nil {
 					s.setError(err)
-					s.Close()
+					s.Shutdown()
 					return
 				}
 
 				code := byte(packet.code)
 				if code == PingRequest {
-					s.output <- packIprotoOk(packet.requestID)
+					select {
+					case s.output <- packIprotoOk(packet.requestID):
+						break
+					case <-s.ctx.Done():
+						break
+					}
 				} else {
-					res := s.handler(packet.Request)
+					res := s.handler(s.ctx, packet.Request)
+
 					outBody, _ := res.pack(packet.requestID)
-					s.output <- outBody
+					select {
+					case s.output <- outBody:
+						break
+					case <-s.ctx.Done():
+						break
+					}
 				}
 				pp.Release()
 			}(pp)
@@ -180,7 +193,17 @@ READER_LOOP:
 	if err != nil {
 		s.setError(err)
 	}
-	s.Close()
+	s.Shutdown()
+
+CLEANUP_LOOP:
+	for {
+		select {
+		case pp = <-s.output:
+			pp.Release()
+		default:
+			break CLEANUP_LOOP
+		}
+	}
 }
 
 func (s *IprotoServer) write() {
@@ -205,7 +228,7 @@ WRITER_LOOP:
 			if err != nil {
 				break WRITER_LOOP
 			}
-		case <-s.quit:
+		case <-s.ctx.Done():
 			w.Flush()
 			break WRITER_LOOP
 		default:
@@ -223,7 +246,7 @@ WRITER_LOOP:
 				if err != nil {
 					break WRITER_LOOP
 				}
-			case <-s.quit:
+			case <-s.ctx.Done():
 				w.Flush()
 				break WRITER_LOOP
 			}
@@ -235,5 +258,5 @@ WRITER_LOOP:
 		s.setError(err)
 	}
 
-	s.Close()
+	s.Shutdown()
 }

@@ -329,7 +329,6 @@ func (conn *Connection) stop() {
 	conn.closeOnce.Do(func() {
 		// debug.PrintStack()
 		close(conn.exit)
-		close(conn.writeChan)
 		conn.tcpConn.Close()
 		runtime.GC()
 	})
@@ -395,7 +394,6 @@ func (conn *Connection) setError(err error) {
 }
 
 func (conn *Connection) worker(tcpConn net.Conn) {
-
 	var wg sync.WaitGroup
 
 	wg.Add(2)
@@ -415,6 +413,18 @@ func (conn *Connection) worker(tcpConn net.Conn) {
 	}()
 
 	wg.Wait()
+
+	// release all pending packets
+CLEANUP_LOOP:
+	for {
+		select {
+		case pp := <-conn.writeChan:
+			pp.Release()
+		default:
+			break CLEANUP_LOOP
+		}
+	}
+	close(conn.writeChan)
 
 	// send error reply to all pending requests
 	conn.requests.CleanUp(func(req *request) {
@@ -492,13 +502,9 @@ READER_LOOP:
 		req = conn.requests.Pop(packet.requestID)
 		if req != nil {
 			res := &Result{}
-
-			if err != nil {
-				res.Error = err
-			} else if packet.Result != nil {
+			if packet.Result != nil {
 				res = packet.Result
 			}
-
 			req.replyChan <- res
 			close(req.replyChan)
 		}
