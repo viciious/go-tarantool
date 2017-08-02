@@ -59,7 +59,7 @@ the `import {...}` section at the start of any Go program.
 
 Here is a very short Go program which tries to connect to a Tarantool server.
 
-```
+```go
 package main
 
 import (
@@ -129,7 +129,7 @@ of Tarantool, such as vclock and replication.
 We can now have a closer look at the `example.go` program and make some observations
 about what it does.
 
-```
+```go
 package main
 
 import (
