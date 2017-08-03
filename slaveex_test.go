@@ -8,7 +8,7 @@ import (
 
 	"sync"
 
-	tnt16 "gitlab.corp.mail.ru/rb/go/helper/tarantool"
+	tnt16 "github.com/viciious/go-tarantool"
 )
 
 func ExampleSlave_subscribeExisted() {
