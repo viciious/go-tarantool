@@ -1,0 +1,34 @@
+language: go
+
+go:
+- 1.8.1
+
+before_script:
+- go get -t ./...
+
+script:
+- export UNFORMATTED=`gofmt -l .`
+- if [[ ! -z "$UNFORMATTED" ]]; then echo "The following files are not formatted:" && echo "$UNFORMATTED" && exit 1; fi
+- go test -v
+
+before_install:
+- curl "http://download.tarantool.org/tarantool/$TARANTOOL_VER/gpgkey" | sudo apt-key add -
+- export RELEASE=`lsb_release -c -s`
+- sudo apt-get -y install apt-transport-https
+- sudo rm -f /etc/apt/sources.list.d/*tarantool*.list
+- echo "deb http://download.tarantool.org/tarantool/$TARANTOOL_VER/ubuntu/ $RELEASE main" | sudo tee -a /etc/apt/sources.list.d/tarantool.list
+- echo "deb-src http://download.tarantool.org/tarantool/$TARANTOOL_VER/ubuntu/ $RELEASE main" | sudo tee -a /etc/apt/sources.list.d/tarantool.list
+
+install:
+- sudo apt-get update
+- sudo apt-get -y install tarantool
+
+matrix:
+  include:
+    - env: TARANTOOL_VER=1.6
+    - env: TARANTOOL_VER=1.7
+  allow_failures:
+    - env: TARANTOOL_VER=1.7
+
+notifications:
+  email: false
