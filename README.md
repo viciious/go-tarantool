@@ -4,7 +4,7 @@
 	<img src="https://avatars2.githubusercontent.com/u/2344919?v=2&s=250" align="right">
 </a>
 
-# Client in Go for Tarantool 1.6+
+Client in Go for Tarantool 1.6+
 
 The `go-tarantool` package has everything necessary for interfacing with
 [Tarantool 1.6+](http://tarantool.org/).
