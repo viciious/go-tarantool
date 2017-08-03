@@ -1,3 +1,5 @@
+# go-tarantool [![GoDoc](https://godoc.org/github.com/viciious/go-tarantool?status.svg)](https://godoc.org/github.com/viciious/go-tarantool) [![Build Status](https://travis-ci.org/viciious/go-tarantool.svg?branch=master)](https://travis-ci.org/viciious/go-tarantool)
+
 <a href="http://tarantool.org">
 	<img src="https://avatars2.githubusercontent.com/u/2344919?v=2&s=250" align="right">
 </a>
