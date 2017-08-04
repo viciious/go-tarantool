@@ -9,7 +9,9 @@ before_script:
 script:
 - export UNFORMATTED=`gofmt -l .`
 - if [[ ! -z "$UNFORMATTED" ]]; then echo "The following files are not formatted:" && echo "$UNFORMATTED" && exit 1; fi
-- go test -v
+- go vet ./...
+- $HOME/gopath/bin/golint ./...
+- go test -v ./...
 
 before_install:
 - curl "http://download.tarantool.org/tarantool/$TARANTOOL_VER/gpgkey" | sudo apt-key add -
@@ -22,6 +24,7 @@ before_install:
 install:
 - sudo apt-get update
 - sudo apt-get -y install tarantool
+- go get github.com/golang/lint/golint
 
 matrix:
   include:
