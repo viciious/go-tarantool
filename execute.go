@@ -2,12 +2,7 @@ package tarantool
 
 import (
 	"context"
-	"time"
 )
-
-type QueryOptions struct {
-	Timeout time.Duration
-}
 
 func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 	var err error
@@ -85,26 +80,7 @@ func (conn *Connection) Exec(ctx context.Context, q Query) *Result {
 	return result
 }
 
-func (conn *Connection) ExecuteOptions(q Query, opts *QueryOptions) ([][]interface{}, error) {
-	var res *Result
-	var cancel context.CancelFunc = func() {}
-	ctx := context.Background()
-
-	// make options
-	if opts == nil {
-		opts = &QueryOptions{}
-	}
-
-	if opts.Timeout != 0 {
-		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
-	}
-
-	res = conn.Exec(ctx, q)
-	cancel()
-
-	return res.Data, res.Error
-}
-
 func (conn *Connection) Execute(q Query) ([][]interface{}, error) {
-	return conn.ExecuteOptions(q, nil)
+	res := conn.Exec(context.Background(), q)
+	return res.Data, res.Error
 }
