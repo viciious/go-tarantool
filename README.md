@@ -123,7 +123,7 @@ and [fmt](https://golang.org/pkg/fmt/) as well.
 `Connect()`. In this example, there is only one thing in the structure, a user
 name. The structure can also contain:
 
-* `ConnectTimeout` 
+* `ConnectTimeout`  (the number of milliseconds the connector will wait a new connection to be established before giving up),
 * `QueryTimeout`    (the default maximum number of milliseconds to wait before giving up - can be overriden on per-query basis),
 * `DefaultSpace`    (the name of default Tarantool space)
 * `Password`        (user's password)
