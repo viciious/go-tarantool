@@ -8,8 +8,7 @@ The `go-tarantool` package has everything necessary for interfacing with
 [Tarantool 1.6+](http://tarantool.org/).
 
 The advantage of integrating Go with Tarantool, which is an application server
-plus a DBMS, is that Go programmers can handle databases and perform on-the-fly
-recompilations of embedded Lua routines, just as in C, with responses that are
+plus a DBMS, is that Go programmers can handle databases with responses that are
 faster than other packages according to public benchmarks.
 
 ## Table of contents
