@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 type Auth struct {
@@ -65,10 +65,10 @@ func (auth *Auth) Pack(data *packData, w io.Writer) (uint32, error) {
 	encoder := msgpack.NewEncoder(w)
 
 	encoder.EncodeMapLen(2) // User, Password
-	encoder.EncodeUint64(KeyUserName)
+	encoder.EncodeUint(KeyUserName)
 	encoder.EncodeString(auth.User)
 
-	encoder.EncodeUint64(KeyTuple)
+	encoder.EncodeUint(KeyTuple)
 	encoder.EncodeArrayLen(2)
 	encoder.EncodeString(authHash)
 	encoder.EncodeBytes(scr)
@@ -97,7 +97,7 @@ func (auth *Auth) Unpack(r io.Reader) (err error) {
 				return
 			}
 		case KeyTuple:
-			if l, err = decoder.DecodeSliceLen(); err != nil {
+			if l, err = decoder.DecodeArrayLen(); err != nil {
 				return
 			}
 			if l == 2 {

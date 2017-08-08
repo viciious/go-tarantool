@@ -48,7 +48,7 @@ func TestDefaultSpace(t *testing.T) {
 		Index: "tester_id",
 	})
 	require.NoError(err)
-	assert.Equal([][]interface{}{{uint64(1)}}, tuples)
+	assert.Equal([][]interface{}{{int8(1)}}, tuples)
 }
 
 func TestConnectOptionsDSN(t *testing.T) {

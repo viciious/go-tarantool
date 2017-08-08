@@ -3,7 +3,7 @@ package tarantool
 import (
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 // Join is the JOIN command
@@ -18,7 +18,7 @@ func (q *Join) Pack(data *packData, w io.Writer) (uint32, error) {
 	enc := msgpack.NewEncoder(w)
 
 	enc.EncodeMapLen(1)
-	enc.EncodeUint32(KeyInstanceUUID)
+	enc.EncodeUint(KeyInstanceUUID)
 	enc.EncodeString(q.UUID)
 	return JoinCommand, nil
 }

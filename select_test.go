@@ -88,10 +88,10 @@ func TestSelect(t *testing.T) {
 	do(nil,
 		&Select{
 			Space: 42,
-			Key:   uint64(3),
+			Key:   int8(3),
 		},
 		[][]interface{}{
-			{uint64(0x3), "Length", uint64(0x5d)},
+			{int8(0x3), "Length", int8(0x5d)},
 		},
 	)
 
@@ -99,10 +99,10 @@ func TestSelect(t *testing.T) {
 	do(nil,
 		&Select{
 			Space: "tester",
-			Key:   uint64(3),
+			Key:   int8(3),
 		},
 		[][]interface{}{
-			{uint64(0x3), "Length", uint64(0x5d)},
+			{int8(0x3), "Length", int8(0x5d)},
 		},
 	)
 
@@ -114,7 +114,7 @@ func TestSelect(t *testing.T) {
 			Key:   "Music",
 		},
 		[][]interface{}{
-			{uint64(0x2), "Music"},
+			{int8(0x2), "Music"},
 		},
 	)
 
@@ -123,10 +123,10 @@ func TestSelect(t *testing.T) {
 		&Select{
 			Space:    42,
 			Index:    "id_name",
-			KeyTuple: []interface{}{uint64(2), "Music"},
+			KeyTuple: []interface{}{int8(2), "Music"},
 		},
 		[][]interface{}{
-			{uint64(0x2), "Music"},
+			{int8(0x2), "Music"},
 		},
 	)
 
@@ -135,7 +135,7 @@ func TestSelect(t *testing.T) {
 		&Select{
 			Space:    42,
 			Index:    "id_name",
-			KeyTuple: []interface{}{uint64(2), "Length"},
+			KeyTuple: []interface{}{int8(2), "Length"},
 		},
 		[][]interface{}{},
 	)
@@ -146,9 +146,9 @@ func TestSelect(t *testing.T) {
 			Iterator: IterAll,
 		},
 		[][]interface{}{
-			{uint64(1), "First record"},
-			{uint64(2), "Music"},
-			{uint64(3), "Length", uint64(93)},
+			{int8(1), "First record"},
+			{int8(2), "Music"},
+			{int8(3), "Length", int8(93)},
 		},
 	)
 	// iterate all using STR index
@@ -159,9 +159,9 @@ func TestSelect(t *testing.T) {
 			Iterator: IterAll,
 		},
 		[][]interface{}{
-			{uint64(2), "Music"},
-			{uint64(3), "Length", uint64(93)},
-			{uint64(1), "First record"},
+			{int8(2), "Music"},
+			{int8(3), "Length", int8(93)},
+			{int8(1), "First record"},
 		},
 	)
 	// iterate Eq using STR index
@@ -173,7 +173,7 @@ func TestSelect(t *testing.T) {
 			Iterator: IterEq,
 		},
 		[][]interface{}{
-			{uint64(3), "Length", uint64(93)},
+			{int8(3), "Length", int8(93)},
 		},
 	)
 

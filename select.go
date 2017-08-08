@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 type Select struct {
@@ -40,24 +40,24 @@ func (q *Select) Pack(data *packData, w io.Writer) (uint32, error) {
 	if q.Offset == 0 {
 		w.Write(data.packedDefaultOffset)
 	} else {
-		encoder.EncodeUint32(KeyOffset)
-		encoder.EncodeUint32(q.Offset)
+		encoder.EncodeUint(KeyOffset)
+		encoder.EncodeUint(uint64(q.Offset))
 	}
 
 	// Limit
 	if q.Limit == 0 {
 		w.Write(data.packedDefaultLimit)
 	} else {
-		encoder.EncodeUint32(KeyLimit)
-		encoder.EncodeUint32(q.Limit)
+		encoder.EncodeUint(KeyLimit)
+		encoder.EncodeUint(uint64(q.Limit))
 	}
 
 	// Iterator
 	if q.Iterator == IterEq {
 		w.Write(data.packedIterEq)
 	} else {
-		encoder.EncodeUint32(KeyIterator)
-		encoder.EncodeUint8(q.Iterator)
+		encoder.EncodeUint(KeyIterator)
+		encoder.EncodeUint(uint64(q.Iterator))
 	}
 
 	// Key
@@ -67,7 +67,7 @@ func (q *Select) Pack(data *packData, w io.Writer) (uint32, error) {
 			return ErrorFlag, err
 		}
 	} else if q.KeyTuple != nil {
-		encoder.EncodeUint32(KeyKey)
+		encoder.EncodeUint(KeyKey)
 		encoder.EncodeArrayLen(len(q.KeyTuple))
 		for _, key := range q.KeyTuple {
 			if err = encoder.Encode(key); err != nil {
@@ -75,7 +75,7 @@ func (q *Select) Pack(data *packData, w io.Writer) (uint32, error) {
 			}
 		}
 	} else {
-		encoder.EncodeUint32(KeyKey)
+		encoder.EncodeUint(KeyKey)
 		encoder.EncodeArrayLen(0)
 	}
 

@@ -91,7 +91,7 @@ func TestTntBoxGuestWrite(t *testing.T) {
 	tnt, err := Connect(box.Listen, &Options{})
 	require.NoError(err)
 	defer tnt.Close()
-	tuple := []interface{}{uint64(2), "Client inserted #2"}
+	tuple := []interface{}{int8(2), "Client inserted #2"}
 	res, err := tnt.Execute(&Insert{
 		Space: "tester",
 		Tuple: tuple,

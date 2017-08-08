@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 type Call struct {
@@ -22,11 +22,11 @@ func (q *Call) Pack(data *packData, w io.Writer) (uint32, error) {
 	encoder.EncodeMapLen(2) // Name, Tuple
 
 	// Name
-	encoder.EncodeUint32(KeyFunctionName)
+	encoder.EncodeUint(KeyFunctionName)
 	encoder.EncodeString(q.Name)
 
 	if q.Tuple != nil {
-		encoder.EncodeUint32(KeyTuple)
+		encoder.EncodeUint(KeyTuple)
 		encoder.EncodeArrayLen(len(q.Tuple))
 		for _, key := range q.Tuple {
 			if err = encoder.Encode(key); err != nil {
@@ -34,7 +34,7 @@ func (q *Call) Pack(data *packData, w io.Writer) (uint32, error) {
 			}
 		}
 	} else {
-		encoder.EncodeUint32(KeyTuple)
+		encoder.EncodeUint(KeyTuple)
 		encoder.EncodeArrayLen(0)
 	}
 

@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2/codes"
+	"github.com/vmihailenco/msgpack/codes"
 )
 
-var emptyBody = []byte{codes.FixedMapLow}
+var emptyBody = []byte{byte(codes.FixedMapLow)}
 
 type packedPacket struct {
 	code      uint32
@@ -54,10 +54,10 @@ func packIprotoOk(requestID uint32) *packedPacket {
 func (pp *packedPacket) WriteTo(w io.Writer) (n int64, err error) {
 
 	h32 := [...]byte{
-		codes.Uint32, 0, 0, 0, 0, // length
-		0x82,                              // 2 element map (codes.FixedMapLow+2)
-		KeyCode, codes.Uint32, 0, 0, 0, 0, // code
-		KeySync, codes.Uint32, 0, 0, 0, 0,
+		byte(codes.Uint32), 0, 0, 0, 0, // length
+		0x82,                                    // 2 element map (codes.FixedMapLow+2)
+		KeyCode, byte(codes.Uint32), 0, 0, 0, 0, // code
+		KeySync, byte(codes.Uint32), 0, 0, 0, 0,
 	}
 	h := h32[:]
 
@@ -95,20 +95,21 @@ func readPacked(r io.Reader) (*packedPacket, error) {
 		return nil, err
 	}
 
+	c := codes.Code(h[0])
 	switch {
-	case h[0] <= codes.PosFixedNumHigh:
+	case c <= codes.PosFixedNumHigh:
 		bodyLength = int(h[0])
-	case h[0] == codes.Uint8:
+	case c == codes.Uint8:
 		if _, err = io.ReadAtLeast(r, h[1:2], 1); err != nil {
 			return nil, err
 		}
 		bodyLength = int(h[1])
-	case h[0] == codes.Uint16:
+	case c == codes.Uint16:
 		if _, err = io.ReadAtLeast(r, h[1:3], 2); err != nil {
 			return nil, err
 		}
 		bodyLength = int(binary.BigEndian.Uint16(h[1:3]))
-	case h[0] == codes.Uint32:
+	case c == codes.Uint32:
 		if _, err = io.ReadAtLeast(r, h[1:5], 4); err != nil {
 			return nil, err
 		}

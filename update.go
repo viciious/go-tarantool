@@ -3,7 +3,7 @@ package tarantool
 import (
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 type Update struct {
@@ -40,7 +40,7 @@ func (q *Update) Pack(data *packData, w io.Writer) (uint32, error) {
 			return ErrorFlag, err
 		}
 	} else if q.KeyTuple != nil {
-		encoder.EncodeUint32(KeyKey)
+		encoder.EncodeUint(KeyKey)
 		encoder.EncodeArrayLen(len(q.KeyTuple))
 		for _, key := range q.KeyTuple {
 			if err = encoder.Encode(key); err != nil {
@@ -50,7 +50,7 @@ func (q *Update) Pack(data *packData, w io.Writer) (uint32, error) {
 	}
 
 	// Update
-	encoder.EncodeUint32(KeyTuple)
+	encoder.EncodeUint(KeyTuple)
 	encoder.EncodeArrayLen(len(q.Set))
 	for _, op := range q.Set {
 		t := op.AsTuple()
