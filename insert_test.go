@@ -61,16 +61,16 @@ func TestInsert(t *testing.T) {
 
 	data, err := do(&Insert{
 		Space: "tester",
-		Tuple: []interface{}{uint64(4), "Hello"},
+		Tuple: []interface{}{int8(4), "Hello"},
 	})
 
 	if assert.NoError(err) {
-		assert.Equal([][]interface{}{{uint64(4), "Hello"}}, data)
+		assert.Equal([][]interface{}{{int8(4), "Hello"}}, data)
 	}
 
 	_, err = do(&Insert{
 		Space: "tester",
-		Tuple: []interface{}{uint64(4), "World"},
+		Tuple: []interface{}{int8(4), "World"},
 	})
 
 	if assert.Error(err) {

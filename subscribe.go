@@ -3,7 +3,7 @@ package tarantool
 import (
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 // Subscribe is the SUBSCRIBE command
@@ -21,18 +21,18 @@ func (q *Subscribe) Pack(data *packData, w io.Writer) (uint32, error) {
 
 	enc.EncodeMapLen(3)
 
-	enc.EncodeUint8(uint8(KeyInstanceUUID))
+	enc.EncodeUint(KeyInstanceUUID)
 	enc.EncodeString(q.UUID)
 
-	enc.EncodeUint8(uint8(KeyReplicaSetUUID))
+	enc.EncodeUint(KeyReplicaSetUUID)
 	enc.EncodeString(q.ReplicaSetUUID)
 
-	enc.EncodeUint8(uint8(KeyVClock))
+	enc.EncodeUint(KeyVClock)
 	// NB: maybe we should omit zero element
 	enc.EncodeMapLen(len(q.VClock))
 	for id, lsn := range q.VClock {
-		enc.EncodeUint32(uint32(id))
-		enc.EncodeInt64(lsn)
+		enc.EncodeUint(uint64(id))
+		enc.EncodeInt(lsn)
 	}
 
 	return SubscribeRequest, nil

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 // Eval query
@@ -24,11 +24,11 @@ func (q *Eval) Pack(data *packData, w io.Writer) (uint32, error) {
 	encoder.EncodeMapLen(2) // Expression, Tuple
 
 	// Expression
-	encoder.EncodeUint32(KeyExpression)
+	encoder.EncodeUint(KeyExpression)
 	encoder.EncodeString(q.Expression)
 
 	if q.Tuple != nil {
-		encoder.EncodeUint32(KeyTuple)
+		encoder.EncodeUint(KeyTuple)
 		encoder.EncodeArrayLen(len(q.Tuple))
 		for _, key := range q.Tuple {
 			if err = encoder.Encode(key); err != nil {
@@ -36,7 +36,7 @@ func (q *Eval) Pack(data *packData, w io.Writer) (uint32, error) {
 			}
 		}
 	} else {
-		encoder.EncodeUint32(KeyTuple)
+		encoder.EncodeUint(KeyTuple)
 		encoder.EncodeArrayLen(0)
 	}
 

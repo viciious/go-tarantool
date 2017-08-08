@@ -3,7 +3,7 @@ package tarantool
 import (
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 type Upsert struct {
@@ -27,7 +27,7 @@ func (q *Upsert) Pack(data *packData, w io.Writer) (uint32, error) {
 	}
 
 	// Tuple (to insert)
-	encoder.EncodeUint32(KeyTuple)
+	encoder.EncodeUint(KeyTuple)
 	encoder.EncodeArrayLen(len(q.Tuple))
 	for _, key := range q.Tuple {
 		if err = encoder.Encode(key); err != nil {
@@ -36,7 +36,7 @@ func (q *Upsert) Pack(data *packData, w io.Writer) (uint32, error) {
 	}
 
 	// Update ops
-	encoder.EncodeUint32(KeyDefTuple)
+	encoder.EncodeUint(KeyDefTuple)
 	encoder.EncodeArrayLen(len(q.Set))
 	for _, op := range q.Set {
 		t := op.AsTuple()

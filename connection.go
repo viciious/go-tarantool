@@ -286,7 +286,8 @@ func (conn *Connection) pullSchema() (err error) {
 	}
 
 	for _, space := range res.Data {
-		conn.packData.spaceMap[space[2].(string)] = space[0].(uint64)
+		spaceID, _ := conn.packData.spaceNo(space[0])
+		conn.packData.spaceMap[space[2].(string)] = spaceID
 	}
 
 	res, err = request(&Select{
@@ -299,11 +300,11 @@ func (conn *Connection) pullSchema() (err error) {
 	}
 
 	for _, index := range res.Data {
-		spaceID := index[0].(uint64)
-		indexID := index[1].(uint64)
+		spaceID, _ := conn.packData.fieldNo(index[0])
+		indexID, _ := conn.packData.fieldNo(index[1])
 		indexName := index[2].(string)
-		indexAttr := index[4].(map[interface{}]interface{}) // e.g: {"unique": true}
-		indexFields := index[5].([]interface{})             // e.g: [[0 num] [1 str]]
+		indexAttr := index[4].(map[string]interface{}) // e.g: {"unique": true}
+		indexFields := index[5].([]interface{})        // e.g: [[0 num] [1 str]]
 
 		indexSpaceMap, exists := conn.packData.indexMap[spaceID]
 		if !exists {
@@ -317,8 +318,8 @@ func (conn *Connection) pullSchema() (err error) {
 			if unique, ok := indexAttr["unique"]; ok && unique.(bool) {
 				pk := make([]int, len(indexFields))
 				for i := range indexFields {
-					f := indexFields[i].([]interface{})
-					pk[i] = int(f[0].(uint64))
+					f, _ := conn.packData.fieldNo(indexFields[i].([]interface{}))
+					pk[i] = int(f)
 				}
 				conn.packData.primaryKeyMap[spaceID] = pk
 			}

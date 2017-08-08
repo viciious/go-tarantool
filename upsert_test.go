@@ -77,7 +77,7 @@ func TestUpsert(t *testing.T) {
 			Key:   1,
 		},
 		[][]interface{}{
-			{uint64(1), "Hello World", uint64(32)},
+			{int8(1), "Hello World", int8(32)},
 		},
 	)
 
@@ -108,7 +108,7 @@ func TestUpsert(t *testing.T) {
 			Key:   2,
 		},
 		[][]interface{}{
-			{uint64(2), "Second", uint64(16)},
+			{int8(2), "Second", int8(16)},
 		},
 	)
 
