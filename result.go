@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 type Result struct {
@@ -27,13 +27,13 @@ func (r *Result) pack(requestID uint32) (*packedPacket, error) {
 		pp = packIprotoError(r.ErrorCode, requestID)
 		encoder := msgpack.NewEncoder(&pp.buffer)
 		encoder.EncodeMapLen(1)
-		encoder.EncodeUint8(KeyError)
+		encoder.EncodeUint(KeyError)
 		encoder.EncodeString(str)
 	} else {
 		pp = packIproto(OkCode, requestID)
 		encoder := msgpack.NewEncoder(&pp.buffer)
 		encoder.EncodeMapLen(1)
-		encoder.EncodeUint8(KeyData)
+		encoder.EncodeUint(KeyData)
 		encoder.EncodeArrayLen(65536) // force encoding as uin32, to be replaced later
 
 		if r.Data != nil {
@@ -69,7 +69,7 @@ func (r *Result) unpack(rr io.Reader) (err error) {
 		}
 		switch cd {
 		case KeyData:
-			value, err := d.DecodeInterface()
+			value, err := d.DecodeInterfaceLoose()
 			if err != nil {
 				return err
 			}

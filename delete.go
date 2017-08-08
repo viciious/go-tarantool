@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 type Delete struct {
@@ -40,7 +40,7 @@ func (q *Delete) Pack(data *packData, w io.Writer) (uint32, error) {
 			return ErrorFlag, err
 		}
 	} else if q.KeyTuple != nil {
-		encoder.EncodeUint32(KeyKey)
+		encoder.EncodeUint(KeyKey)
 		encoder.EncodeArrayLen(len(q.KeyTuple))
 		for _, key := range q.KeyTuple {
 			if err = encoder.Encode(key); err != nil {

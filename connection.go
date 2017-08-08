@@ -303,8 +303,8 @@ func (conn *Connection) pullSchema() (err error) {
 		spaceID, _ := conn.packData.fieldNo(index[0])
 		indexID, _ := conn.packData.fieldNo(index[1])
 		indexName := index[2].(string)
-		indexAttr := index[4].(map[interface{}]interface{}) // e.g: {"unique": true}
-		indexFields := index[5].([]interface{})             // e.g: [[0 num] [1 str]]
+		indexAttr := index[4].(map[string]interface{}) // e.g: {"unique": true}
+		indexFields := index[5].([]interface{})        // e.g: [[0 num] [1 str]]
 
 		indexSpaceMap, exists := conn.packData.indexMap[spaceID]
 		if !exists {
@@ -318,8 +318,7 @@ func (conn *Connection) pullSchema() (err error) {
 			if _, ok := indexAttr["unique"]; ok {
 				pk := make([]int, len(indexFields))
 				for i := range indexFields {
-					descr := indexFields[i].([]interface{})
-					f, _ := conn.packData.fieldNo(descr[0])
+					f, _ := conn.packData.fieldNo(indexFields[i].([]interface{}))
 					pk[i] = int(f)
 				}
 				conn.packData.primaryKeyMap[spaceID] = pk

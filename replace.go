@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 )
 
 type Replace struct {
@@ -31,7 +31,7 @@ func (q *Replace) Pack(data *packData, w io.Writer) (uint32, error) {
 	}
 
 	// Tuple
-	encoder.EncodeUint32(KeyTuple)
+	encoder.EncodeUint(KeyTuple)
 	encoder.EncodeArrayLen(len(q.Tuple))
 	for _, value := range q.Tuple {
 		if err = encoder.Encode(value); err != nil {
