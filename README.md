@@ -13,12 +13,20 @@ faster than other packages according to public benchmarks.
 
 ## Table of contents
 
+* [Key features](#advantages)
 * [Installation](#installation)
 * [Hello World](#hello-world)
 * [API reference](#api-reference)
 * [Walking through the example](#walking-through-example-in-go)
-* [Help](#help)
 * [Alternative way to connect](#alternative-way-to-connect)
+* [Help](#help)
+
+## Key features
+
+- Support for both encoding and decoding of Tarantool queries/commands, which makes opens up the following possibilities:
+   - implementing services that mimic a real Tarantool DBMS is relatively easy; for example, one can code a service which would relay them to a real Tarantool instance; the server interface is described here: https://godoc.org/github.com/viciious/go-tarantool#IprotoServer;
+   - replication support: one can implement a service which would mimic a Tarantool replication slave and get on-the-fly data updates from the Tarantool master, an example is provided here https://godoc.org/github.com/viciious/go-tarantool#ex-Slave-Attach-Async.
+- The interface for sending and packing queries is different from other go-tarantool implementations, which one may find more aesthetically pleasant to work with: all queries are represented with different types that follow the same interface rather than with individual methods in the connector, e.g. conn.Exec(&Update{...}) vs conn.Update({}).
 
 ## Installation
 
