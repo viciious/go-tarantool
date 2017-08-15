@@ -202,18 +202,16 @@ The source files for the requests library are:
   for an example of a data-manipulation function used in tests.
 
 See comments in these files for syntax details:
-```
-call.go
-delete.go
-eval.go
-insert.go
-iterator.go
-join.go
-operator.go
-pack.go
-update.go
-upsert.go
-```
+* [call.go](https://github.com/viciious/go-tarantool/blob/master/call.go)
+* [delete.go](https://github.com/viciious/go-tarantool/blob/master/delete.go)
+* [eval.go](https://github.com/viciious/go-tarantool/blob/master/eval.go)
+* [insert.go](https://github.com/viciious/go-tarantool/blob/master/insert.go)
+* [iterator.go](https://github.com/viciious/go-tarantool/blob/master/iterator.go)
+* [join.go](https://github.com/viciious/go-tarantool/blob/master/join.go)
+* [operator.go](https://github.com/viciious/go-tarantool/blob/master/operator.go)
+* [pack.go](https://github.com/viciious/go-tarantool/blob/master/pack.go)
+* [update.go](https://github.com/viciious/go-tarantool/blob/master/update.go)
+* [upsert.go](https://github.com/viciious/go-tarantool/blob/master/upsert.go)
 
 The supported requests have parameters and results equivalent to requests in the
 Tarantool manual. Browsing through the other *.go programs in the package will
