@@ -72,7 +72,6 @@ func (p *VClock) decodeHeader(r io.Reader) (err error) {
 	return nil
 }
 
-// r should read full packet bytes, not only body
 func (p *VClock) decodeBody(r io.Reader) (err error) {
 	var count int
 
@@ -92,17 +91,19 @@ func (p *VClock) decodeBody(r io.Reader) (err error) {
 			if n, err = d.DecodeMapLen(); err != nil {
 				return err
 			}
-			p.VClock = make(VectorClock, n)
+			p.VClock = NewVectorClock()
 			for ; n > 0; n-- {
-				mk, err := d.DecodeUint32()
+				id, err := d.DecodeUint32()
 				if err != nil {
 					return err
 				}
-				mv, err := d.DecodeInt64()
+				lsn, err := d.DecodeInt64()
 				if err != nil {
 					return err
 				}
-				p.VClock[mk] = mv
+				if !p.VClock.Follow(id, lsn) {
+					return ErrVectorClock
+				}
 			}
 		default:
 			if err = d.Skip(); err != nil {

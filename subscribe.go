@@ -10,7 +10,7 @@ import (
 type Subscribe struct {
 	UUID           string
 	ReplicaSetUUID string
-	LSN            int64
+	VClock         VectorClock
 }
 
 var _ Query = (*Subscribe)(nil)
@@ -28,15 +28,12 @@ func (q *Subscribe) Pack(data *packData, w io.Writer) (uint32, error) {
 	enc.EncodeString(q.ReplicaSetUUID)
 
 	enc.EncodeUint8(uint8(KeyVClock))
-	enc.EncodeMapLen(1)
-	// InstanceID must be always 1. I don't know why
-	// if it is changed, master push all request (from lsn = 0)
-	// see:
-	// https://github.com/tarantool/tarantool/blob/1.6.9/src/box/relay.cc#L224-L246
-	// https://github.com/tarantool/tarantool/blob/1.6.9/src/box/xrow.cc#L299-L366
-	// https://github.com/tarantool/tarantool/blob/1.6.9/src/box/vclock.c#L38-L55
-	enc.EncodeUint32(1)
-	enc.EncodeInt64(q.LSN)
+	// NB: maybe we should omit zero element
+	enc.EncodeMapLen(len(q.VClock))
+	for id, lsn := range q.VClock {
+		enc.EncodeUint32(uint32(id))
+		enc.EncodeInt64(lsn)
+	}
 
 	return SubscribeRequest, nil
 }

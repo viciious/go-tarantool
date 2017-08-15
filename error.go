@@ -36,6 +36,8 @@ var (
 	ErrNotInReplicaSet = NewQueryError("Full Replica Set params hasn't been set")
 	// ErrBadResult means that query result was of invalid type or length.
 	ErrBadResult = NewQueryError("invalid result")
+	// ErrVectorClock is returns in case of bad manipulation with vector clock.
+	ErrVectorClock = NewQueryError("vclock manipulation")
 )
 
 func NewConnectionError(con *Connection, message string, timeout bool) *ConnectionError {

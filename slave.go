@@ -25,18 +25,14 @@ type Slave struct {
 	cw         *bufio.Writer
 	UUID       string
 	VClock     VectorClock
-	ReplicaSet struct {
-		UUID      string
-		Instances ReplicaSet
-	}
-	next func() (*Packet, error) // next stores current iterator
-	p    *Packet                 // p stores last packet for Packet method
-	err  error                   // err stores last error for Err method
+	ReplicaSet ReplicaSet
+	next       func() (*Packet, error) // next stores current iterator
+	p          *Packet                 // p stores last packet for Packet method
+	err        error                   // err stores last error for Err method
 }
 
-// NewSlave instance of Slave with tarantool master uri
-// URI is parsed by url package and therefore should contains
-// any scheme supported by net.Dial
+// NewSlave instance with tarantool master uri.
+// URI is parsed by url package and therefore should contains any scheme supported by net.Dial.
 func NewSlave(uri string, opts ...Options) (s *Slave, err error) {
 
 	s = new(Slave)
@@ -45,11 +41,11 @@ func NewSlave(uri string, opts ...Options) (s *Slave, err error) {
 		options = opts[0]
 	}
 
+	s.ReplicaSet = NewReplicaSet()
+
 	if err = s.parseOptions(uri, options); err != nil {
 		return nil, err
 	}
-
-	s.ReplicaSet.Instances = make(ReplicaSet, ReplicaSetMaxSize)
 
 	// it is discussable to connect to instance in instance creation
 	if err = s.connect(uri, &options); err != nil {
@@ -74,40 +70,52 @@ func (s *Slave) parseOptions(uri string, options Options) (err error) {
 	return nil
 }
 
-// Attach Slave to Replica Set and subscribe for DML requests, starting from lsn.
+// Attach Slave to Replica Set and subscribe for the new(!) DML requests.
 // Use out chan for asynchronous packet receiving or synchronous PacketIterator otherwise.
-func (s *Slave) Attach(lsn int64, out ...chan *Packet) (PacketIterator, error) {
-	if err := s.Join(); err != nil {
+// If you need all requests in chan use JoinWithSnap(chan) and then s.Subscribe(s.VClock[1:]...).
+func (s *Slave) Attach(out ...chan *Packet) (it PacketIterator, err error) {
+	if err = s.Join(); err != nil {
 		return nil, err
 	}
-	return s.Subscribe(lsn, out...)
+	// skip reserved zero index of the Vector Clock
+	if it, err = s.Subscribe(s.VClock[1:]...); err != nil {
+		return nil, err
+	}
+
+	// no chan means synchronous dml request receiving
+	if s.isEmptyChan(out...) {
+		return it, nil
+	}
+
+	// consume new DML requests and send them to the given chan
+	go func(out chan *Packet) {
+		defer close(out)
+		for s.HasNext() {
+			out <- s.Packet()
+		}
+	}(out[0])
+
+	// return nil iterator to avoid concurrent using of the Next method
+	return nil, nil
 }
 
-// Close Slave connection to Master
+// Close Slave connection to Master.
 func (s *Slave) Close() error {
 	return s.disconnect()
 }
 
-// Join the Replica Set using Master instance
+// Join the Replica Set using Master instance.
 func (s *Slave) Join() (err error) {
 
-	it, err := s.JoinWithSnap()
+	_, err = s.JoinWithSnap()
 	if err != nil {
 		return err
 	}
 
-	for {
-		_, err = it.Next()
-		if err != nil {
-			break
-		}
+	for s.HasNext() {
 	}
 
-	if err == io.EOF {
-		return nil
-	}
-
-	return
+	return s.Err()
 }
 
 // JoinWithSnap the Replica Set using Master instance.
@@ -127,22 +135,12 @@ func (s *Slave) JoinWithSnap(out ...chan *Packet) (it PacketIterator, err error)
 		return s, nil
 	}
 
-	respc := out[0]
-	defer close(respc)
-
-	for {
-		p, err := s.Next()
-		if err != nil {
-			break
-		}
-		respc <- p
+	defer close(out[0])
+	for s.HasNext() {
+		out[0] <- s.Packet()
 	}
 
-	if err == io.EOF {
-		return nil, nil
-	}
-
-	return nil, err
+	return nil, s.Err()
 }
 
 // isEmptyChan parses channels option.
@@ -150,44 +148,29 @@ func (s *Slave) isEmptyChan(out ...chan *Packet) bool {
 	return len(out) == 0 || out[0] == nil
 }
 
-// Subscribe for every DML request (insert, update, delete, replace, upsert) from master since lsn.
+// Subscribe for DML requests (insert, update, delete, replace, upsert) since vector clock.
+// Variadic lsn is start vector clock. Each lsn is one clock in vector (sequentially).
+// One lsn is enough for master-slave replica set.
 // Replica Set and self UUID should be set before call subscribe. Use options in New or Join for it.
 // Subscribe sends requests asynchronously to out channel specified or use synchronous PacketIterator otherwise.
-func (s *Slave) Subscribe(lsn int64, out ...chan *Packet) (it PacketIterator, err error) {
+func (s *Slave) Subscribe(lsns ...int64) (it PacketIterator, err error) {
+	if len(lsns) == 0 || len(lsns) >= VClockMax {
+		return nil, ErrVectorClock
+	}
 	//don't call subscribe if there are no options had been set or before join request
 	if !s.IsInReplicaSet() {
 		return nil, ErrNotInReplicaSet
 	}
-
-	if err = s.subscribe(lsn); err != nil {
+	if err = s.subscribe(lsns...); err != nil {
 		return nil, err
 	}
 
 	// set iterator for the Next method
 	s.next = s.nextXlog
-
-	if s.isEmptyChan(out...) {
-		// no chan means synchronous dml request receiving
-		return s, nil
-	}
-
-	// consuming new DML requests asynchronously
-	go func(out chan *Packet) {
-		defer close(out)
-		for {
-			p, err := s.Next()
-			if err != nil {
-				s.err = err
-				break
-			}
-			out <- p
-		}
-	}(out[0])
-
-	return nil, nil
+	return s, nil
 }
 
-// IsInReplicaSet checks whether Slave has Replica Set params or not
+// IsInReplicaSet checks whether Slave has Replica Set params or not.
 func (s *Slave) IsInReplicaSet() bool {
 	return len(s.UUID) > 0 && len(s.ReplicaSet.UUID) > 0
 }
@@ -245,18 +228,17 @@ func (s *Slave) join() (err error) {
 	return nil
 }
 
-// subscribe sends SUBSCRIBE request and waits for VCLOCK response
-func (s *Slave) subscribe(lsn int64) error {
-
+// subscribe sends SUBSCRIBE request and waits for VCLOCK response.
+func (s *Slave) subscribe(lsns ...int64) error {
+	vc := NewVectorClockFrom(lsns...)
 	pp, err := s.newPacket(&Subscribe{
 		UUID:           s.UUID,
 		ReplicaSetUUID: s.ReplicaSet.UUID,
-		LSN:            lsn,
+		VClock:         vc,
 	})
 	if err != nil {
 		return err
 	}
-
 	if err = s.send(pp); err != nil {
 		return err
 	}
@@ -274,6 +256,9 @@ func (s *Slave) subscribe(lsn int64) error {
 	if p.code != OKRequest {
 		// TODO: little hack for complex attach
 		s.p = p
+		if p.Result == nil {
+			return ErrBadResult
+		}
 		return p.Result.Error
 	}
 
@@ -291,13 +276,13 @@ func (s *Slave) subscribe(lsn int64) error {
 // HasNext implements bufio.Scanner Scan style iterator.
 func (s *Slave) HasNext() bool {
 	s.p, s.err = s.Next()
-	if s.err != nil {
-		if s.err == io.EOF {
-			s.err = nil
-		}
-		return false
+	if s.err == nil {
+		return true
 	}
-	return true
+	if s.err == io.EOF {
+		s.err = nil
+	}
+	return false
 }
 
 // Packet has been got by HasNext method.
@@ -335,6 +320,9 @@ func (s *Slave) nextXlog() (p *Packet, err error) {
 	p, err = decodePacket(pp)
 	if err != nil {
 		return nil, err
+	}
+	if !s.VClock.Follow(p.InstanceID, p.LSN) {
+		return nil, ErrVectorClock
 	}
 
 	return p, nil
@@ -383,7 +371,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 			// but we know exactly that it can be casted to uint8 without loosing data
 			instanceID := uint32(q.Tuple[0].(uint64))
 			// uuid
-			s.ReplicaSet.Instances[instanceID] = q.Tuple[1].(string)
+			s.ReplicaSet.SetInstance(instanceID, q.Tuple[1].(string))
 		}
 	case OKRequest:
 		v := new(VClock)
@@ -401,12 +389,12 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 	return p, nil
 }
 
-// nextEOF is empty iterator to avoid calling others in inappropriate cases
+// nextEOF is empty iterator to avoid calling others in inappropriate cases.
 func (s *Slave) nextEOF() (*Packet, error) {
 	return nil, io.EOF
 }
 
-// connect to tarantool instance (dial + handshake + auth)
+// connect to tarantool instance (dial + handshake + auth).
 func (s *Slave) connect(uri string, options *Options) (err error) {
 	dsn, opts, err := parseOptions(uri, options)
 	if err != nil {
@@ -423,7 +411,7 @@ func (s *Slave) connect(uri string, options *Options) (err error) {
 	return
 }
 
-// disconnect call stop on shadow connection instance
+// disconnect call stop on shadow connection instance.
 func (s *Slave) disconnect() (err error) {
 	s.c.stop()
 	return
@@ -437,18 +425,19 @@ func (s *Slave) send(pp *packedPacket) (err error) {
 	return s.cw.Flush()
 }
 
-// receive new response packet
+// receive new response packet.
 func (s *Slave) receive() (*packedPacket, error) {
 	return readPacked(s.cr)
 }
 
-// newPacket compose packet from body
+// newPacket compose packet from body.
 func (s *Slave) newPacket(q Query) (pp *packedPacket, err error) {
-	pp = packIproto(0, s.c.nextID())
+	pp = packetPool.Get()
 	pp.code, err = q.Pack(s.c.packData, &pp.buffer)
 	if err != nil {
 		pp.Release()
-		pp = nil
+		return nil, err
 	}
+	pp.requestID = s.c.nextID()
 	return
 }
