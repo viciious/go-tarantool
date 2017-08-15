@@ -66,6 +66,8 @@ const (
 
 	SchemaKeyClusterUUID = "cluster"
 	ReplicaSetMaxSize    = 32
+	VClockMax            = ReplicaSetMaxSize
+	UUIDStrLength        = 36
 )
 
 const (

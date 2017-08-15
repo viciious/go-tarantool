@@ -118,7 +118,7 @@ func TestSlaveJoinWithSnapSync(t *testing.T) {
 	expected := struct {
 		UUID          string
 		ReplicaSetLen int
-	}{tnt16UUID, 1}
+	}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
 	// setup
 	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
@@ -170,7 +170,7 @@ func TestSlaveHasNextOnJoin(t *testing.T) {
 	expected := struct {
 		UUID          string
 		ReplicaSetLen int
-	}{tnt16UUID, 1}
+	}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
 	// setup
 	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
@@ -241,7 +241,7 @@ func TestSlaveJoinWithSnapAsync(t *testing.T) {
 	expected := struct {
 		UUID          string
 		ReplicaSetLen int
-	}{tnt16UUID, 1}
+	}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
 
 	// setup
 	s, _ := NewSlave(box.Listen, Options{
@@ -289,7 +289,7 @@ func TestSlaveJoin(t *testing.T) {
 	expected := struct {
 		UUID          string
 		ReplicaSetLen int
-	}{tnt16UUID, 1}
+	}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
 
 	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
@@ -343,6 +343,8 @@ func TestSlaveSubscribeSync(t *testing.T) {
 	// register in replica set
 	err = s.Join()
 	require.NoError(err)
+	assert.Len(s.UUID, UUIDStrLength)
+	assert.Len(s.ReplicaSet.UUID, UUIDStrLength)
 	err = s.Close()
 	require.NoError(err)
 
@@ -439,55 +441,6 @@ func TestSlaveHasNextOnSubscribe(t *testing.T) {
 	}
 }
 
-func TestSlaveSubscribeAsync(t *testing.T) {
-	require := require.New(t)
-	assert := assert.New(t)
-
-	// setup TestBox
-	box, err := newTntBox()
-	require.NoError(err)
-	defer box.Close()
-
-	s, _ := NewSlave(box.Listen, Options{
-		User:     tnt16User,
-		Password: tnt16Pass,
-	})
-	// register in replica set
-	err = s.Join()
-	require.NoError(err)
-	err = s.Close()
-	require.NoError(err)
-
-	// new instance for the purity of the test
-	ns, _ := NewSlave(box.Listen, Options{
-		User:           tnt16User,
-		Password:       tnt16Pass,
-		UUID:           s.UUID,
-		ReplicaSetUUID: s.ReplicaSet.UUID,
-	})
-	defer ns.Close()
-	respc := make(chan *Packet, 1)
-	it, err := ns.Subscribe(0, respc)
-	require.NoError(err)
-
-	// check
-	timeout := time.After(10 * time.Second)
-loop:
-	for {
-		select {
-		case p := <-respc:
-			require.NotNil(p)
-			if isUUIDinReplicaSet(p, s.UUID) {
-				break loop
-			}
-		case <-timeout:
-			t.Fatal("Timeout: there is no necessary xlog.")
-			break loop
-		}
-	}
-	assert.Nil(it)
-}
-
 func isUUIDinReplicaSet(p *Packet, uuid string) bool {
 	if p == nil || len(uuid) == 0 {
 		return false
@@ -505,6 +458,66 @@ func isUUIDinReplicaSet(p *Packet, uuid string) bool {
 	return false
 }
 
+func TestSlaveVClock(t *testing.T) {
+	require := require.New(t)
+
+	// setup
+	config := schemeNewReplicator(tnt16User, tnt16Pass)
+	config += schemeSpaceTester()
+	config += schemeGrantEval("guest")
+	config += schemeGrantLastSnapLSN(tnt16User, tnt16Pass)
+	box, err := NewBox(config, &BoxOptions{})
+	require.NoError(err)
+	defer box.Close()
+
+	tnt, err := Connect(box.Listen, &Options{})
+	require.NoError(err)
+	defer tnt.Close()
+
+	makesnapshot := &Eval{Expression: "local box = require('box') box.snapshot()"}
+	res, err := tnt.Execute(makesnapshot)
+	require.NoError(err)
+	require.Len(res, 0, "response to make snapshot request contains error")
+
+	// check 1
+	s, err := NewSlave(box.Listen, Options{
+		User:     tnt16User,
+		Password: tnt16Pass,
+		UUID:     tnt16UUID,
+	})
+	require.NoError(err)
+	defer s.Close()
+
+	_, err = s.JoinWithSnap()
+	require.NoError(err)
+	count := 0
+	for s.HasNext() {
+		// add new items to tnt concurrently while snap is downloading
+		field := fmt.Sprintf("Inserted tuple #%v", count+2)
+		_, err = tnt.Execute(&Insert{
+			Space: "tester",
+			Tuple: []interface{}{count + 2, field},
+		})
+		require.NoError(err)
+		count++
+	}
+	require.NoError(s.Err())
+	joinLSN := s.VClock.LSN()
+	t.Logf("Join: %#v", s.VClock)
+	it, err := s.Subscribe(s.VClock[1:]...)
+	require.NoError(err)
+	subscribeLSN := s.VClock.LSN()
+	t.Logf("Subscribe: %#v", s.VClock)
+	assert.EqualValues(t, count, subscribeLSN-joinLSN-1)
+
+	// check 2
+	for ; count >= 0; count-- {
+		_, err = it.Next()
+		require.NoError(err)
+	}
+	assert.EqualValues(t, subscribeLSN, s.VClock.LSN())
+}
+
 func TestSlaveAttach(t *testing.T) {
 	require := require.New(t)
 
@@ -520,7 +533,7 @@ func TestSlaveAttach(t *testing.T) {
 		UUID:     tnt16UUID})
 
 	// check
-	it, err := s.Attach(0)
+	it, err := s.Attach()
 	require.NoError(err)
 	assert.NotNil(t, it)
 
@@ -529,10 +542,7 @@ func TestSlaveAttach(t *testing.T) {
 	require.NoError(err)
 }
 
-func TestSlaveComplex(t *testing.T) {
-	if testing.Short() {
-		t.SkipNow()
-	}
+func TestSlaveAttachAsync(t *testing.T) {
 	require := require.New(t)
 
 	// setup TestBox
@@ -546,7 +556,7 @@ func TestSlaveComplex(t *testing.T) {
 		Password: tnt16Pass,
 	})
 	respc := make(chan *Packet, 1)
-	_, err = s.Attach(2, respc)
+	_, err = s.Attach(respc)
 	require.NoError(err)
 	defer s.Close()
 
@@ -664,4 +674,66 @@ func TestSlaveLastSnapLSN(t *testing.T) {
 	require.NoError(err)
 
 	assert.NotZero(t, lsn, "newly generated snapshot has zero lsn")
+}
+
+func TestVectorClock(t *testing.T) {
+	assert := assert.New(t)
+	expected := make([]int64, VClockMax)
+	expectedLSN := int64(0)
+	for i := range expected {
+		lsn := int64(i * 10)
+		expected[i] = lsn
+		expectedLSN += lsn
+	}
+
+	vc := NewVectorClock()
+	// zebra filling is special test
+	for i := 0; i < VClockMax; i = i + 2 {
+		assert.True(vc.Follow(uint32(i), int64(10*i)), "id=%v", i)
+	}
+	for i := 1; i < VClockMax; i = i + 2 {
+		assert.True(vc.Follow(uint32(i), int64(10*i)), "id=%v", i)
+	}
+	// updating existing lsns
+	for i := VClockMax - 1; i >= 0; i-- {
+		assert.True(vc.Follow(uint32(i), int64(10*i)), "id=%v", i)
+	}
+	assert.EqualValues(expected, vc)
+
+	assert.False(vc.Follow(VClockMax, 0), "VClockMax")
+	assert.False(vc.Follow(VClockMax+1, 0), "VClockMax+1")
+	assert.False(vc.Follow(0, -1), "Negative LSN")
+
+	assert.EqualValues(expected, vc)
+
+	assert.Equal(expectedLSN, vc.LSN(), "LSN")
+}
+
+func TestReplicaSet(t *testing.T) {
+	assert := assert.New(t)
+	expected := make([]string, ReplicaSetMaxSize)
+	uuidgen := func(i int) string { return fmt.Sprintf("%v%012v", tnt16UUID[:UUIDStrLength-12], i) }
+	for i := range expected {
+		expected[i] = uuidgen(i * 10)
+	}
+
+	rs := NewReplicaSet()
+	// zebra filling is special test
+	for i := 0; i < ReplicaSetMaxSize; i = i + 2 {
+		assert.True(rs.SetInstance(uint32(i), uuidgen(10*i)), "id=%v", i)
+	}
+	for i := 1; i < ReplicaSetMaxSize; i = i + 2 {
+		assert.True(rs.SetInstance(uint32(i), uuidgen(10*i)), "id=%v", i)
+	}
+	// updating existing lsns
+	for i := ReplicaSetMaxSize - 1; i >= 0; i-- {
+		assert.True(rs.SetInstance(uint32(i), uuidgen(10*i)), "id=%v", i)
+	}
+	assert.EqualValues(expected, rs.Instances)
+
+	assert.False(rs.SetInstance(ReplicaSetMaxSize, tnt16UUID), "ReplicaSetMax")
+	assert.False(rs.SetInstance(ReplicaSetMaxSize+1, tnt16UUID), "ReplicaSetMax+1")
+	assert.False(rs.SetInstance(0, ""), "Empty UUID")
+
+	assert.EqualValues(expected, rs.Instances)
 }
