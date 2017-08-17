@@ -54,14 +54,12 @@ func (rs *ReplicaSet) Has(id uint32) bool {
 // One can count instances in vector just using built-in len function.
 type VectorClock []int64
 
-// NewVectorClock returns empty VectorClock.
-func NewVectorClock() VectorClock {
-	// zero index is reserved
-	return make([]int64, 0, VClockMax)
-}
-
 // NewVectorClockFrom returns VectorClock with clocks equal to the given lsn elements sequentially.
-func NewVectorClockFrom(lsns ...int64) VectorClock {
+// Empty VectorClock would be returned if no lsn elements is given.
+func NewVectorClock(lsns ...int64) VectorClock {
+	if len(lsns) == 0 {
+		return make([]int64, 0, VClockMax)
+	}
 	// zero index is reserved
 	vc := make([]int64, len(lsns)+1, VClockMax)
 	copy(vc[1:], lsns)
