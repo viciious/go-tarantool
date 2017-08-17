@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func schemeGrantEval(username string) string {
+func schemeGrantUserEval(username string) string {
 	scheme := `
     box.schema.user.grant('{username}', 'execute', 'universe', {if_not_exists = true})
     `
@@ -34,7 +34,7 @@ func TestEvalExecute(t *testing.T) {
 	assert := assert.New(t)
 
 	user := "guest"
-	config := schemeGrantEval(user)
+	config := schemeGrantUserEval(user)
 	expr := "local arg = {...} return box.cfg.listen, box.session.user(), arg[1], arg[2], arg"
 	args := []interface{}{"one", "two"}
 	q := &Eval{Expression: expr, Tuple: args}

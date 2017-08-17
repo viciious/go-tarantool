@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	procLUALastSnapLSN = "lastsnaplsn"
+	procLUALastSnapVClock = "lastsnapvclock"
 )
 
 // PacketIterator is a wrapper around Slave provided iteration over new Packets functionality.
@@ -178,42 +178,47 @@ func (s *Slave) IsInReplicaSet() bool {
 	return len(s.UUID) > 0 && len(s.ReplicaSet.UUID) > 0
 }
 
-func (s *Slave) LastSnapLSN() (int64, error) {
-	pp, err := s.newPacket(&Call{Name: procLUALastSnapLSN})
+func (s *Slave) LastSnapVClock() (VectorClock, error) {
+	pp, err := s.newPacket(&Call{Name: procLUALastSnapVClock})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	if err = s.send(pp); err != nil {
-		return 0, err
+		return nil, err
 	}
 	pp.Release()
 
 	if pp, err = s.receive(); err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer pp.Release()
 
 	p, err := decodePacket(pp)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if p.code != OKRequest {
 		s.p = p
+		if p.Result == nil {
+			return nil, ErrBadResult
+		}
 		s.err = p.Result.Error
-		return 0, s.err
+		return nil, s.err
 	}
-
 	res := p.Result.Data
 	if len(res) == 0 || len(res[0]) == 0 {
-		return 0, ErrBadResult
+		return nil, ErrBadResult
 	}
-
-	lsn, ok := res[0][0].(uint64)
-	if !ok {
-		return 0, ErrBadResult
+	vc := NewVectorClock()
+	for i, lsnu64 := range res[0] {
+		lsn, ok := lsnu64.(uint64)
+		if !ok {
+			return nil, ErrBadResult
+		}
+		vc.Follow(uint32(i+1), int64(lsn))
 	}
-	return int64(lsn), nil
+	return vc, nil
 }
 
 // join send JOIN request.
