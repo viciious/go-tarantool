@@ -3,7 +3,6 @@ package tarantool_test
 import (
 	"log"
 	"strings"
-
 	"sync"
 
 	tnt16 "github.com/viciious/go-tarantool"

@@ -78,6 +78,9 @@ func (s *Slave) Attach(out ...chan *Packet) (it PacketIterator, err error) {
 		return nil, err
 	}
 	// skip reserved zero index of the Vector Clock
+	if len(s.VClock) <= 1 {
+		return nil, ErrVectorClock
+	}
 	if it, err = s.Subscribe(s.VClock[1:]...); err != nil {
 		return nil, err
 	}
@@ -230,7 +233,7 @@ func (s *Slave) join() (err error) {
 
 // subscribe sends SUBSCRIBE request and waits for VCLOCK response.
 func (s *Slave) subscribe(lsns ...int64) error {
-	vc := NewVectorClockFrom(lsns...)
+	vc := NewVectorClock(lsns...)
 	pp, err := s.newPacket(&Subscribe{
 		UUID:           s.UUID,
 		ReplicaSetUUID: s.ReplicaSet.UUID,
@@ -254,7 +257,6 @@ func (s *Slave) subscribe(lsns ...int64) error {
 		return err
 	}
 	if p.code != OKRequest {
-		// TODO: little hack for complex attach
 		s.p = p
 		if p.Result == nil {
 			return ErrBadResult
