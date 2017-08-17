@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const luaMakeSnapshot = "require('box').snapshot()"
+
 var (
 	tnt16User = "username"
 	tnt16Pass = "password"
@@ -29,6 +31,17 @@ func schemeNewReplicator(user, pass string) string {
 	tmpl = strings.Replace(tmpl, "{user}", user, -1)
 	tmpl = strings.Replace(tmpl, "{pass}", pass, -1)
 	return tmpl
+}
+
+func schemeGrantRoleFunc(role, fn string) string {
+	scheme := `
+	box.once('{role}:exec_{fn}', function()
+		box.schema.role.grant('{role}', 'execute', 'function', '{fn}', {if_not_exists = true})
+	end)
+	`
+	scheme = strings.Replace(scheme, "{role}", role, -1)
+	scheme = strings.Replace(scheme, "{fn}", fn, -1)
+	return scheme
 }
 
 func schemeSpaceTester() string {
@@ -462,10 +475,12 @@ func TestSlaveVClock(t *testing.T) {
 	require := require.New(t)
 
 	// setup
+	guest := "guest"
 	config := schemeNewReplicator(tnt16User, tnt16Pass)
 	config += schemeSpaceTester()
-	config += schemeGrantEval("guest")
-	config += schemeGrantLastSnapLSN(tnt16User, tnt16Pass)
+	// for making snapshot
+	config += schemeGrantUserEval(guest)
+
 	box, err := NewBox(config, &BoxOptions{})
 	require.NoError(err)
 	defer box.Close()
@@ -474,7 +489,7 @@ func TestSlaveVClock(t *testing.T) {
 	require.NoError(err)
 	defer tnt.Close()
 
-	makesnapshot := &Eval{Expression: "local box = require('box') box.snapshot()"}
+	makesnapshot := &Eval{Expression: luaMakeSnapshot}
 	res, err := tnt.Execute(makesnapshot)
 	require.NoError(err)
 	require.Len(res, 0, "response to make snapshot request contains error")
@@ -631,49 +646,53 @@ func TestSlaveParseOptionsRSParams(t *testing.T) {
 	}
 }
 
-func TestSlaveLastSnapLSN(t *testing.T) {
+func TestSlaveLastSnapVClock(t *testing.T) {
 	require := require.New(t)
 
 	// setup
-	user, luaDir, role := "guest", "lua", "replication"
-	luaInit, err := ioutil.ReadFile(filepath.Join(luaDir, "init.lua"))
+	user, role, luaDir := "guest", "replication", "lua"
+	luaInit, err := ioutil.ReadFile(filepath.Join("testdata", "init.lua"))
 	require.NoError(err)
 	config := string(luaInit)
-	config += schemeGrantRoleLastSnapLSN(role)
 	config += schemeNewReplicator(tnt16User, tnt16Pass)
+	config += schemeGrantRoleFunc(role, procLUALastSnapVClock)
 	// for making snapshot
-	config += schemeGrantEval(user)
+	config += schemeGrantUserEval(user)
 
 	box, err := NewBox(config, &BoxOptions{WorkDir: luaDir})
 	require.NoError(err)
 	defer box.Close()
 
+	// add replica to replica set
 	s, err := NewSlave(box.Listen, Options{User: tnt16User, Password: tnt16Pass})
+	require.NoError(err)
+	defer s.Close()
+	err = s.Join()
 	require.NoError(err)
 
 	// check init snapshot
-	expected := 0
-	lsn, err := s.LastSnapLSN()
+	expected := NewVectorClock(0)
+	vc, err := s.LastSnapVClock()
 	require.NoError(err)
 	defer s.Close()
+	assert.Equal(t, expected, vc, "init snapshot")
 
-	assert.EqualValues(t, expected, lsn, "init snapshot")
-
-	// prepare another one snapshot
+	// make snapshot
 	tnt, err := Connect(box.Listen, &Options{})
 	require.NoError(err)
 	defer tnt.Close()
-
-	makesnapshot := &Eval{Expression: "local box = require('box') box.snapshot()"}
+	makesnapshot := &Eval{Expression: luaMakeSnapshot}
 	res, err := tnt.Execute(makesnapshot)
 	require.NoError(err)
 	require.Len(res, 0, "response to make snapshot request contains error")
 
 	// check newly generated snapshot
-	lsn, err = s.LastSnapLSN()
+	vc, err = s.LastSnapVClock()
 	require.NoError(err)
 
-	assert.NotZero(t, lsn, "newly generated snapshot has zero lsn")
+	require.NotEqual(expected, vc)
+	require.True(vc.Has(2))
+	require.Zero(vc[2], "replica clock should be zero")
 }
 
 func TestVectorClock(t *testing.T) {
