@@ -93,6 +93,7 @@ func main() {
     conn, err := tarantool.Connect("127.0.0.1:3301", &opts)
     if err != nil {
         fmt.Println("Connection refused: %s", err.Error())
+	return
     }
 
     query := &tarantool.Insert{Space: "examples", Tuple: []interface{}{uint64(99999), "BB"}}
@@ -235,9 +236,11 @@ import (
 
 func main() {
     opts := tarantool.Options{User: "guest"}
-    conn, err := tarantool.Connect("127.0.0.1:3301", &opts)
+    tnt := tarantool.New("127.0.0.1:3301", &opts)
+    conn, err := tnt.Connect()
     if err != nil {
         fmt.Println("Connection refused: %s", err.Error())
+	return
     }
 
     query := &tarantool.Insert{Space: "examples", Tuple: []interface{}{uint64(99999), "BB"}}
@@ -254,7 +257,7 @@ func main() {
 ```
 
 In this variation, `tarantool.New` returns a Connector instance,
-which is a goroutine-safe object that can transparently handle
+which is a goroutine-safe singleton object that can transparently handle
 reconnects.
 
 ## Help
