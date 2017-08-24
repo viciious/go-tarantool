@@ -11,8 +11,8 @@ import (
 
 type Packet struct {
 	code       int
-	requestID  uint32
 	LSN        int64
+	requestID  uint32
 	InstanceID uint32
 	Timestamp  time.Time
 	Request    Query

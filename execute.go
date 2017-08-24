@@ -26,7 +26,7 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 	oldRequest := conn.requests.Put(requestID, r)
 	if oldRequest != nil {
 		oldRequest.replyChan <- &Result{
-			Error: NewConnectionError(conn, "Shred old requests", false), // wtf?
+			Error: NewConnectionError(conn, "Shred old requests"), // wtf?
 		}
 		close(oldRequest.replyChan)
 	}

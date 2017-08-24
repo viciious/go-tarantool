@@ -68,7 +68,7 @@ func TestInsert(t *testing.T) {
 		assert.Equal([][]interface{}{{uint64(4), "Hello"}}, data)
 	}
 
-	data, err = do(&Insert{
+	_, err = do(&Insert{
 		Space: "tester",
 		Tuple: []interface{}{uint64(4), "World"},
 	})

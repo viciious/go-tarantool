@@ -15,7 +15,6 @@ type Query interface {
 
 type request struct {
 	query     Query
-	raw       []byte
 	replyChan chan *Result
 }
 
