@@ -62,7 +62,7 @@ func TestReplace(t *testing.T) {
 
 	if assert.NoError(err) {
 		assert.Equal([][]interface{}{
-			[]interface{}{
+			{
 				uint64(4),
 				"Hello",
 			},
@@ -76,7 +76,7 @@ func TestReplace(t *testing.T) {
 
 	if assert.NoError(err) {
 		assert.Equal([][]interface{}{
-			[]interface{}{
+			{
 				uint64(4),
 				"World",
 			},

@@ -2,7 +2,6 @@ package tarantool
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 
@@ -20,8 +19,8 @@ func (r *Result) pack(requestID uint32) (*packedPacket, error) {
 	var pp *packedPacket
 
 	if r.ErrorCode != OkCode || r.Error != nil {
-		if err = r.Error; err == nil {
-			err = errors.New("Unknown error")
+		if r.Error == nil {
+			err = ErrUnknownError
 		}
 		var str = err.Error()
 

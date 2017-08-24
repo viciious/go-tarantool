@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	defaultConnectTimeout time.Duration = time.Duration(time.Second)
-	defaultQueryTimeout   time.Duration = time.Duration(time.Second)
+	defaultConnectTimeout = time.Second
+	defaultQueryTimeout   = time.Second
 )
 
 var (
@@ -437,7 +437,7 @@ CLEANUP_LOOP:
 	close(conn.closed)
 }
 
-func writer(tcpConn net.Conn, writeChan chan *packedPacket, stopChan chan bool) (err error) {
+func writer(tcpConn io.Writer, writeChan chan *packedPacket, stopChan chan bool) (err error) {
 	w := bufio.NewWriter(tcpConn)
 
 WRITER_LOOP:
@@ -479,7 +479,7 @@ WRITER_LOOP:
 	return
 }
 
-func (conn *Connection) reader(tcpConn net.Conn) (err error) {
+func (conn *Connection) reader(tcpConn io.Reader) (err error) {
 	var packet *Packet
 	var pp *packedPacket
 	var req *request

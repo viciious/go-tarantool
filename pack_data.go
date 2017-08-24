@@ -72,7 +72,7 @@ func (data *packData) spaceNo(space interface{}) (uint64, error) {
 	case int64:
 		return uint64(value), nil
 	case uint64:
-		return uint64(value), nil
+		return value, nil
 	case int32:
 		return uint64(value), nil
 	case uint32:
@@ -122,7 +122,7 @@ func (data *packData) indexNo(space interface{}, index interface{}) (uint64, err
 	case int64:
 		return uint64(value), nil
 	case uint64:
-		return uint64(value), nil
+		return value, nil
 	case int32:
 		return uint64(value), nil
 	case uint32:

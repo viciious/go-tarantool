@@ -13,7 +13,6 @@ type Error interface {
 
 type ConnectionError struct {
 	error
-	timeout bool
 }
 
 type ContextError struct {
@@ -38,9 +37,11 @@ var (
 	ErrBadResult = NewQueryError("invalid result")
 	// ErrVectorClock is returns in case of bad manipulation with vector clock.
 	ErrVectorClock = NewQueryError("vclock manipulation")
+	// ErrUnknown is returns when ErrorCode isn't OK but Error is nil in Result.
+	ErrUnknownError = NewQueryError("unknown error")
 )
 
-func NewConnectionError(con *Connection, message string, timeout bool) *ConnectionError {
+func NewConnectionError(con *Connection, message string) *ConnectionError {
 	return &ConnectionError{
 		error: fmt.Errorf("%s, remote: %s", message, con.remoteAddr),
 	}
@@ -52,7 +53,7 @@ func ConnectionClosedError(con *Connection) *ConnectionError {
 	if err != nil {
 		message = fmt.Sprintf("Connection error: %s", err)
 	}
-	return NewConnectionError(con, message, false)
+	return NewConnectionError(con, message)
 }
 
 func NewContextError(ctx context.Context, con *Connection, message string) *ContextError {
@@ -68,10 +69,6 @@ func (e *ConnectionError) Error() string {
 
 func (e *ConnectionError) Temporary() bool {
 	return true
-}
-
-func (e *ConnectionError) Timeout() bool {
-	return e.timeout
 }
 
 func NewQueryError(message string) *QueryError {
