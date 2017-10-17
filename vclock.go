@@ -32,11 +32,7 @@ func (p *VClock) UnmarshalBinary(data []byte) (err error) {
 	if r.Len() == 0 {
 		return nil
 	}
-
-	if err = p.decodeBody(r); err != nil {
-		return err
-	}
-	return nil
+	return p.decodeBody(r)
 }
 
 func (p *VClock) decodeHeader(r io.Reader) (err error) {
