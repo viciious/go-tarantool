@@ -88,7 +88,7 @@ func (r *Result) unpack(rr io.Reader) (err error) {
 			if err != nil {
 				return err
 			}
-			r.Error = NewQueryError(errorMessage)
+			r.Error = NewQueryError(r.ErrorCode, errorMessage)
 		default:
 			if err = d.Skip(); err != nil {
 				return

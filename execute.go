@@ -12,21 +12,19 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 	pp := packIproto(0, requestID)
 	defer pp.Release()
 
-	pp.code, err = r.query.Pack(conn.packData, &pp.buffer)
-
-	if err != nil {
+	if pp.code, err = r.query.Pack(conn.packData, &pp.buffer); err != nil {
 		return &Result{
 			Error: &QueryError{
+				Code:  ErrInvalidMsgpack,
 				error: err,
 			},
 			ErrorCode: ErrInvalidMsgpack,
 		}
 	}
 
-	oldRequest := conn.requests.Put(requestID, r)
-	if oldRequest != nil {
+	if oldRequest := conn.requests.Put(requestID, r); oldRequest != nil {
 		oldRequest.replyChan <- &Result{
-			Error: NewConnectionError(conn, "Shred old requests"), // wtf?
+			Error: NewConnectionError(conn, "shred old requests"), // wtf?
 		}
 		close(oldRequest.replyChan)
 	}
