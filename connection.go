@@ -415,16 +415,18 @@ func (conn *Connection) worker(tcpConn net.Conn) {
 	wg.Wait()
 
 	// release all pending packets
+	writeChan := conn.writeChan
+	conn.writeChan = nil
+
 CLEANUP_LOOP:
 	for {
 		select {
-		case pp := <-conn.writeChan:
+		case pp := <-writeChan:
 			pp.Release()
 		default:
 			break CLEANUP_LOOP
 		}
 	}
-	close(conn.writeChan)
 
 	// send error reply to all pending requests
 	conn.requests.CleanUp(func(req *request) {

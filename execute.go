@@ -29,8 +29,15 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 		close(oldRequest.replyChan)
 	}
 
+	writeChan := conn.writeChan
+	if writeChan == nil {
+		return &Result{
+			Error: NewConnectionError(conn, "Connection closed"),
+		}
+	}
+
 	select {
-	case conn.writeChan <- pp:
+	case writeChan <- pp:
 	case <-ctx.Done():
 		conn.requests.Pop(requestID)
 		return &Result{
