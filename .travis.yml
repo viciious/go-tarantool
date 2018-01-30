@@ -4,14 +4,14 @@ go:
 - 1.8.1
 
 before_script:
-- go get -t ./...
+- go get -u -t ./...
 
 script:
 - export UNFORMATTED=`gofmt -l .`
 - if [[ ! -z "$UNFORMATTED" ]]; then echo "The following files are not formatted:" && echo "$UNFORMATTED" && exit 1; fi
-- go vet ./...
-- $HOME/gopath/bin/golint ./...
-- go test -v ./...
+- go vet
+- $HOME/gopath/bin/golint
+- go test -v
 
 before_install:
 - curl "http://download.tarantool.org/tarantool/$TARANTOOL_VER/gpgkey" | sudo apt-key add -
