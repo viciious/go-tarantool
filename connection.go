@@ -13,11 +13,6 @@ import (
 	"time"
 )
 
-const (
-	defaultConnectTimeout = time.Second
-	defaultQueryTimeout   = time.Second
-)
-
 var (
 	ErrEmptyDefaultSpace = errors.New("zero-length default space or unnecessary slash in dsn.path")
 	ErrSyncFailed        = errors.New("SYNC failed")
@@ -200,10 +195,10 @@ func parseOptions(dsnString string, options *Options) (*url.URL, Options, error)
 	}
 
 	if opts.ConnectTimeout.Nanoseconds() == 0 {
-		opts.ConnectTimeout = defaultConnectTimeout
+		opts.ConnectTimeout = DefaultConnectTimeout
 	}
 	if opts.QueryTimeout.Nanoseconds() == 0 {
-		opts.QueryTimeout = defaultQueryTimeout
+		opts.QueryTimeout = DefaultQueryTimeout
 	}
 
 	if len(opts.User) == 0 {
