@@ -440,7 +440,7 @@ CLEANUP_LOOP:
 }
 
 func writer(tcpConn io.Writer, writeChan chan *packedPacket, stopChan chan bool) (err error) {
-	w := bufio.NewWriter(tcpConn)
+	w := bufio.NewWriterSize(tcpConn, DefaultWriterBufSize)
 
 WRITER_LOOP:
 	for {
