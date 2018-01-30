@@ -4,7 +4,7 @@ go:
 - 1.8.1
 
 before_script:
-- go get -u -t ./...
+- go get -t ./...
 
 script:
 - export UNFORMATTED=`gofmt -l .`
