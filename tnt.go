@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const ioTickerInterval = time.Microsecond * 100
+const ioTickerInterval = time.Microsecond * 200
 
 var packetPool *packedPacketPool
 var ioTicker *time.Ticker
