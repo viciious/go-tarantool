@@ -12,5 +12,5 @@ const (
 
 var (
 	DefaultReaderBufSize = 128 * 1024
-	DefaultWriterBufSize = 4 * 1024
+	DefaultWriterBufSize = 1024
 )

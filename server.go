@@ -231,7 +231,7 @@ WRITER_LOOP:
 		case <-s.ctx.Done():
 			w.Flush()
 			break WRITER_LOOP
-		default:
+		case <-ioTicker.C:
 			if err = w.Flush(); err != nil {
 				break WRITER_LOOP
 			}
@@ -250,7 +250,6 @@ WRITER_LOOP:
 				w.Flush()
 				break WRITER_LOOP
 			}
-
 		}
 	}
 
