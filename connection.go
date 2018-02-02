@@ -114,7 +114,6 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 
 	connectDeadline := time.Now().Add(opts.ConnectTimeout)
 	conn.tcpConn.SetDeadline(connectDeadline)
-
 	// removing deadline deferred
 	defer conn.tcpConn.SetDeadline(time.Time{})
 
@@ -452,7 +451,7 @@ WRITER_LOOP:
 			}
 		case <-stopChan:
 			break WRITER_LOOP
-		case <-ioTicker.C:
+		default:
 			if err = w.Flush(); err != nil {
 				break WRITER_LOOP
 			}

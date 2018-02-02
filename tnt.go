@@ -1,18 +1,11 @@
 package tarantool
 
-import (
-	"io"
-	"time"
-)
-
-const ioTickerInterval = time.Microsecond * 200
+import "io"
 
 var packetPool *packedPacketPool
-var ioTicker *time.Ticker
 
 func init() {
 	packetPool = newPackedPacketPool()
-	ioTicker = time.NewTicker(ioTickerInterval)
 }
 
 type Query interface {
