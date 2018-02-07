@@ -53,6 +53,8 @@ func (q *Upsert) Pack(data *packData, w io.Writer) (uint32, error) {
 
 func (q *Upsert) Unpack(r io.Reader) error {
 	decoder := msgpack.NewDecoder(r)
+	decoder.UseDecodeInterfaceLoose(true)
+
 	_, err := decoder.DecodeInterface()
 	return err
 }

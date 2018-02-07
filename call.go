@@ -49,6 +49,7 @@ func (q *Call) Unpack(r io.Reader) (err error) {
 	q.Tuple = nil
 
 	decoder := msgpack.NewDecoder(r)
+	decoder.UseDecodeInterfaceLoose(true)
 
 	if i, err = decoder.DecodeMapLen(); err != nil {
 		return

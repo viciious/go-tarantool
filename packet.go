@@ -43,6 +43,7 @@ func (pack *Packet) String() string {
 func (pack *Packet) decodeHeader(r io.Reader) (err error) {
 	var l int
 	d := msgpack.NewDecoder(r)
+	d.UseDecodeInterfaceLoose(true)
 	if l, err = d.DecodeMapLen(); err != nil {
 		return
 	}

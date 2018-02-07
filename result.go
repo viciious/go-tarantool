@@ -58,7 +58,10 @@ func (r *Result) pack(requestID uint32) (*packedPacket, error) {
 
 func (r *Result) unpack(rr io.Reader) (err error) {
 	var l int
+
 	d := msgpack.NewDecoder(rr)
+	d.UseDecodeInterfaceLoose(true)
+
 	if l, err = d.DecodeMapLen(); err != nil {
 		return
 	}
