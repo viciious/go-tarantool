@@ -63,6 +63,7 @@ func (q *Delete) Unpack(r io.Reader) (err error) {
 	q.KeyTuple = nil
 
 	decoder := msgpack.NewDecoder(r)
+	decoder.UseDecodeInterfaceLoose(true)
 
 	if i, err = decoder.DecodeMapLen(); err != nil {
 		return

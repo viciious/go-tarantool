@@ -49,6 +49,7 @@ func (q *Eval) Unpack(r io.Reader) (err error) {
 	var k int
 
 	decoder := msgpack.NewDecoder(r)
+	decoder.UseDecodeInterfaceLoose(true)
 
 	if i, err = decoder.DecodeMapLen(); err != nil {
 		return

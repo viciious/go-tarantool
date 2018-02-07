@@ -94,6 +94,7 @@ func (q *Select) Unpack(r io.Reader) (err error) {
 	q.Iterator = IterEq
 
 	decoder := msgpack.NewDecoder(r)
+	decoder.UseDecodeInterfaceLoose(true)
 
 	if i, err = decoder.DecodeMapLen(); err != nil {
 		return

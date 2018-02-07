@@ -37,7 +37,10 @@ func (p *VClock) UnmarshalBinary(data []byte) (err error) {
 
 func (p *VClock) decodeHeader(r io.Reader) (err error) {
 	var l int
+
 	d := msgpack.NewDecoder(r)
+	d.UseDecodeInterfaceLoose(true)
+
 	if l, err = d.DecodeMapLen(); err != nil {
 		return
 	}
@@ -72,6 +75,8 @@ func (p *VClock) decodeBody(r io.Reader) (err error) {
 	var count int
 
 	d := msgpack.NewDecoder(r)
+	d.UseDecodeInterfaceLoose(true)
+
 	if count, err = d.DecodeMapLen(); err != nil {
 		return
 	}
