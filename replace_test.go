@@ -57,13 +57,13 @@ func TestReplace(t *testing.T) {
 
 	data, err := do(&Replace{
 		Space: "tester",
-		Tuple: []interface{}{int8(4), "Hello"},
+		Tuple: []interface{}{int64(4), "Hello"},
 	})
 
 	if assert.NoError(err) {
 		assert.Equal([][]interface{}{
 			{
-				uint8(4),
+				int64(4),
 				"Hello",
 			},
 		}, data)
@@ -71,13 +71,13 @@ func TestReplace(t *testing.T) {
 
 	data, err = do(&Replace{
 		Space: "tester",
-		Tuple: []interface{}{int8(4), "World"},
+		Tuple: []interface{}{int64(4), "World"},
 	})
 
 	if assert.NoError(err) {
 		assert.Equal([][]interface{}{
 			{
-				uint8(4),
+				int64(4),
 				"World",
 			},
 		}, data)
