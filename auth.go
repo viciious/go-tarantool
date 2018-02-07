@@ -81,6 +81,7 @@ func (auth *Auth) Unpack(r io.Reader) (err error) {
 	var k uint64
 
 	decoder := msgpack.NewDecoder(r)
+	decoder.UseDecodeInterfaceLoose(true)
 
 	if i, err = decoder.DecodeMapLen(); err != nil {
 		return
