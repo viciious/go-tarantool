@@ -84,9 +84,9 @@ func TestCall(t *testing.T) {
 			Name: "sel_all",
 		},
 		[][]interface{}{
-			{int8(1), "First record"},
-			{int8(2), "Music"},
-			{int8(3), "Length", int8(93)},
+			{int64(1), "First record"},
+			{int64(2), "Music"},
+			{int64(3), "Length", int64(93)},
 		},
 	)
 
@@ -94,10 +94,10 @@ func TestCall(t *testing.T) {
 	do(nil,
 		&Call{
 			Name:  "sel_name",
-			Tuple: []interface{}{int8(2), "Music"},
+			Tuple: []interface{}{int64(2), "Music"},
 		},
 		[][]interface{}{
-			{int8(2), "Music"},
+			{int64(2), "Music"},
 		},
 	)
 

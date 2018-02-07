@@ -212,7 +212,7 @@ func (s *Slave) LastSnapVClock() (VectorClock, error) {
 	}
 	vc := NewVectorClock()
 	for i, lsnu64 := range res[0] {
-		lsn, ok := lsnu64.(uint64)
+		lsn, ok := lsnu64.(int64)
 		if !ok {
 			return nil, ErrBadResult
 		}
@@ -374,7 +374,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 			// {0x1, "89b1203b-acda-4ff1-ae76-8069145344b8"}
 			// {0x2, "7c025e42-2394-11e7-aacf-0242ac110002"}
 
-			// in reality _cluster key field is decoded to uint64
+			// in reality _cluster key field is decoded to int64
 			// but we know exactly that it can be casted to uint32 without data loss
 			instanceIDu64, _ := numberToUint64(q.Tuple[0])
 			instanceID := uint32(instanceIDu64)
