@@ -63,13 +63,13 @@ func SubTestVClockSelf(box *Box) func(t *testing.T) {
 		require.NotEmpty(t, res, "result [][]interface is empty")
 		require.Len(t, res[0], 2, "vector clock should contain two clocks")
 		switch res := res[0][0].(type) {
-		case uint64:
+		case int64:
 			require.True(t, res > 0, "master clock (result[0][0]) should be greater than zero")
 		default:
 			t.Fatalf("NaN master clock: %#v (%T)", res, res)
 		}
 		switch res := res[0][1].(type) {
-		case uint64:
+		case int64:
 			require.True(t, res == 0, "replica clock (result[0][1]) should be zero")
 		default:
 			t.Fatalf("NaN master clock: %#v (%T)", res, res)
@@ -154,9 +154,9 @@ func SubTestVClockParseVClock(box *Box) func(t *testing.T) {
 			{"VClock:{}", []interface{}{interface{}(nil)}},
 			// parse empty Vlock -> empty slice
 			{"VClock: {}", []interface{}{}},
-			{"VClock: {1:10}", []interface{}{uint64(10)}},
-			{"VClock: {1:10, 2:0}", []interface{}{uint64(10), uint64(0)}},
-			{"VClock: { 1:10,2:0 }", []interface{}{uint64(10), uint64(0)}},
+			{"VClock: {1:10}", []interface{}{int64(10)}},
+			{"VClock: {1:10, 2:0}", []interface{}{int64(10), int64(0)}},
+			{"VClock: { 1:10,2:0 }", []interface{}{int64(10), int64(0)}},
 		}
 		for tc, item := range tt {
 			luaProc.Tuple = []interface{}{item.str}
