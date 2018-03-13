@@ -19,6 +19,8 @@ type Packet struct {
 	Result     *Result
 }
 
+var emptyPacket Packet
+
 func (pack *Packet) String() string {
 	switch {
 	// response to client
@@ -138,7 +140,9 @@ func (pack *Packet) decodeBody(r io.Reader) (err error) {
 func decodePacket(pp *packedPacket) (*Packet, error) {
 	r := bytes.NewReader(pp.body)
 
-	pack := new(Packet)
+	pack := &pp.packet
+	*pack = emptyPacket
+
 	err := pack.decodeHeader(r)
 	if err != nil {
 		return nil, err

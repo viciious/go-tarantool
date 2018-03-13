@@ -18,6 +18,7 @@ type packedPacket struct {
 	body      []byte // for incoming packets
 	buffer    bytes.Buffer
 	pool      *packedPacketPool
+	packet    Packet
 }
 
 // Uint32 is an alias for PackL
