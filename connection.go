@@ -134,23 +134,29 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		requestID := conn.nextID()
 
 		pp := packIproto(0, requestID)
-		defer pp.Release()
-
 		pp.code, err = (&Auth{
 			User:         opts.User,
 			Password:     opts.Password,
 			GreetingAuth: conn.Greeting.Auth,
 		}).Pack(conn.packData, &pp.buffer)
 		if err != nil {
+			pp.Release()
 			return
 		}
 
 		_, err = pp.WriteTo(conn.tcpConn)
+		pp.Release()
 		if err != nil {
 			return
 		}
 
-		authResponse, err = readPacket(conn.tcpConn)
+		pp, err = readPacked(conn.tcpConn)
+		if err != nil {
+			return
+		}
+		defer pp.Release()
+
+		authResponse, err = decodePacket(pp)
 		if err != nil {
 			return
 		}
@@ -232,19 +238,25 @@ func (conn *Connection) pullSchema() (err error) {
 		requestID := conn.nextID()
 
 		pp := packIproto(0, requestID)
-		defer pp.Release()
-
 		pp.code, err = q.Pack(conn.packData, &pp.buffer)
 		if err != nil {
+			pp.Release()
 			return nil, err
 		}
 
 		_, err = pp.WriteTo(conn.tcpConn)
+		pp.Release()
 		if err != nil {
 			return nil, err
 		}
 
-		response, err := readPacket(conn.tcpConn)
+		pp, err = readPacked(conn.tcpConn)
+		if err != nil {
+			return nil, err
+		}
+		defer pp.Release()
+
+		response, err := decodePacket(pp)
 		if err != nil {
 			return nil, err
 		}
@@ -505,19 +517,4 @@ READER_LOOP:
 		pp.Release()
 	}
 	return
-}
-
-func readPacket(r io.Reader) (p *Packet, err error) {
-	pp, err := readPacked(r)
-	if err != nil {
-		return nil, err
-	}
-	defer pp.Release()
-
-	p, err = decodePacket(pp)
-	if err != nil {
-		return nil, err
-	}
-
-	return p, nil
 }
