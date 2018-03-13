@@ -55,6 +55,6 @@ func (q *Upsert) Unpack(r io.Reader) error {
 	decoder := msgpack.NewDecoder(r)
 	decoder.UseDecodeInterfaceLoose(true)
 
-	_, err := decoder.DecodeInterface()
+	err := decoder.Skip()
 	return err
 }
