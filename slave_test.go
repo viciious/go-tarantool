@@ -604,7 +604,7 @@ func TestSlaveAttachAsync(t *testing.T) {
 		select {
 		case qi := <-out:
 			if qi.Space.(int) > SpaceSystemMax {
-				if num, ok := qi.Tuple[0].(uint64); ok && num > 1 {
+				if num, ok := qi.Tuple[0].(int64); ok && num > 1 {
 					require.EqualValues(expected, qi.Tuple)
 					return
 				}
