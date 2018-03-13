@@ -13,11 +13,11 @@ faster than other packages according to public benchmarks.
 
 ## Table of contents
 
-* [Key features](#advantages)
+* [Key features](#key-features)
 * [Installation](#installation)
 * [Hello World](#hello-world)
 * [API reference](#api-reference)
-* [Walking through the example](#walking-through-example-in-go)
+* [Walking through the example](#walking-through-the-example)
 * [Alternative way to connect](#alternative-way-to-connect)
 * [Help](#help)
 
@@ -92,7 +92,7 @@ func main() {
     opts := tarantool.Options{User: "guest"}
     conn, err := tarantool.Connect("127.0.0.1:3301", &opts)
     if err != nil {
-        fmt.Println("Connection refused: %s", err.Error())
+        fmt.Printf("Connection refused: %s\n", err.Error())
 	return
     }
 
@@ -239,7 +239,7 @@ func main() {
     tnt := tarantool.New("127.0.0.1:3301", &opts)
     conn, err := tnt.Connect()
     if err != nil {
-        fmt.Println("Connection refused: %s", err.Error())
+        fmt.Printf("Connection refused: %s\n", err.Error())
 	return
     }
 

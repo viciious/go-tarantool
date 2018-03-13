@@ -53,7 +53,7 @@ func (rs *ReplicaSet) Has(id uint32) bool {
 // One can count instances in vector just using built-in len function.
 type VectorClock []int64
 
-// NewVectorClockFrom returns VectorClock with clocks equal to the given lsn elements sequentially.
+// NewVectorClock returns VectorClock with clocks equal to the given lsn elements sequentially.
 // Empty VectorClock would be returned if no lsn elements is given.
 func NewVectorClock(lsns ...int64) VectorClock {
 	if len(lsns) == 0 {
