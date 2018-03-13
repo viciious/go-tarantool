@@ -18,8 +18,8 @@ type packData struct {
 	packedDefaultOffset []byte
 	packedSingleKey     []byte
 	spaceMap            map[string]uint64
-	indexMap            map[uint64](map[string]uint64)
-	primaryKeyMap       map[uint64]([]int)
+	indexMap            map[uint64]map[string]uint64
+	primaryKeyMap       map[uint64][]int
 }
 
 func encodeValues2(v1, v2 interface{}) []byte {
@@ -52,8 +52,8 @@ func newPackData(defaultSpace interface{}) *packData {
 		packedDefaultOffset: encodeValues2(KeyOffset, 0),
 		packedSingleKey:     packSelectSingleKey(),
 		spaceMap:            make(map[string]uint64),
-		indexMap:            make(map[uint64](map[string]uint64)),
-		primaryKeyMap:       make(map[uint64]([]int)),
+		indexMap:            make(map[uint64]map[string]uint64),
+		primaryKeyMap:       make(map[uint64][]int),
 	}
 }
 
@@ -92,7 +92,7 @@ func (data *packData) spaceNo(space interface{}) (uint64, error) {
 		}
 		return 0, fmt.Errorf("Unknown space %#v", space)
 	}
-
+	// TODO: unreachable code
 	return numberToUint64(space)
 }
 
