@@ -17,7 +17,7 @@ func TestAuth(t *testing.T) {
 	assert.NoError(err)
 	defer box.Close()
 
-	// unkwnown user
+	// unknown user
 	conn, err := box.Connect(&Options{
 		User:     "user_not_found",
 		Password: "qwerty",
