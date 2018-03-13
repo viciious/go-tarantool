@@ -77,7 +77,7 @@ func (r *Result) unpack(rr io.Reader) (err error) {
 				return err
 			}
 			v := value.([]interface{})
-			r.Data = make([]([]interface{}), len(v))
+			r.Data = make([][]interface{}, len(v))
 			for i := 0; i < len(v); i++ {
 				switch vi := v[i].(type) {
 				case []interface{}:
