@@ -36,7 +36,7 @@ type Greeting struct {
 type Connection struct {
 	requestID uint32
 	requests  *requestMap
-	writeChan chan *packedPacket // packed messages with header
+	writeChan chan *binaryPacket // packed messages with header
 	closeOnce sync.Once
 	exit      chan bool
 	closed    chan bool
@@ -97,7 +97,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 	conn = &Connection{
 		remoteAddr:     addr,
 		requests:       newRequestMap(),
-		writeChan:      make(chan *packedPacket, 256),
+		writeChan:      make(chan *binaryPacket, 256),
 		exit:           make(chan bool),
 		closed:         make(chan bool),
 		firstErrorLock: &sync.Mutex{},
@@ -129,16 +129,14 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 
 	// try to authenticate if user have been provided
 	if len(opts.User) > 0 {
-		var authResponse *Packet
-
 		requestID := conn.nextID()
 
 		pp := packIproto(0, requestID)
-		pp.code, err = (&Auth{
+		err = pp.packQuery(&Auth{
 			User:         opts.User,
 			Password:     opts.Password,
 			GreetingAuth: conn.Greeting.Auth,
-		}).Pack(conn.packData, &pp.buffer)
+		}, conn.packData)
 		if err != nil {
 			pp.Release()
 			return
@@ -150,13 +148,15 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 			return
 		}
 
-		pp, err = readPacked(conn.tcpConn)
+		pp = packetPool.Get()
+		_, err = pp.ReadFrom(conn.tcpConn)
 		if err != nil {
 			return
 		}
 		defer pp.Release()
 
-		authResponse, err = decodePacket(pp)
+		authResponse := &pp.packet
+		err = authResponse.UnmarshalBinary(pp.body)
 		if err != nil {
 			return
 		}
@@ -238,8 +238,7 @@ func (conn *Connection) pullSchema() (err error) {
 		requestID := conn.nextID()
 
 		pp := packIproto(0, requestID)
-		pp.code, err = q.Pack(conn.packData, &pp.buffer)
-		if err != nil {
+		if err = pp.packQuery(q, conn.packData); err != nil {
 			pp.Release()
 			return nil, err
 		}
@@ -250,13 +249,15 @@ func (conn *Connection) pullSchema() (err error) {
 			return nil, err
 		}
 
-		pp, err = readPacked(conn.tcpConn)
+		pp = packetPool.Get()
+		_, err = pp.ReadFrom(conn.tcpConn)
 		if err != nil {
 			return nil, err
 		}
 		defer pp.Release()
 
-		response, err := decodePacket(pp)
+		response := &pp.packet
+		err = response.UnmarshalBinary(pp.body)
 		if err != nil {
 			return nil, err
 		}
@@ -447,7 +448,7 @@ CLEANUP_LOOP:
 	close(conn.closed)
 }
 
-func writer(tcpConn io.Writer, writeChan chan *packedPacket, stopChan chan bool) (err error) {
+func writer(tcpConn io.Writer, writeChan chan *binaryPacket, stopChan chan bool) (err error) {
 	w := bufio.NewWriterSize(tcpConn, DefaultWriterBufSize)
 
 WRITER_LOOP:
@@ -491,7 +492,7 @@ WRITER_LOOP:
 
 func (conn *Connection) reader(tcpConn io.Reader) (err error) {
 	var packet *Packet
-	var pp *packedPacket
+	var pp *binaryPacket
 	var req *request
 
 	r := bufio.NewReaderSize(tcpConn, DefaultReaderBufSize)
@@ -499,12 +500,15 @@ func (conn *Connection) reader(tcpConn io.Reader) (err error) {
 READER_LOOP:
 	for {
 		// read raw bytes
-		pp, err = readPacked(r)
+		pp := packetPool.Get()
+
+		_, err = pp.ReadFrom(r)
 		if err != nil {
 			break READER_LOOP
 		}
 
-		packet, err = decodePacket(pp)
+		packet = &pp.packet
+		err := packet.UnmarshalBinary(pp.body)
 		if err != nil {
 			break READER_LOOP
 		}

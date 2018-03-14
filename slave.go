@@ -194,7 +194,8 @@ func (s *Slave) LastSnapVClock() (VectorClock, error) {
 	}
 	defer pp.Release()
 
-	p, err := decodePacket(pp)
+	p := &pp.packet
+	err = p.UnmarshalBinary(pp.body)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +258,8 @@ func (s *Slave) subscribe(lsns ...int64) error {
 	}
 	defer pp.Release()
 
-	p, err := decodePacket(pp)
+	p := &pp.packet
+	err = p.UnmarshalBinary(pp.body)
 	if err != nil {
 		return err
 	}
@@ -324,7 +326,8 @@ func (s *Slave) nextXlog() (p *Packet, err error) {
 	}
 	defer pp.Release()
 
-	p, err = decodePacket(pp)
+	p = &Packet{}
+	err = p.UnmarshalBinary(pp.body)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +349,8 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 	}
 	defer pp.Release()
 
-	p, err = decodePacket(pp)
+	p = &Packet{}
+	err = p.UnmarshalBinary(pp.body)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +430,7 @@ func (s *Slave) disconnect() (err error) {
 }
 
 // send packed packet to the connection buffer, flush buffer.
-func (s *Slave) send(pp *packedPacket) (err error) {
+func (s *Slave) send(pp *binaryPacket) (err error) {
 	if _, err = pp.WriteTo(s.cw); err != nil {
 		return
 	}
@@ -434,15 +438,16 @@ func (s *Slave) send(pp *packedPacket) (err error) {
 }
 
 // receive new response packet.
-func (s *Slave) receive() (*packedPacket, error) {
-	return readPacked(s.cr)
+func (s *Slave) receive() (*binaryPacket, error) {
+	pp := packetPool.Get()
+	_, err := pp.ReadFrom(s.cr)
+	return pp, err
 }
 
 // newPacket compose packet from body.
-func (s *Slave) newPacket(q Query) (pp *packedPacket, err error) {
+func (s *Slave) newPacket(q Query) (pp *binaryPacket, err error) {
 	pp = packetPool.Get()
-	pp.code, err = q.Pack(s.c.packData, &pp.buffer)
-	if err != nil {
+	if err = pp.packQuery(q, s.c.packData); err != nil {
 		pp.Release()
 		return nil, err
 	}

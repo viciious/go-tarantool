@@ -2,9 +2,8 @@ package tarantool
 
 import (
 	"errors"
-	"io"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 type Replace struct {
@@ -14,74 +13,70 @@ type Replace struct {
 
 var _ Query = (*Replace)(nil)
 
-func (q *Replace) Pack(data *packData, w io.Writer) (uint32, error) {
-	var err error
-
+func (q Replace) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
 	if q.Tuple == nil {
-		return ErrorFlag, errors.New("Tuple can not be nil")
+		return o, ErrorFlag, errors.New("Tuple can not be nil")
 	}
 
-	encoder := msgpack.NewEncoder(w)
+	o = b
+	o = msgp.AppendMapHeader(o, 2)
 
-	encoder.EncodeMapLen(2) // Space, Tuple
-
-	// Space
-	if err = data.writeSpace(q.Space, w, encoder); err != nil {
-		return ErrorFlag, err
+	if o, err = data.packSpace(q.Space, o); err != nil {
+		return o, ErrorFlag, err
 	}
 
-	// Tuple
-	encoder.EncodeUint(KeyTuple)
-	encoder.EncodeArrayLen(len(q.Tuple))
-	for _, value := range q.Tuple {
-		if err = encoder.Encode(value); err != nil {
-			return ErrorFlag, err
-		}
+	o = msgp.AppendUint(o, KeyTuple)
+	if o, err = msgp.AppendIntf(o, q.Tuple); err != nil {
+		return o, ErrorFlag, err
 	}
 
-	return ReplaceRequest, nil
+	return o, ReplaceRequest, nil
 }
 
-func (q *Replace) Unpack(r io.Reader) (err error) {
-	var i int
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (q *Replace) UnmarshalBinary(data []byte) (err error) {
+	_, err = q.UnmarshalMsg(data)
+	return err
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (q *Replace) UnmarshalMsg(data []byte) (buf []byte, err error) {
+	var i uint32
 	var k int
-	var t uint
+	var t interface{}
 
 	q.Space = nil
 	q.Tuple = nil
 
-	decoder := msgpack.NewDecoder(r)
-	decoder.UseDecodeInterfaceLoose(true)
-
-	if i, err = decoder.DecodeMapLen(); err != nil {
+	buf = data
+	if i, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
 
 	for ; i > 0; i-- {
-		if k, err = decoder.DecodeInt(); err != nil {
+		if k, buf, err = msgp.ReadIntBytes(buf); err != nil {
 			return
 		}
 
 		switch k {
 		case KeySpaceNo:
-			if t, err = decoder.DecodeUint(); err != nil {
+			if q.Space, buf, err = msgp.ReadIntBytes(buf); err != nil {
 				return
 			}
-			q.Space = int(t)
 		case KeyTuple:
-			q.Tuple, err = decoder.DecodeSlice()
-			if err != nil {
-				return err
+			t, buf, err = msgp.ReadIntfBytes(buf)
+			if q.Tuple = t.([]interface{}); q.Tuple == nil {
+				return buf, errors.New("Interface type is not []interface{}")
 			}
 		}
 	}
 
 	if q.Space == nil {
-		return errors.New("Replace.Unpack: no space specified")
+		return buf, errors.New("Replace.Unpack: no space specified")
 	}
 	if q.Tuple == nil {
-		return errors.New("Replace.Unpack: no tuple specified")
+		return buf, errors.New("Replace.Unpack: no tuple specified")
 	}
 
-	return nil
+	return
 }

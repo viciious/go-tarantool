@@ -1,9 +1,7 @@
 package tarantool
 
 import (
-	"io"
-
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 type Update struct {
@@ -16,59 +14,48 @@ type Update struct {
 
 var _ Query = (*Update)(nil)
 
-func (q *Update) Pack(data *packData, w io.Writer) (uint32, error) {
-	var err error
+func (q Update) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+	o = b
+	o = msgp.AppendMapHeader(o, 4)
 
-	encoder := msgpack.NewEncoder(w)
-
-	encoder.EncodeMapLen(4) // Space, Index, Key, Update operators
-
-	// Space
-	if err = data.writeSpace(q.Space, w, encoder); err != nil {
-		return ErrorFlag, err
+	if o, err = data.packSpace(q.Space, o); err != nil {
+		return o, ErrorFlag, err
 	}
 
-	// Index
-	if err = data.writeIndex(q.Space, q.Index, w, encoder); err != nil {
-		return ErrorFlag, err
+	if o, err = data.packIndex(q.Space, q.Index, o); err != nil {
+		return o, ErrorFlag, err
 	}
 
-	// Key
 	if q.Key != nil {
-		w.Write(data.packedSingleKey)
-		if err = encoder.Encode(q.Key); err != nil {
-			return ErrorFlag, err
+		o = append(o, data.packedSingleKey...)
+		if o, err = msgp.AppendIntf(o, q.Key); err != nil {
+			return o, ErrorFlag, err
 		}
 	} else if q.KeyTuple != nil {
-		encoder.EncodeUint(KeyKey)
-		encoder.EncodeArrayLen(len(q.KeyTuple))
-		for _, key := range q.KeyTuple {
-			if err = encoder.Encode(key); err != nil {
-				return ErrorFlag, err
-			}
+		o = msgp.AppendUint(o, KeyKey)
+		if o, err = msgp.AppendIntf(o, q.KeyTuple); err != nil {
+			return o, ErrorFlag, err
 		}
 	}
 
-	// Update
-	encoder.EncodeUint(KeyTuple)
-	encoder.EncodeArrayLen(len(q.Set))
+	o = msgp.AppendUint(o, KeyTuple)
+	o = msgp.AppendArrayHeader(o, uint32(len(q.Set)))
 	for _, op := range q.Set {
-		t := op.AsTuple()
-		encoder.EncodeArrayLen(len(t))
-		for _, value := range t {
-			if err = encoder.Encode(value); err != nil {
-				return ErrorFlag, err
-			}
+		if o, err = msgp.AppendIntf(o, op.AsTuple()); err != nil {
+			return o, ErrorFlag, err
 		}
 	}
 
-	return UpdateRequest, nil
+	return o, UpdateRequest, nil
 }
 
-func (q *Update) Unpack(r io.Reader) error {
-	decoder := msgpack.NewDecoder(r)
-	decoder.UseDecodeInterfaceLoose(true)
-
-	err := decoder.Skip()
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (q *Update) UnmarshalBinary(data []byte) error {
+	_, err := q.UnmarshalMsg(data)
 	return err
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (q *Update) UnmarshalMsg(data []byte) ([]byte, error) {
+	return msgp.Skip(data)
 }

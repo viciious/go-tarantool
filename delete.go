@@ -2,9 +2,8 @@ package tarantool
 
 import (
 	"errors"
-	"io"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 type Delete struct {
@@ -16,79 +15,75 @@ type Delete struct {
 
 var _ Query = (*Delete)(nil)
 
-func (q *Delete) Pack(data *packData, w io.Writer) (uint32, error) {
-	var err error
+func (q Delete) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+	o = b
+	o = msgp.AppendMapHeader(o, 3)
 
-	encoder := msgpack.NewEncoder(w)
-
-	encoder.EncodeMapLen(3) // Space, Index, Key
-
-	// Space
-	if err = data.writeSpace(q.Space, w, encoder); err != nil {
-		return ErrorFlag, err
+	if o, err = data.packSpace(q.Space, o); err != nil {
+		return o, ErrorFlag, err
 	}
 
-	// Index
-	if err = data.writeIndex(q.Space, q.Index, w, encoder); err != nil {
-		return ErrorFlag, err
+	if o, err = data.packIndex(q.Space, q.Index, o); err != nil {
+		return o, ErrorFlag, err
 	}
 
-	// Key
 	if q.Key != nil {
-		w.Write(data.packedSingleKey)
-		if err = encoder.Encode(q.Key); err != nil {
-			return ErrorFlag, err
+		o = append(o, data.packedSingleKey...)
+		if o, err = msgp.AppendIntf(o, q.Key); err != nil {
+			return o, ErrorFlag, err
 		}
 	} else if q.KeyTuple != nil {
-		encoder.EncodeUint(KeyKey)
-		encoder.EncodeArrayLen(len(q.KeyTuple))
-		for _, key := range q.KeyTuple {
-			if err = encoder.Encode(key); err != nil {
-				return ErrorFlag, err
-			}
+		o = msgp.AppendUint(o, KeyKey)
+		if o, err = msgp.AppendIntf(o, q.KeyTuple); err != nil {
+			return o, ErrorFlag, err
 		}
 	}
 
-	return DeleteRequest, nil
+	return o, DeleteRequest, nil
 }
 
-func (q *Delete) Unpack(r io.Reader) (err error) {
-	var i int
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (q *Delete) UnmarshalBinary(data []byte) (err error) {
+	_, err = q.UnmarshalMsg(data)
+	return err
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (q *Delete) UnmarshalMsg(data []byte) (buf []byte, err error) {
+	var i uint32
 	var k int
-	var t uint
+	var t interface{}
 
 	q.Space = nil
 	q.Index = 0
 	q.Key = nil
 	q.KeyTuple = nil
 
-	decoder := msgpack.NewDecoder(r)
-	decoder.UseDecodeInterfaceLoose(true)
-
-	if i, err = decoder.DecodeMapLen(); err != nil {
+	buf = data
+	if i, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
 
 	for ; i > 0; i-- {
-		if k, err = decoder.DecodeInt(); err != nil {
+		if k, buf, err = msgp.ReadIntBytes(buf); err != nil {
 			return
 		}
 
 		switch k {
 		case KeySpaceNo:
-			if t, err = decoder.DecodeUint(); err != nil {
+			if q.Space, buf, err = msgp.ReadIntBytes(buf); err != nil {
 				return
 			}
-			q.Space = int(t)
 		case KeyIndexNo:
-			if t, err = decoder.DecodeUint(); err != nil {
+			if q.Index, buf, err = msgp.ReadUintBytes(buf); err != nil {
 				return
 			}
-			q.Index = int(t)
 		case KeyKey:
-			if q.KeyTuple, err = decoder.DecodeSlice(); err != nil {
-				return
+			t, buf, err = msgp.ReadIntfBytes(buf)
+			if q.KeyTuple = t.([]interface{}); q.KeyTuple == nil {
+				return buf, errors.New("Interface type is not []interface{}")
 			}
+
 			if len(q.KeyTuple) == 1 {
 				q.Key = q.KeyTuple[0]
 				q.KeyTuple = nil
@@ -97,11 +92,11 @@ func (q *Delete) Unpack(r io.Reader) (err error) {
 	}
 
 	if q.Space == nil {
-		return errors.New("Delete.Unpack: no space specified")
+		return buf, errors.New("Delete.Unpack: no space specified")
 	}
 	if q.Key == nil && q.KeyTuple == nil {
-		return errors.New("Delete.Unpack: no tuple specified")
+		return buf, errors.New("Delete.Unpack: no tuple specified")
 	}
 
-	return nil
+	return
 }
