@@ -1,7 +1,6 @@
 package tarantool
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"time"
@@ -42,8 +41,15 @@ func (pack *Packet) String() string {
 
 func (pack *Packet) decodeHeader(r io.Reader) (err error) {
 	var l int
-	d := msgpack.NewDecoder(r)
-	d.UseDecodeInterfaceLoose(true)
+
+	var d *msgpack.Decoder
+	if pp, ok := r.(*packedPacket); ok {
+		d = pp.GetMsgpackDecoder()
+	} else {
+		d = msgpack.NewDecoder(r)
+		d.UseDecodeInterfaceLoose(true)
+	}
+
 	if l, err = d.DecodeMapLen(); err != nil {
 		return
 	}
@@ -138,18 +144,28 @@ func (pack *Packet) decodeBody(r io.Reader) (err error) {
 	}
 }
 
+func (pp *packedPacket) GetMsgpackDecoder() *msgpack.Decoder {
+	if pp.msgpackDecoder == nil {
+		pp.msgpackDecoder = msgpack.NewDecoder(pp)
+		pp.msgpackDecoder.UseDecodeInterfaceLoose(true)
+	} else {
+		pp.msgpackDecoder.Reset(pp)
+	}
+	return pp.msgpackDecoder
+}
+
 func decodePacket(pp *packedPacket) (*Packet, error) {
-	r := bytes.NewReader(pp.body)
+	pp.Reset()
 
 	pack := &pp.packet
 	*pack = emptyPacket
 
-	err := pack.decodeHeader(r)
+	err := pack.decodeHeader(pp)
 	if err != nil {
 		return nil, err
 	}
 
-	err = pack.decodeBody(r)
+	err = pack.decodeBody(pp)
 	if err != nil {
 		return nil, err
 	}

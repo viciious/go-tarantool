@@ -7,18 +7,21 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/vmihailenco/msgpack"
 	"github.com/vmihailenco/msgpack/codes"
 )
 
 var emptyBody = []byte{byte(codes.FixedMapLow)}
 
 type packedPacket struct {
-	code      uint32
-	requestID uint32
-	body      []byte // for incoming packets
-	buffer    bytes.Buffer
-	pool      *packedPacketPool
-	packet    Packet
+	code           uint32
+	requestID      uint32
+	body           []byte // for incoming packets
+	buffer         bytes.Buffer
+	pool           *packedPacketPool
+	packet         Packet
+	bodyIndex      int64 // current reading index
+	msgpackDecoder *msgpack.Decoder
 }
 
 // Uint32 is an alias for PackL
@@ -134,4 +137,37 @@ func readPacked(r io.Reader) (*packedPacket, error) {
 	}
 
 	return pp, nil
+}
+
+func (pp *packedPacket) Reset() {
+	pp.bodyIndex = 0
+}
+
+// Read implements the io.Reader interface.
+func (pp *packedPacket) Read(b []byte) (n int, err error) {
+	if pp.bodyIndex >= int64(len(pp.body)) {
+		return 0, io.EOF
+	}
+	n = copy(b, pp.body[pp.bodyIndex:])
+	pp.bodyIndex += int64(n)
+	return
+}
+
+// ReadByte implements the io.ByteReader interface.
+func (pp *packedPacket) ReadByte() (byte, error) {
+	if pp.bodyIndex >= int64(len(pp.body)) {
+		return 0, io.EOF
+	}
+	b := pp.body[pp.bodyIndex]
+	pp.bodyIndex++
+	return b, nil
+}
+
+// UnreadByte complements ReadByte in implementing the io.ByteScanner interface.
+func (pp *packedPacket) UnreadByte() error {
+	if pp.bodyIndex <= 0 {
+		return errors.New("bytes.Reader.UnreadByte: at beginning of slice")
+	}
+	pp.bodyIndex--
+	return nil
 }
