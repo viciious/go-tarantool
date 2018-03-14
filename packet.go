@@ -2,10 +2,9 @@ package tarantool
 
 import (
 	"fmt"
-	"io"
 	"time"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 type Packet struct {
@@ -39,135 +38,126 @@ func (pack *Packet) String() string {
 	}
 }
 
-func (pack *Packet) decodeHeader(r io.Reader) (err error) {
-	var l int
+func (pack *Packet) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
+	var l uint32
 
-	var d *msgpack.Decoder
-	if pp, ok := r.(*packedPacket); ok {
-		d = pp.GetMsgpackDecoder()
-	} else {
-		d = msgpack.NewDecoder(r)
-		d.UseDecodeInterfaceLoose(true)
-	}
-
-	if l, err = d.DecodeMapLen(); err != nil {
+	buf = data
+	if l, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
+
 	for ; l > 0; l-- {
 		var cd int
-		if cd, err = d.DecodeInt(); err != nil {
+		if cd, buf, err = msgp.ReadIntBytes(buf); err != nil {
 			return
 		}
 		switch cd {
 		case KeySync:
-			if pack.requestID, err = d.DecodeUint32(); err != nil {
+			if pack.requestID, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 				return
 			}
 		case KeyCode:
-			if pack.code, err = d.DecodeInt(); err != nil {
+			if pack.code, buf, err = msgp.ReadIntBytes(buf); err != nil {
 				return
 			}
 		case KeySchemaID:
-			if _, err = d.DecodeUint32(); err != nil {
+			if _, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 				return
 			}
 		case KeyLSN:
-			if pack.LSN, err = d.DecodeInt64(); err != nil {
+			if pack.LSN, buf, err = msgp.ReadInt64Bytes(buf); err != nil {
 				return
 			}
 		case KeyInstanceID:
-			if pack.InstanceID, err = d.DecodeUint32(); err != nil {
+			if pack.InstanceID, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 				return
 			}
 		case KeyTimestamp:
 			var ts float64
-			if ts, err = d.DecodeFloat64(); err != nil {
+			if ts, buf, err = msgp.ReadFloat64Bytes(buf); err != nil {
 				return
 			}
 			ts = ts * 1e9
 			pack.Timestamp = time.Unix(0, int64(ts))
 		default:
-			if err = d.Skip(); err != nil {
+			if buf, err = msgp.Skip(buf); err != nil {
 				return
 			}
 		}
 	}
-	return nil
+	return buf, nil
 }
 
-func (pack *Packet) decodeBody(r io.Reader) (err error) {
-	unpackq := func(q Query) error {
-		if err := q.Unpack(r); err != nil {
-			return err
+func (pack *Packet) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
+	unpackq := func(q Query, data []byte) (buf []byte, err error) {
+		buf = data
+		if buf, err = q.UnmarshalMsg(buf); err != nil {
+			return
 		}
 		pack.Request = q
-		return nil
+		return
 	}
 
-	unpackr := func(errorCode int) error {
+	unpackr := func(errorCode int, data []byte) (buf []byte, err error) {
+		buf = data
 		res := &Result{ErrorCode: errorCode}
-		if err := res.unpack(r); err != nil {
-			return err
+		if buf, err = res.UnmarshalMsg(buf); err != nil {
+			return
 		}
 		pack.Result = res
-		return nil
+		return
 	}
 
 	if pack.code&ErrorFlag != 0 {
 		// error
-		return unpackr(pack.code - ErrorFlag)
+		return unpackr(pack.code-ErrorFlag, data)
 	}
 
 	switch pack.code {
 	case SelectRequest:
-		return unpackq(&Select{})
+		return unpackq(&Select{}, data)
 	case AuthRequest:
-		return unpackq(&Auth{})
+		return unpackq(&Auth{}, data)
 	case InsertRequest:
-		return unpackq(&Insert{})
+		return unpackq(&Insert{}, data)
 	case ReplaceRequest:
-		return unpackq(&Replace{})
+		return unpackq(&Replace{}, data)
 	case DeleteRequest:
-		return unpackq(&Delete{})
+		return unpackq(&Delete{}, data)
 	case CallRequest:
-		return unpackq(&Call{})
+		return unpackq(&Call{}, data)
 	case UpdateRequest:
-		return unpackq(&Update{})
+		return unpackq(&Update{}, data)
 	case UpsertRequest:
-		return unpackq(&Upsert{})
+		return unpackq(&Upsert{}, data)
 	case PingRequest:
-		return unpackq(&Ping{})
+		return unpackq(&Ping{}, data)
 	case EvalRequest:
-		return unpackq(&Eval{})
+		return unpackq(&Eval{}, data)
 	default:
-		return unpackr(OkCode)
+		return unpackr(OkCode, data)
 	}
 }
 
-func (pp *packedPacket) GetMsgpackDecoder() *msgpack.Decoder {
-	if pp.msgpackDecoder == nil {
-		pp.msgpackDecoder = msgpack.NewDecoder(pp)
-		pp.msgpackDecoder.UseDecodeInterfaceLoose(true)
-	} else {
-		pp.msgpackDecoder.Reset(pp)
-	}
-	return pp.msgpackDecoder
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (pack *Packet) UnmarshalBinary(data []byte) error {
+	_, err := pack.UnmarshalMsg(data)
+	return err
 }
 
-func decodePacket(pp *packedPacket) (*Packet, error) {
-	pp.Reset()
-
-	pack := &pp.packet
+// UnmarshalMsg implements msgp.Unmarshaller
+func (pack *Packet) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	*pack = emptyPacket
 
-	err := pack.decodeHeader(pp)
+	buf = data
+	buf, err = pack.UnmarshalBinaryHeader(data)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	err = pack.decodeBody(pp)
+	buf, err = pack.UnmarshalBinaryBody(buf)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return pack, nil
+	return
 }

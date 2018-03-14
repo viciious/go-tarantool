@@ -2,9 +2,8 @@ package tarantool
 
 import (
 	"errors"
-	"io"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 // Eval query
@@ -15,70 +14,66 @@ type Eval struct {
 
 var _ Query = (*Eval)(nil)
 
-// Pack implements Query interface.
-func (q *Eval) Pack(data *packData, w io.Writer) (uint32, error) {
-	var err error
+func (q Eval) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+	o = b
+	o = msgp.AppendMapHeader(o, 2)
 
-	encoder := msgpack.NewEncoder(w)
+	o = msgp.AppendUint(o, KeyExpression)
+	o = msgp.AppendString(o, q.Expression)
 
-	encoder.EncodeMapLen(2) // Expression, Tuple
-
-	// Expression
-	encoder.EncodeUint(KeyExpression)
-	encoder.EncodeString(q.Expression)
-
-	if q.Tuple != nil {
-		encoder.EncodeUint(KeyTuple)
-		encoder.EncodeArrayLen(len(q.Tuple))
-		for _, key := range q.Tuple {
-			if err = encoder.Encode(key); err != nil {
-				return ErrorFlag, err
-			}
-		}
+	if q.Tuple == nil {
+		o = msgp.AppendUint(o, KeyTuple)
+		o = msgp.AppendArrayHeader(o, 0)
 	} else {
-		encoder.EncodeUint(KeyTuple)
-		encoder.EncodeArrayLen(0)
+		o = msgp.AppendUint(o, KeyTuple)
+		if o, err = msgp.AppendIntf(o, q.Tuple); err != nil {
+			return o, ErrorFlag, err
+		}
 	}
 
-	return EvalRequest, nil
+	return o, EvalRequest, nil
 }
 
-// Unpack implements Query interface.
-func (q *Eval) Unpack(r io.Reader) (err error) {
-	var i int
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (q *Eval) UnmarshalBinary(data []byte) (err error) {
+	_, err = q.UnmarshalMsg(data)
+	return err
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (q *Eval) UnmarshalMsg(data []byte) (buf []byte, err error) {
+	var i uint32
 	var k int
+	var t interface{}
 
-	decoder := msgpack.NewDecoder(r)
-	decoder.UseDecodeInterfaceLoose(true)
-
-	if i, err = decoder.DecodeMapLen(); err != nil {
+	buf = data
+	if i, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
 
 	if i != 2 {
-		return errors.New("Eval.Unpack: expected map of length 2")
+		return buf, errors.New("Eval.Unpack: expected map of length 2")
 	}
 
 	for ; i > 0; i-- {
-		if k, err = decoder.DecodeInt(); err != nil {
+		if k, buf, err = msgp.ReadIntBytes(buf); err != nil {
 			return
 		}
 
 		switch k {
 		case KeyExpression:
-			if q.Expression, err = decoder.DecodeString(); err != nil {
+			if q.Expression, buf, err = msgp.ReadStringBytes(buf); err != nil {
 				return
 			}
 		case KeyTuple:
-			q.Tuple, err = decoder.DecodeSlice()
-			if err != nil {
-				return
+			t, buf, err = msgp.ReadIntfBytes(buf)
+			if q.Tuple = t.([]interface{}); q.Tuple == nil {
+				return buf, errors.New("Interface type is not []interface{}")
 			}
 			if len(q.Tuple) == 0 {
 				q.Tuple = nil
 			}
 		}
 	}
-
-	return nil
+	return
 }

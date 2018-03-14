@@ -62,11 +62,10 @@ func TestUpdate(t *testing.T) {
 
 func BenchmarkUpdatePack(b *testing.B) {
 	d := newPackData(42)
+	buf := make([]byte, 0)
 
 	for i := 0; i < b.N; i++ {
-		pp := packetPool.Get()
-
-		(&Update{
+		buf, _, _ = (&Update{
 			Space: 1,
 			Index: 0,
 			Key:   1,
@@ -80,8 +79,6 @@ func BenchmarkUpdatePack(b *testing.B) {
 					Argument: "Hello World",
 				},
 			},
-		}).Pack(d, &pp.buffer)
-
-		pp.Release()
+		}).PackMsg(d, buf)
 	}
 }

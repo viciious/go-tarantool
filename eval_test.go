@@ -1,7 +1,6 @@
 package tarantool
 
 import (
-	"bytes"
 	"strings"
 	"testing"
 
@@ -19,13 +18,14 @@ func schemeGrantUserEval(username string) string {
 func TestEvalPackUnpack(t *testing.T) {
 	q := &Eval{Expression: "return 2+2", Tuple: []interface{}{"test"}}
 	// check unpack
-	buf := new(bytes.Buffer)
-	code, err := q.Pack(nil, buf)
+	buf := make([]byte, 0)
+	buf, code, err := q.PackMsg(nil, buf)
 	require.NoError(t, err)
 	assert.EqualValues(t, EvalRequest, code)
 
 	qa := &Eval{}
-	qa.Unpack(buf)
+	err = qa.UnmarshalBinary(buf)
+	require.NoError(t, err)
 	assert.Equal(t, q, qa)
 }
 
@@ -58,9 +58,8 @@ func TestEvalExecute(t *testing.T) {
 
 func BenchmarkEvalPack(b *testing.B) {
 	d := newPackData(42)
+	buf := make([]byte, 0)
 	for i := 0; i < b.N; i++ {
-		pp := packetPool.Get()
-		(&Eval{Expression: "return 2+2"}).Pack(d, &pp.buffer)
-		pp.Release()
+		buf, _, _ = (&Eval{Expression: "return 2+2"}).PackMsg(d, buf)
 	}
 }

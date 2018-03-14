@@ -1,11 +1,9 @@
 package tarantool
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 // cache precompiled
@@ -23,19 +21,17 @@ type packData struct {
 }
 
 func encodeValues2(v1, v2 interface{}) []byte {
-	var buf bytes.Buffer
-	encoder := msgpack.NewEncoder(&buf)
-	encoder.Encode(v1)
-	encoder.Encode(v2)
-	return buf.Bytes()
+	o := make([]byte, 0)
+	o, _ = msgp.AppendIntf(o, v1)
+	o, _ = msgp.AppendIntf(o, v2)
+	return o[:]
 }
 
 func packSelectSingleKey() []byte {
-	var buf bytes.Buffer
-	encoder := msgpack.NewEncoder(&buf)
-	encoder.EncodeUint(KeyKey)
-	encoder.EncodeArrayLen(1)
-	return buf.Bytes()
+	o := make([]byte, 0)
+	o = msgp.AppendUint(o, KeyKey)
+	o = msgp.AppendArrayHeader(o, 1)
+	return o[:]
 }
 
 func newPackData(defaultSpace interface{}) *packData {
@@ -63,28 +59,6 @@ func (data *packData) spaceNo(space interface{}) (uint64, error) {
 	}
 
 	switch value := space.(type) {
-	default:
-		return 0, fmt.Errorf("Wrong space %#v", space)
-	case int:
-		return uint64(value), nil
-	case uint:
-		return uint64(value), nil
-	case int8:
-		return uint64(value), nil
-	case uint8:
-		return uint64(value), nil
-	case int16:
-		return uint64(value), nil
-	case uint16:
-		return uint64(value), nil
-	case int64:
-		return uint64(value), nil
-	case uint64:
-		return value, nil
-	case int32:
-		return uint64(value), nil
-	case uint32:
-		return uint64(value), nil
 	case string:
 		spaceNo, exists := data.spaceMap[value]
 		if exists {
@@ -92,28 +66,24 @@ func (data *packData) spaceNo(space interface{}) (uint64, error) {
 		}
 		return 0, fmt.Errorf("Unknown space %#v", space)
 	}
-	// TODO: unreachable code
+
 	return numberToUint64(space)
 }
 
-func (data *packData) encodeSpace(space interface{}, encoder *msgpack.Encoder) error {
+func (data *packData) packSpace(space interface{}, o []byte) ([]byte, error) {
+	if space == nil && data.packedDefaultSpace != nil {
+		o = append(o, data.packedDefaultSpace...)
+		return o, nil
+	}
+
 	spaceNo, err := data.spaceNo(space)
 	if err != nil {
-		return err
+		return o, err
 	}
 
-	encoder.EncodeUint(KeySpaceNo)
-	encoder.Encode(spaceNo)
-	return nil
-}
-
-func (data *packData) writeSpace(space interface{}, w io.Writer, encoder *msgpack.Encoder) error {
-	if space == nil && data.packedDefaultSpace != nil {
-		w.Write(data.packedDefaultSpace)
-		return nil
-	}
-
-	return data.encodeSpace(space, encoder)
+	o = msgp.AppendUint(o, KeySpaceNo)
+	o = msgp.AppendUint64(o, spaceNo)
+	return o, nil
 }
 
 func numberToUint64(number interface{}) (uint64, error) {
@@ -139,7 +109,7 @@ func numberToUint64(number interface{}) (uint64, error) {
 	case int64:
 		return uint64(value), nil
 	case uint64:
-		return uint64(value), nil
+		return value, nil
 	}
 }
 
@@ -173,18 +143,18 @@ func (data *packData) indexNo(space interface{}, index interface{}) (uint64, err
 	return numberToUint64(index)
 }
 
-func (data *packData) writeIndex(space interface{}, index interface{}, w io.Writer, encoder *msgpack.Encoder) error {
+func (data *packData) packIndex(space interface{}, index interface{}, o []byte) ([]byte, error) {
 	if index == nil {
-		w.Write(data.packedDefaultIndex)
-		return nil
+		o = append(o, data.packedDefaultIndex...)
+		return o, nil
 	}
 
 	indexNo, err := data.indexNo(space, index)
 	if err != nil {
-		return err
+		return o, err
 	}
 
-	encoder.EncodeUint(KeyIndexNo)
-	encoder.Encode(indexNo)
-	return nil
+	o = msgp.AppendUint(o, KeyIndexNo)
+	o = msgp.AppendUint64(o, indexNo)
+	return o, nil
 }

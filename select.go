@@ -2,9 +2,8 @@ package tarantool
 
 import (
 	"errors"
-	"io"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 type Select struct {
@@ -19,73 +18,68 @@ type Select struct {
 
 var _ Query = (*Select)(nil)
 
-func (q *Select) Pack(data *packData, w io.Writer) (uint32, error) {
-	var err error
+func (q Select) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+	o = b
+	o = msgp.AppendMapHeader(o, 6)
 
-	encoder := msgpack.NewEncoder(w)
-
-	encoder.EncodeMapLen(6) // Space, Index, Offset, Limit, Iterator, Key
-
-	// Space
-	if err = data.writeSpace(q.Space, w, encoder); err != nil {
-		return ErrorFlag, err
+	if o, err = data.packSpace(q.Space, o); err != nil {
+		return o, ErrorFlag, err
 	}
 
-	// Index
-	if err = data.writeIndex(q.Space, q.Index, w, encoder); err != nil {
-		return ErrorFlag, err
+	if o, err = data.packIndex(q.Space, q.Index, o); err != nil {
+		return o, ErrorFlag, err
 	}
 
-	// Offset
 	if q.Offset == 0 {
-		w.Write(data.packedDefaultOffset)
+		o = append(o, data.packedDefaultOffset...)
 	} else {
-		encoder.EncodeUint(KeyOffset)
-		encoder.EncodeUint(uint64(q.Offset))
+		o = msgp.AppendUint(o, KeyOffset)
+		o = msgp.AppendUint(o, uint(q.Offset))
 	}
 
-	// Limit
 	if q.Limit == 0 {
-		w.Write(data.packedDefaultLimit)
+		o = append(o, data.packedDefaultLimit...)
 	} else {
-		encoder.EncodeUint(KeyLimit)
-		encoder.EncodeUint(uint64(q.Limit))
+		o = msgp.AppendUint(o, KeyLimit)
+		o = msgp.AppendUint(o, uint(q.Limit))
 	}
 
-	// Iterator
 	if q.Iterator == IterEq {
-		w.Write(data.packedIterEq)
+		o = append(o, data.packedIterEq...)
 	} else {
-		encoder.EncodeUint(KeyIterator)
-		encoder.EncodeUint(uint64(q.Iterator))
+		o = msgp.AppendUint(o, KeyIterator)
+		o = msgp.AppendUint8(o, q.Iterator)
 	}
 
-	// Key
 	if q.Key != nil {
-		w.Write(data.packedSingleKey)
-		if err = encoder.Encode(q.Key); err != nil {
-			return ErrorFlag, err
+		o = append(o, data.packedSingleKey...)
+		if o, err = msgp.AppendIntf(o, q.Key); err != nil {
+			return o, ErrorFlag, err
 		}
 	} else if q.KeyTuple != nil {
-		encoder.EncodeUint(KeyKey)
-		encoder.EncodeArrayLen(len(q.KeyTuple))
-		for _, key := range q.KeyTuple {
-			if err = encoder.Encode(key); err != nil {
-				return ErrorFlag, err
-			}
+		o = msgp.AppendUint(o, KeyKey)
+		if o, err = msgp.AppendIntf(o, q.KeyTuple); err != nil {
+			return o, ErrorFlag, err
 		}
 	} else {
-		encoder.EncodeUint(KeyKey)
-		encoder.EncodeArrayLen(0)
+		o = msgp.AppendUint(o, KeyKey)
+		o = msgp.AppendArrayHeader(o, 0)
 	}
 
-	return SelectRequest, nil
+	return o, SelectRequest, nil
 }
 
-func (q *Select) Unpack(r io.Reader) (err error) {
-	var i int
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (q *Select) UnmarshalBinary(data []byte) (err error) {
+	_, err = q.UnmarshalMsg(data)
+	return err
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (q *Select) UnmarshalMsg(data []byte) (buf []byte, err error) {
+	var i uint32
 	var k int
-	var t uint
+	var t interface{}
 
 	q.Space = nil
 	q.Index = 0
@@ -93,48 +87,47 @@ func (q *Select) Unpack(r io.Reader) (err error) {
 	q.Limit = 0
 	q.Iterator = IterEq
 
-	decoder := msgpack.NewDecoder(r)
-	decoder.UseDecodeInterfaceLoose(true)
-
-	if i, err = decoder.DecodeMapLen(); err != nil {
+	buf = data
+	if i, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
 
 	for ; i > 0; i-- {
-		if k, err = decoder.DecodeInt(); err != nil {
+		if k, buf, err = msgp.ReadIntBytes(buf); err != nil {
 			return
 		}
 
 		switch k {
 		case KeySpaceNo:
-			if t, err = decoder.DecodeUint(); err != nil {
+			if q.Space, buf, err = msgp.ReadIntBytes(buf); err != nil {
 				return
 			}
-			q.Space = int(t)
 		case KeyIndexNo:
-			if t, err = decoder.DecodeUint(); err != nil {
+			if q.Index, buf, err = msgp.ReadIntBytes(buf); err != nil {
 				return
 			}
-			q.Index = int(t)
 		case KeyOffset:
-			if t, err = decoder.DecodeUint(); err != nil {
+			if q.Offset, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 				return
 			}
-			q.Offset = uint32(t)
 		case KeyLimit:
-			if t, err = decoder.DecodeUint(); err != nil {
+			if q.Limit, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 				return
 			}
-			q.Limit = uint32(t)
 		case KeyIterator:
-			if t, err = decoder.DecodeUint(); err != nil {
+			if q.Iterator, buf, err = msgp.ReadUint8Bytes(buf); err != nil {
 				return
 			}
-			q.Iterator = uint8(t)
 		case KeyKey:
-			if q.KeyTuple, err = decoder.DecodeSlice(); err != nil {
-				return
+			t, buf, err = msgp.ReadIntfBytes(buf)
+			if err != nil {
+				return buf, err
 			}
+
+			if q.KeyTuple = t.([]interface{}); q.KeyTuple == nil {
+				return buf, errors.New("Interface type is not []interface{}")
+			}
+
 			if len(q.KeyTuple) == 1 {
 				q.Key = q.KeyTuple[0]
 				q.KeyTuple = nil
@@ -143,8 +136,8 @@ func (q *Select) Unpack(r io.Reader) (err error) {
 	}
 
 	if q.Space == nil {
-		return errors.New("Select.Unpack: no space specified")
+		return buf, errors.New("Select.Unpack: no space specified")
 	}
 
-	return nil
+	return
 }

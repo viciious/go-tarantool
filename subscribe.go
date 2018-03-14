@@ -1,9 +1,7 @@
 package tarantool
 
 import (
-	"io"
-
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 // Subscribe is the SUBSCRIBE command
@@ -15,30 +13,33 @@ type Subscribe struct {
 
 var _ Query = (*Subscribe)(nil)
 
-// Pack implements a part of the Query interface
-func (q *Subscribe) Pack(data *packData, w io.Writer) (uint32, error) {
-	enc := msgpack.NewEncoder(w)
+func (q Subscribe) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+	o = b
+	o = msgp.AppendMapHeader(o, 3)
 
-	enc.EncodeMapLen(3)
+	o = msgp.AppendUint(o, KeyInstanceUUID)
+	o = msgp.AppendString(o, q.UUID)
 
-	enc.EncodeUint(KeyInstanceUUID)
-	enc.EncodeString(q.UUID)
+	o = msgp.AppendUint(o, KeyReplicaSetUUID)
+	o = msgp.AppendString(o, q.ReplicaSetUUID)
 
-	enc.EncodeUint(KeyReplicaSetUUID)
-	enc.EncodeString(q.ReplicaSetUUID)
-
-	enc.EncodeUint(KeyVClock)
-	// NB: maybe we should omit zero element
-	enc.EncodeMapLen(len(q.VClock))
+	o = msgp.AppendUint(o, KeyVClock)
+	o = msgp.AppendMapHeader(o, uint32(len(q.VClock)))
 	for id, lsn := range q.VClock {
-		enc.EncodeUint(uint64(id))
-		enc.EncodeInt(lsn)
+		o = msgp.AppendUint(o, uint(id))
+		o = msgp.AppendInt64(o, lsn)
 	}
 
-	return SubscribeRequest, nil
+	return o, SubscribeRequest, nil
 }
 
-// Unpack implements a part of the Query interface
-func (q *Subscribe) Unpack(r io.Reader) (err error) {
-	return ErrNotSupported
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (q *Subscribe) UnmarshalBinary(data []byte) (err error) {
+	_, err = q.UnmarshalMsg(data)
+	return err
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (q *Subscribe) UnmarshalMsg([]byte) (buf []byte, err error) {
+	return buf, ErrNotSupported
 }

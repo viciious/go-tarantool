@@ -1,16 +1,15 @@
 package tarantool
 
-import "io"
-
-var packetPool *packedPacketPool
+var packetPool *binaryPacketPool
 
 func init() {
 	packetPool = newPackedPacketPool()
 }
 
 type Query interface {
-	Pack(data *packData, w io.Writer) (uint32, error)
-	Unpack(r io.Reader) error
+	UnmarshalBinary(data []byte) error
+	UnmarshalMsg(data []byte) ([]byte, error)
+	PackMsg(data *packData, b []byte) ([]byte, uint32, error)
 }
 
 type request struct {
