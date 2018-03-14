@@ -12,7 +12,7 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 	pp := packIproto(0, requestID)
 	defer pp.Release()
 
-	if pp.code, err = r.query.Pack(conn.packData, &pp.buffer); err != nil {
+	if err = pp.packQuery(r.query, conn.packData); err != nil {
 		return &Result{
 			Error: &QueryError{
 				Code:  ErrInvalidMsgpack,

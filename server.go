@@ -27,7 +27,7 @@ type IprotoServer struct {
 	cancel     context.CancelFunc
 	handler    QueryHandler
 	onShutdown OnShutdownCallback
-	output     chan *packedPacket
+	output     chan *binaryPacket
 	closeOnce  sync.Once
 	firstError error
 }
@@ -48,7 +48,7 @@ func (s *IprotoServer) Accept(conn net.Conn) {
 	s.reader = bufio.NewReader(conn)
 	s.writer = bufio.NewWriter(conn)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
-	s.output = make(chan *packedPacket, 1024)
+	s.output = make(chan *binaryPacket, 1024)
 
 	err := s.greet()
 	if err != nil {
@@ -142,7 +142,7 @@ func (s *IprotoServer) loop() {
 
 func (s *IprotoServer) read() {
 	var err error
-	var pp *packedPacket
+	var pp *binaryPacket
 
 	r := s.reader
 
@@ -153,13 +153,16 @@ READER_LOOP:
 			break READER_LOOP
 		default:
 			// read raw bytes
-			pp, err = readPacked(r)
+			pp = packetPool.Get()
+			_, err = pp.ReadFrom(r)
 			if err != nil {
 				break READER_LOOP
 			}
 
-			go func(pp *packedPacket) {
-				packet, err := decodePacket(pp)
+			go func(pp *binaryPacket) {
+				packet := &pp.packet
+				err := packet.UnmarshalBinary(pp.body)
+
 				if err != nil {
 					s.setError(err)
 					s.Shutdown()
@@ -177,7 +180,7 @@ READER_LOOP:
 				} else {
 					res := s.handler(s.ctx, packet.Request)
 
-					outBody, _ := res.pack(packet.requestID)
+					outBody, _ := res.PackMsg(packet.requestID)
 					select {
 					case s.output <- outBody:
 						break
@@ -210,7 +213,7 @@ func (s *IprotoServer) write() {
 	var err error
 
 	w := s.writer
-	wp := func(w io.Writer, packet *packedPacket) error {
+	wp := func(w io.Writer, packet *binaryPacket) error {
 		_, err = packet.WriteTo(w)
 		defer packet.Release()
 		return err
