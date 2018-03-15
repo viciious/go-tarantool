@@ -12,6 +12,7 @@ script:
 - go vet
 - $HOME/gopath/bin/golint
 - go test -v
+- go test -bench=.
 
 before_install:
 - curl "http://download.tarantool.org/tarantool/$TARANTOOL_VER/gpgkey" | sudo apt-key add -
