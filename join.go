@@ -11,12 +11,16 @@ type Join struct {
 
 var _ Query = (*Join)(nil)
 
-func (q Join) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+func (q Join) GetCommandID() uint32 {
+	return JoinCommand
+}
+
+func (q Join) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 1)
 	o = msgp.AppendUint(o, KeyInstanceUUID)
 	o = msgp.AppendString(o, q.UUID)
-	return o, JoinCommand, nil
+	return o, nil
 }
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler

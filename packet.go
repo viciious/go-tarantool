@@ -8,27 +8,25 @@ import (
 )
 
 type Packet struct {
-	code       int
+	cmd        uint32
 	LSN        int64
-	requestID  uint32
+	requestID  uint64
 	InstanceID uint32
 	Timestamp  time.Time
 	Request    Query
 	Result     *Result
 }
 
-var emptyPacket Packet
-
 func (pack *Packet) String() string {
 	switch {
 	// response to client
 	case pack.Result != nil:
 		return fmt.Sprintf("Packet Type:%v, ReqID:%v\n%v",
-			pack.code, pack.requestID, pack.Result)
+			pack.cmd, pack.requestID, pack.Result)
 	// request to server
 	case pack.requestID != 0:
 		return fmt.Sprintf("Packet Type:%v, ReqID:%v\nRequest:%#v",
-			pack.code, pack.requestID, pack.Request)
+			pack.cmd, pack.requestID, pack.Request)
 	// response from master
 	case pack.LSN != 0:
 		return fmt.Sprintf("Packet LSN:%v, InstanceID:%v, Timestamp:%v\nRequest:%#v",
@@ -53,11 +51,11 @@ func (pack *Packet) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
 		}
 		switch cd {
 		case KeySync:
-			if pack.requestID, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
+			if pack.requestID, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
 				return
 			}
 		case KeyCode:
-			if pack.code, buf, err = msgp.ReadIntBytes(buf); err != nil {
+			if pack.cmd, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 				return
 			}
 		case KeySchemaID:
@@ -98,7 +96,7 @@ func (pack *Packet) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
 		return
 	}
 
-	unpackr := func(errorCode int, data []byte) (buf []byte, err error) {
+	unpackr := func(errorCode uint32, data []byte) (buf []byte, err error) {
 		buf = data
 		res := &Result{ErrorCode: errorCode}
 		if buf, err = res.UnmarshalMsg(buf); err != nil {
@@ -108,35 +106,15 @@ func (pack *Packet) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
 		return
 	}
 
-	if pack.code&ErrorFlag != 0 {
+	if pack.cmd&ErrorFlag != 0 {
 		// error
-		return unpackr(pack.code-ErrorFlag, data)
+		return unpackr(pack.cmd^ErrorFlag, data)
 	}
 
-	switch pack.code {
-	case SelectRequest:
-		return unpackq(&Select{}, data)
-	case AuthRequest:
-		return unpackq(&Auth{}, data)
-	case InsertRequest:
-		return unpackq(&Insert{}, data)
-	case ReplaceRequest:
-		return unpackq(&Replace{}, data)
-	case DeleteRequest:
-		return unpackq(&Delete{}, data)
-	case CallRequest:
-		return unpackq(&Call{}, data)
-	case UpdateRequest:
-		return unpackq(&Update{}, data)
-	case UpsertRequest:
-		return unpackq(&Upsert{}, data)
-	case PingRequest:
-		return unpackq(&Ping{}, data)
-	case EvalRequest:
-		return unpackq(&Eval{}, data)
-	default:
-		return unpackr(OkCode, data)
+	if q := NewQuery(pack.cmd); q != nil {
+		return unpackq(q, data)
 	}
+	return unpackr(OKCommand, data)
 }
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler
@@ -147,7 +125,7 @@ func (pack *Packet) UnmarshalBinary(data []byte) error {
 
 // UnmarshalMsg implements msgp.Unmarshaller
 func (pack *Packet) UnmarshalMsg(data []byte) (buf []byte, err error) {
-	*pack = emptyPacket
+	*pack = Packet{}
 
 	buf = data
 	buf, err = pack.UnmarshalBinaryHeader(data)

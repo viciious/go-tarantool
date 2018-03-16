@@ -6,12 +6,6 @@ func init() {
 	packetPool = newPackedPacketPool()
 }
 
-type Query interface {
-	UnmarshalBinary(data []byte) error
-	UnmarshalMsg(data []byte) ([]byte, error)
-	PackMsg(data *packData, b []byte) ([]byte, uint32, error)
-}
-
 type request struct {
 	query     Query
 	replyChan chan *Result

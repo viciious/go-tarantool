@@ -19,9 +19,8 @@ func TestEvalPackUnpack(t *testing.T) {
 	q := &Eval{Expression: "return 2+2", Tuple: []interface{}{"test"}}
 	// check unpack
 	buf := make([]byte, 0)
-	buf, code, err := q.PackMsg(nil, buf)
+	buf, err := q.PackMsg(nil, buf)
 	require.NoError(t, err)
-	assert.EqualValues(t, EvalRequest, code)
 
 	qa := &Eval{}
 	err = qa.UnmarshalBinary(buf)
@@ -60,6 +59,6 @@ func BenchmarkEvalPack(b *testing.B) {
 	d := newPackData(42)
 	buf := make([]byte, 0)
 	for i := 0; i < b.N; i++ {
-		buf, _, _ = (&Eval{Expression: "return 2+2"}).PackMsg(d, buf)
+		buf, _ = (&Eval{Expression: "return 2+2"}).PackMsg(d, buf)
 	}
 }

@@ -14,7 +14,11 @@ type Eval struct {
 
 var _ Query = (*Eval)(nil)
 
-func (q Eval) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+func (q Eval) GetCommandID() uint32 {
+	return EvalCommand
+}
+
+func (q Eval) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 2)
 
@@ -27,11 +31,11 @@ func (q Eval) PackMsg(data *packData, b []byte) (o []byte, code uint32, err erro
 	} else {
 		o = msgp.AppendUint(o, KeyTuple)
 		if o, err = msgp.AppendIntf(o, q.Tuple); err != nil {
-			return o, ErrorFlag, err
+			return o, err
 		}
 	}
 
-	return o, EvalRequest, nil
+	return o, nil
 }
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler

@@ -18,16 +18,20 @@ type Select struct {
 
 var _ Query = (*Select)(nil)
 
-func (q Select) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+func (q Select) GetCommandID() uint32 {
+	return SelectCommand
+}
+
+func (q Select) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 6)
 
 	if o, err = data.packSpace(q.Space, o); err != nil {
-		return o, ErrorFlag, err
+		return o, err
 	}
 
 	if o, err = data.packIndex(q.Space, q.Index, o); err != nil {
-		return o, ErrorFlag, err
+		return o, err
 	}
 
 	if q.Offset == 0 {
@@ -54,19 +58,19 @@ func (q Select) PackMsg(data *packData, b []byte) (o []byte, code uint32, err er
 	if q.Key != nil {
 		o = append(o, data.packedSingleKey...)
 		if o, err = msgp.AppendIntf(o, q.Key); err != nil {
-			return o, ErrorFlag, err
+			return o, err
 		}
 	} else if q.KeyTuple != nil {
 		o = msgp.AppendUint(o, KeyKey)
 		if o, err = msgp.AppendIntf(o, q.KeyTuple); err != nil {
-			return o, ErrorFlag, err
+			return o, err
 		}
 	} else {
 		o = msgp.AppendUint(o, KeyKey)
 		o = msgp.AppendArrayHeader(o, 0)
 	}
 
-	return o, SelectRequest, nil
+	return o, nil
 }
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler

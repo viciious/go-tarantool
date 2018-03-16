@@ -10,18 +10,21 @@ func newPackedPacketPool() *binaryPacketPool {
 	}
 }
 
-func (p *binaryPacketPool) Get() *binaryPacket {
+func (p *binaryPacketPool) GetWithID(requestID uint64) (pp *binaryPacket) {
 	select {
-	case pp := <-p.queue:
+	case pp = <-p.queue:
+		pp.Reset()
 		pp.pool = p
-		pp.code = 0
-		pp.requestID = 0
-		pp.body = pp.body[:0]
-		return pp
 	default:
-		pp := &binaryPacket{}
-		return pp
+		pp = &binaryPacket{}
+		pp.Reset()
 	}
+	pp.packet.requestID = requestID
+	return
+}
+
+func (p *binaryPacketPool) Get() *binaryPacket {
+	return p.GetWithID(0)
 }
 
 func (p *binaryPacketPool) Put(pp *binaryPacket) {
