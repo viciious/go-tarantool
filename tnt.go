@@ -8,7 +8,7 @@ func init() {
 
 type request struct {
 	query     Query
-	replyChan chan *Result
+	replyChan chan *binaryPacket
 }
 
 // ReplicaSet is used to store params of the Replica Set.

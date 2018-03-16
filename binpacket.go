@@ -112,6 +112,37 @@ func (pp *binaryPacket) ReadPacket(r io.Reader) (err error) {
 	return pp.packet.UnmarshalBinary(pp.body)
 }
 
+// ReadRawPacket reads the whole packet body and only unpacks request ID for routing purposes
+func (pp *binaryPacket) ReadRawPacket(r io.Reader) (requestID uint64, err error) {
+	var l uint32
+
+	requestID = 0
+	if _, err = pp.ReadFrom(r); err != nil {
+		return
+	}
+
+	buf := pp.body
+	if l, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
+		return
+	}
+
+	for ; l > 0; l-- {
+		var cd int
+		if cd, buf, err = msgp.ReadIntBytes(buf); err != nil {
+			return
+		}
+		if cd == KeySync {
+			requestID, buf, err = msgp.ReadUint64Bytes(buf)
+			return
+		}
+		if buf, err = msgp.Skip(buf); err != nil {
+			return
+		}
+	}
+
+	return
+}
+
 func (pp *binaryPacket) packQuery(q Query, packdata *packData) (err error) {
 	if pp.body, err = q.PackMsg(packdata, pp.body[:0]); err != nil {
 		pp.packet.Cmd = ErrorFlag
