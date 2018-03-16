@@ -24,7 +24,7 @@ func (pp *binaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 
 	h = msgp.AppendMapHeader(h, 2)
 	h = msgp.AppendUint(h, KeyCode)
-	h = msgp.AppendUint32(h, pp.packet.cmd)
+	h = msgp.AppendUint32(h, pp.packet.Cmd)
 	h = msgp.AppendUint(h, KeySync)
 	h = msgp.AppendUint64(h, pp.packet.requestID)
 
@@ -46,7 +46,7 @@ func (pp *binaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 }
 
 func (pp *binaryPacket) Reset() {
-	pp.packet.cmd = OKCommand
+	pp.packet.Cmd = OKCommand
 	pp.packet.requestID = 0
 	pp.body = pp.body[:0]
 }
@@ -109,15 +109,14 @@ func (pp *binaryPacket) ReadPacket(r io.Reader) (err error) {
 	if _, err = pp.ReadFrom(r); err != nil {
 		return
 	}
-
 	return pp.packet.UnmarshalBinary(pp.body)
 }
 
 func (pp *binaryPacket) packQuery(q Query, packdata *packData) (err error) {
 	if pp.body, err = q.PackMsg(packdata, pp.body[:0]); err != nil {
-		pp.packet.cmd = ErrorFlag
+		pp.packet.Cmd = ErrorFlag
 		return err
 	}
-	pp.packet.cmd = q.GetCommandID()
+	pp.packet.Cmd = q.GetCommandID()
 	return nil
 }

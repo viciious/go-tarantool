@@ -8,7 +8,7 @@ import (
 )
 
 type Packet struct {
-	cmd        uint32
+	Cmd        uint32
 	LSN        int64
 	requestID  uint64
 	InstanceID uint32
@@ -22,11 +22,11 @@ func (pack *Packet) String() string {
 	// response to client
 	case pack.Result != nil:
 		return fmt.Sprintf("Packet Type:%v, ReqID:%v\n%v",
-			pack.cmd, pack.requestID, pack.Result)
+			pack.Cmd, pack.requestID, pack.Result)
 	// request to server
 	case pack.requestID != 0:
 		return fmt.Sprintf("Packet Type:%v, ReqID:%v\nRequest:%#v",
-			pack.cmd, pack.requestID, pack.Request)
+			pack.Cmd, pack.requestID, pack.Request)
 	// response from master
 	case pack.LSN != 0:
 		return fmt.Sprintf("Packet LSN:%v, InstanceID:%v, Timestamp:%v\nRequest:%#v",
@@ -55,7 +55,7 @@ func (pack *Packet) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
 				return
 			}
 		case KeyCode:
-			if pack.cmd, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
+			if pack.Cmd, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 				return
 			}
 		case KeySchemaID:
@@ -106,12 +106,12 @@ func (pack *Packet) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
 		return
 	}
 
-	if pack.cmd&ErrorFlag != 0 {
+	if pack.Cmd&ErrorFlag != 0 {
 		// error
-		return unpackr(pack.cmd^ErrorFlag, data)
+		return unpackr(pack.Cmd^ErrorFlag, data)
 	}
 
-	if q := NewQuery(pack.cmd); q != nil {
+	if q := NewQuery(pack.Cmd); q != nil {
 		return unpackq(q, data)
 	}
 	return unpackr(OKCommand, data)

@@ -199,7 +199,7 @@ func (s *Slave) LastSnapVClock() (VectorClock, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p.cmd != OKCommand {
+	if p.Cmd != OKCommand {
 		s.p = p
 		if p.Result == nil {
 			return nil, ErrBadResult
@@ -263,7 +263,7 @@ func (s *Slave) subscribe(lsns ...int64) error {
 	if err != nil {
 		return err
 	}
-	if p.cmd != OKCommand {
+	if p.Cmd != OKCommand {
 		s.p = p
 		if p.Result == nil {
 			return ErrBadResult
@@ -360,7 +360,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 	// this response error type means that UUID had been joined Replica Set already
 	joined := uint32(ErrorFlag | ErrTupleFound)
 
-	switch p.cmd {
+	switch p.Cmd {
 	case InsertCommand:
 		q := p.Request.(*Insert)
 		switch q.Space {
