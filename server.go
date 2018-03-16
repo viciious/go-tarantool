@@ -169,21 +169,26 @@ READER_LOOP:
 					return
 				}
 
-				code := byte(packet.code)
-				if code == PingRequest {
+				code := byte(packet.cmd)
+				if code == PingCommand {
 					select {
-					case s.output <- packIprotoOk(packet.requestID):
+					case s.output <- packetPool.GetWithID(packet.requestID):
 						break
 					case <-s.ctx.Done():
 						break
 					}
 				} else {
 					res := s.handler(s.ctx, packet.Request)
+					if res.ErrorCode != OKCommand && res.Error == nil {
+						res.Error = ErrUnknownError
+					}
 
-					outBody, _ := res.PackMsg(packet.requestID)
+					// reuse the same binary packet object for result marshalling
+					pp.packQuery(res, nil)
+
 					select {
-					case s.output <- outBody:
-						break
+					case s.output <- pp:
+						return
 					case <-s.ctx.Done():
 						break
 					}

@@ -13,24 +13,24 @@ type Replace struct {
 
 var _ Query = (*Replace)(nil)
 
-func (q Replace) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+func (q Replace) GetCommandID() uint32 {
+	return ReplaceCommand
+}
+
+func (q Replace) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	if q.Tuple == nil {
-		return o, ErrorFlag, errors.New("Tuple can not be nil")
+		return o, errors.New("Tuple can not be nil")
 	}
 
 	o = b
 	o = msgp.AppendMapHeader(o, 2)
 
 	if o, err = data.packSpace(q.Space, o); err != nil {
-		return o, ErrorFlag, err
+		return o, err
 	}
 
 	o = msgp.AppendUint(o, KeyTuple)
-	if o, err = msgp.AppendIntf(o, q.Tuple); err != nil {
-		return o, ErrorFlag, err
-	}
-
-	return o, ReplaceRequest, nil
+	return msgp.AppendIntf(o, q.Tuple)
 }
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler

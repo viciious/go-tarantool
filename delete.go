@@ -15,31 +15,35 @@ type Delete struct {
 
 var _ Query = (*Delete)(nil)
 
-func (q Delete) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+func (q Delete) GetCommandID() uint32 {
+	return DeleteCommand
+}
+
+func (q Delete) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 3)
 
 	if o, err = data.packSpace(q.Space, o); err != nil {
-		return o, ErrorFlag, err
+		return o, err
 	}
 
 	if o, err = data.packIndex(q.Space, q.Index, o); err != nil {
-		return o, ErrorFlag, err
+		return o, err
 	}
 
 	if q.Key != nil {
 		o = append(o, data.packedSingleKey...)
 		if o, err = msgp.AppendIntf(o, q.Key); err != nil {
-			return o, ErrorFlag, err
+			return o, err
 		}
 	} else if q.KeyTuple != nil {
 		o = msgp.AppendUint(o, KeyKey)
 		if o, err = msgp.AppendIntf(o, q.KeyTuple); err != nil {
-			return o, ErrorFlag, err
+			return o, err
 		}
 	}
 
-	return o, DeleteRequest, nil
+	return o, nil
 }
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler

@@ -9,31 +9,27 @@ import (
 	"github.com/tinylib/msgp/msgp"
 )
 
-var emptyBody = []byte{byte(0)}
-
 type binaryPacket struct {
-	code      uint32
-	requestID uint32
-	body      []byte // for incoming packets
-	pool      *binaryPacketPool
-	packet    Packet
+	body   []byte
+	pool   *binaryPacketPool
+	packet Packet
 }
 
 // WriteTo implements the io.WriterTo interface
 func (pp *binaryPacket) WriteTo(w io.Writer) (n int64, err error) {
-	h32 := [...]byte{
-		0xce, 0, 0, 0, 0, // length
-		0x82,                      // 2 element map (codes.FixedMapLow+2)
-		KeyCode, 0xce, 0, 0, 0, 0, // code
-		KeySync, 0xce, 0, 0, 0, 0,
-	}
-	h := h32[:]
+	h32 := [32]byte{0xce, 0, 0, 0, 0}
 
-	binary.BigEndian.PutUint32(h[8:], pp.code)
-	binary.BigEndian.PutUint32(h[14:], pp.requestID)
+	h := h32[5:5]
+	body := pp.body
 
-	body := pp.body[:]
-	l := len(h) - PacketLengthBytes + len(body)
+	h = msgp.AppendMapHeader(h, 2)
+	h = msgp.AppendUint(h, KeyCode)
+	h = msgp.AppendUint32(h, pp.packet.cmd)
+	h = msgp.AppendUint(h, KeySync)
+	h = msgp.AppendUint64(h, pp.packet.requestID)
+
+	l := len(h) + len(body)
+	h = h32[:5+len(h)]
 	binary.BigEndian.PutUint32(h[1:], uint32(l))
 
 	m, err := w.Write(h)
@@ -49,6 +45,12 @@ func (pp *binaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 	return
 }
 
+func (pp *binaryPacket) Reset() {
+	pp.packet.cmd = OKCommand
+	pp.packet.requestID = 0
+	pp.body = pp.body[:0]
+}
+
 func (pp *binaryPacket) Release() {
 	if pp.pool != nil {
 		pp.pool.Put(pp)
@@ -57,7 +59,7 @@ func (pp *binaryPacket) Release() {
 
 // ReadFrom implements the io.ReaderFrom interface
 func (pp *binaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
-	var h [PacketLengthBytes]byte
+	var h [8]byte
 	var bodyLength int
 	var headerLength int
 	var rr, crr int
@@ -103,7 +105,19 @@ func (pp *binaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
 	return int64(rr) + int64(crr), err
 }
 
+func (pp *binaryPacket) ReadPacket(r io.Reader) (err error) {
+	if _, err = pp.ReadFrom(r); err != nil {
+		return
+	}
+
+	return pp.packet.UnmarshalBinary(pp.body)
+}
+
 func (pp *binaryPacket) packQuery(q Query, packdata *packData) (err error) {
-	pp.body, pp.code, err = q.PackMsg(packdata, pp.body)
-	return err
+	if pp.body, err = q.PackMsg(packdata, pp.body[:0]); err != nil {
+		pp.packet.cmd = ErrorFlag
+		return err
+	}
+	pp.packet.cmd = q.GetCommandID()
+	return nil
 }

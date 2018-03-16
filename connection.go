@@ -34,7 +34,7 @@ type Greeting struct {
 }
 
 type Connection struct {
-	requestID uint32
+	requestID uint64
 	requests  *requestMap
 	writeChan chan *binaryPacket // packed messages with header
 	closeOnce sync.Once
@@ -131,7 +131,8 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 	if len(opts.User) > 0 {
 		requestID := conn.nextID()
 
-		pp := packIproto(0, requestID)
+		pp := packetPool.GetWithID(requestID)
+
 		err = pp.packQuery(&Auth{
 			User:         opts.User,
 			Password:     opts.Password,
@@ -149,18 +150,13 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		}
 
 		pp = packetPool.Get()
-		_, err = pp.ReadFrom(conn.tcpConn)
-		if err != nil {
-			return
-		}
 		defer pp.Release()
 
-		authResponse := &pp.packet
-		err = authResponse.UnmarshalBinary(pp.body)
-		if err != nil {
+		if err = pp.ReadPacket(conn.tcpConn); err != nil {
 			return
 		}
 
+		authResponse := &pp.packet
 		if authResponse.requestID != requestID {
 			err = ErrSyncFailed
 			return
@@ -237,7 +233,7 @@ func (conn *Connection) pullSchema() (err error) {
 
 		requestID := conn.nextID()
 
-		pp := packIproto(0, requestID)
+		pp := packetPool.GetWithID(requestID)
 		if err = pp.packQuery(q, conn.packData); err != nil {
 			pp.Release()
 			return nil, err
@@ -250,18 +246,13 @@ func (conn *Connection) pullSchema() (err error) {
 		}
 
 		pp = packetPool.Get()
-		_, err = pp.ReadFrom(conn.tcpConn)
-		if err != nil {
-			return nil, err
-		}
 		defer pp.Release()
 
-		response := &pp.packet
-		err = response.UnmarshalBinary(pp.body)
-		if err != nil {
+		if err = pp.ReadPacket(conn.tcpConn); err != nil {
 			return nil, err
 		}
 
+		response := &pp.packet
 		if response.requestID != requestID {
 			return nil, errors.New("Bad response requestID")
 		}
@@ -330,8 +321,8 @@ func (conn *Connection) pullSchema() (err error) {
 	return
 }
 
-func (conn *Connection) nextID() uint32 {
-	return atomic.AddUint32(&conn.requestID, 1)
+func (conn *Connection) nextID() uint64 {
+	return atomic.AddUint64(&conn.requestID, 1)
 }
 
 func (conn *Connection) stop() {
@@ -480,9 +471,7 @@ WRITER_LOOP:
 }
 
 func (conn *Connection) reader(tcpConn io.Reader) (err error) {
-	var packet *Packet
 	var pp *binaryPacket
-	var req *request
 
 	r := bufio.NewReaderSize(tcpConn, DefaultReaderBufSize)
 
@@ -490,23 +479,16 @@ READER_LOOP:
 	for {
 		// read raw bytes
 		pp := packetPool.Get()
-
-		_, err = pp.ReadFrom(r)
-		if err != nil {
+		if err = pp.ReadPacket(r); err != nil {
 			break READER_LOOP
 		}
 
-		packet = &pp.packet
-		err := packet.UnmarshalBinary(pp.body)
-		if err != nil {
-			break READER_LOOP
-		}
-
-		req = conn.requests.Pop(packet.requestID)
+		packet := &pp.packet
+		req := conn.requests.Pop(packet.requestID)
 		if req != nil {
-			res := &Result{}
-			if packet.Result != nil {
-				res = packet.Result
+			res := packet.Result
+			if res == nil {
+				res = &Result{}
 			}
 			req.replyChan <- res
 			close(req.replyChan)

@@ -45,7 +45,7 @@ func TestSelect(t *testing.T) {
 
 		defer conn.Close()
 
-		buf, _, err = query.PackMsg(conn.packData, buf)
+		buf, err = query.PackMsg(conn.packData, buf)
 
 		if assert.NoError(err) {
 			var query2 = &Select{}
@@ -182,8 +182,6 @@ func BenchmarkSelectPack(b *testing.B) {
 	d := newPackData(42)
 	buf := make([]byte, 0)
 	for i := 0; i < b.N; i++ {
-		pp := packetPool.Get()
-		buf, _, _ = (&Select{Key: 3}).PackMsg(d, buf)
-		pp.Release()
+		buf, _ = (&Select{Key: 3}).PackMsg(d, buf)
 	}
 }

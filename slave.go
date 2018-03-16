@@ -199,7 +199,7 @@ func (s *Slave) LastSnapVClock() (VectorClock, error) {
 	if err != nil {
 		return nil, err
 	}
-	if p.code != OKRequest {
+	if p.cmd != OKCommand {
 		s.p = p
 		if p.Result == nil {
 			return nil, ErrBadResult
@@ -263,7 +263,7 @@ func (s *Slave) subscribe(lsns ...int64) error {
 	if err != nil {
 		return err
 	}
-	if p.code != OKRequest {
+	if p.cmd != OKCommand {
 		s.p = p
 		if p.Result == nil {
 			return ErrBadResult
@@ -358,10 +358,10 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 	// we have to parse snapshot logs to find replica set instances, UUID
 
 	// this response error type means that UUID had been joined Replica Set already
-	joined := ErrorFlag | ErrTupleFound
+	joined := uint32(ErrorFlag | ErrTupleFound)
 
-	switch p.code {
-	case InsertRequest:
+	switch p.cmd {
+	case InsertCommand:
 		q := p.Request.(*Insert)
 		switch q.Space {
 		case SpaceSchema:
@@ -385,7 +385,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 			// uuid
 			s.ReplicaSet.SetInstance(instanceID, q.Tuple[1].(string))
 		}
-	case OKRequest:
+	case OKCommand:
 		v := new(VClock)
 		err = v.UnmarshalBinary(pp.body)
 		if err != nil {
@@ -446,11 +446,10 @@ func (s *Slave) receive() (*binaryPacket, error) {
 
 // newPacket compose packet from body.
 func (s *Slave) newPacket(q Query) (pp *binaryPacket, err error) {
-	pp = packetPool.Get()
+	pp = packetPool.GetWithID(s.c.nextID())
 	if err = pp.packQuery(q, s.c.packData); err != nil {
 		pp.Release()
 		return nil, err
 	}
-	pp.requestID = s.c.nextID()
 	return
 }

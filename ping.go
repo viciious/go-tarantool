@@ -1,18 +1,16 @@
 package tarantool
 
-import "io"
-
 type Ping struct {
 }
 
 var _ Query = (*Ping)(nil)
 
-func (q *Ping) Pack(data *packData, w io.Writer) (uint32, error) {
-	return PingRequest, nil
+func (q Ping) GetCommandID() uint32 {
+	return PingCommand
 }
 
-func (q Ping) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
-	return b, PingRequest, nil
+func (q Ping) PackMsg(data *packData, b []byte) (o []byte, err error) {
+	return b, nil
 }
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler

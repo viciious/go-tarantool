@@ -5,19 +5,19 @@ Forked from https://github.com/tarantool/go-tarantool/blob/master/const.go
 */
 
 const (
-	OKRequest        = 0
-	SelectRequest    = 1
-	InsertRequest    = 2
-	ReplaceRequest   = 3
-	UpdateRequest    = 4
-	DeleteRequest    = 5
-	CallRequest      = 6
-	AuthRequest      = 7
-	EvalRequest      = 8
-	UpsertRequest    = 9
-	PingRequest      = 64
+	OKCommand        = 0
+	SelectCommand    = 1
+	InsertCommand    = 2
+	ReplaceCommand   = 3
+	UpdateCommand    = 4
+	DeleteCommand    = 5
+	CallCommand      = 6
+	AuthCommand      = 7
+	EvalCommand      = 8
+	UpsertCommand    = 9
+	PingCommand      = 64
 	JoinCommand      = 65
-	SubscribeRequest = 66
+	SubscribeCommand = 66
 	ErrorFlag        = 0x8000
 )
 
@@ -61,9 +61,6 @@ const (
 )
 
 const (
-	OkCode            = 0
-	PacketLengthBytes = 5
-
 	SchemaKeyClusterUUID = "cluster"
 	ReplicaSetMaxSize    = 32
 	VClockMax            = ReplicaSetMaxSize
