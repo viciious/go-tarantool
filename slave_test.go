@@ -458,7 +458,7 @@ func isUUIDinReplicaSet(p *Packet, uuid string) bool {
 	if p == nil || len(uuid) == 0 {
 		return false
 	}
-	switch p.cmd {
+	switch p.Cmd {
 	case InsertCommand:
 		q := p.Request.(*Insert)
 		switch q.Space {
