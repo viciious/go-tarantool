@@ -419,9 +419,6 @@ CLEANUP_LOOP:
 
 	// send error reply to all pending requests
 	conn.requests.CleanUp(func(req *request) {
-		req.replyChan <- &Result{
-			Error: ConnectionClosedError(conn),
-		}
 		close(req.replyChan)
 	})
 
@@ -472,29 +469,31 @@ WRITER_LOOP:
 
 func (conn *Connection) reader(tcpConn io.Reader) (err error) {
 	var pp *binaryPacket
+	var requestID uint64
 
 	r := bufio.NewReaderSize(tcpConn, DefaultReaderBufSize)
 
 READER_LOOP:
 	for {
-		// read raw bytes
 		pp := packetPool.Get()
-		if err = pp.ReadPacket(r); err != nil {
+		if requestID, err = pp.ReadRawPacket(r); err != nil {
 			break READER_LOOP
 		}
 
-		packet := &pp.packet
-		req := conn.requests.Pop(packet.requestID)
-		if req != nil {
-			res := packet.Result
-			if res == nil {
-				res = &Result{}
-			}
-			req.replyChan <- res
-			close(req.replyChan)
+		req := conn.requests.Pop(requestID)
+		if req == nil {
+			pp.Release()
+			pp = nil
+			continue
 		}
 
-		pp.Release()
+		select {
+		case req.replyChan <- pp:
+			break
+		default:
+			pp.Release()
+		}
+		close(req.replyChan)
 		pp = nil
 	}
 

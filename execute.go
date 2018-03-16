@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
+func (conn *Connection) doExecute(ctx context.Context, r *request) (*binaryPacket, *Result) {
 	var err error
 
 	requestID := conn.nextID()
@@ -13,7 +13,7 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 	defer pp.Release()
 
 	if err = pp.packQuery(r.query, conn.packData); err != nil {
-		return &Result{
+		return nil, &Result{
 			Error: &QueryError{
 				Code:  ErrInvalidMsgpack,
 				error: err,
@@ -23,15 +23,12 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 	}
 
 	if oldRequest := conn.requests.Put(requestID, r); oldRequest != nil {
-		oldRequest.replyChan <- &Result{
-			Error: NewConnectionError(conn, "shred old requests"), // wtf?
-		}
 		close(oldRequest.replyChan)
 	}
 
 	writeChan := conn.writeChan
 	if writeChan == nil {
-		return &Result{
+		return nil, &Result{
 			Error: NewConnectionError(conn, "Connection closed"),
 		}
 	}
@@ -40,33 +37,33 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 	case writeChan <- pp:
 	case <-ctx.Done():
 		conn.requests.Pop(requestID)
-		return &Result{
+		return nil, &Result{
 			Error:     NewContextError(ctx, conn, "Send error"),
 			ErrorCode: ErrTimeout,
 		}
 	case <-conn.exit:
-		return &Result{
+		return nil, &Result{
 			Error:     ConnectionClosedError(conn),
 			ErrorCode: ErrNoConnection,
 		}
 	}
 
-	var res *Result
 	select {
-	case res = <-r.replyChan:
+	case pp := <-r.replyChan:
+		return pp, nil
 	case <-ctx.Done():
-		return &Result{
+		return nil, &Result{
 			Error:     NewContextError(ctx, conn, "Recv error"),
 			ErrorCode: ErrTimeout,
 		}
 	case <-conn.exit:
-		return &Result{
+		return nil, &Result{
 			Error:     ConnectionClosedError(conn),
 			ErrorCode: ErrNoConnection,
 		}
 	}
 
-	return res
+	return nil, &Result{Error: err, ErrorCode: ErrUnknown}
 }
 
 func (conn *Connection) Exec(ctx context.Context, q Query) *Result {
@@ -74,14 +71,28 @@ func (conn *Connection) Exec(ctx context.Context, q Query) *Result {
 
 	request := &request{
 		query:     q,
-		replyChan: make(chan *Result, 1),
+		replyChan: make(chan *binaryPacket, 1),
 	}
 
 	if _, ok := ctx.Deadline(); !ok && conn.queryTimeout != 0 {
 		ctx, cancel = context.WithTimeout(ctx, conn.queryTimeout)
 	}
-	result := conn.doExecute(ctx, request)
+
+	pp, rerr := conn.doExecute(ctx, request)
 	cancel()
+
+	if rerr != nil {
+		return rerr
+	}
+
+	var result *Result
+	if err := pp.packet.UnmarshalBinary(pp.body); err != nil {
+		result = &Result{Error: err, ErrorCode: ErrInvalidMsgpack}
+	} else {
+		result = pp.packet.Result
+	}
+	pp.Release()
+
 	return result
 }
 
