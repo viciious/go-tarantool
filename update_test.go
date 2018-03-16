@@ -65,7 +65,7 @@ func BenchmarkUpdatePack(b *testing.B) {
 	buf := make([]byte, 0)
 
 	for i := 0; i < b.N; i++ {
-		buf, _, _ = (&Update{
+		buf, _ = (&Update{
 			Space: 1,
 			Index: 0,
 			Key:   1,

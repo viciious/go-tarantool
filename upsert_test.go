@@ -119,7 +119,7 @@ func BenchmarkUpsertPack(b *testing.B) {
 	buf := make([]byte, 0)
 
 	for i := 0; i < b.N; i++ {
-		buf, _, _ = (&Upsert{
+		buf, _ = (&Upsert{
 			Space: 1,
 			Tuple: []interface{}{1},
 			Set: []Operator{

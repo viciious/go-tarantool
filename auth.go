@@ -55,10 +55,14 @@ func xor(left, right []byte, size int) []byte {
 	return result
 }
 
-func (auth Auth) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+func (auth Auth) GetCommandID() uint32 {
+	return AuthCommand
+}
+
+func (auth Auth) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	scr, err := scramble(auth.GreetingAuth, auth.Password)
 	if err != nil {
-		return o, ErrorFlag, fmt.Errorf("auth: scrambling failure: %s", err.Error())
+		return o, fmt.Errorf("auth: scrambling failure: %s", err.Error())
 	}
 
 	o = b
@@ -71,7 +75,7 @@ func (auth Auth) PackMsg(data *packData, b []byte) (o []byte, code uint32, err e
 	o = msgp.AppendString(o, authHash)
 	o = msgp.AppendBytes(o, scr)
 
-	return o, AuthRequest, nil
+	return o, nil
 }
 
 // UnmarshalMsg implements msgp.Unmarshaller

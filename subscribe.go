@@ -13,7 +13,11 @@ type Subscribe struct {
 
 var _ Query = (*Subscribe)(nil)
 
-func (q Subscribe) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+func (q Subscribe) GetCommandID() uint32 {
+	return SubscribeCommand
+}
+
+func (q Subscribe) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 3)
 
@@ -30,7 +34,7 @@ func (q Subscribe) PackMsg(data *packData, b []byte) (o []byte, code uint32, err
 		o = msgp.AppendInt64(o, lsn)
 	}
 
-	return o, SubscribeRequest, nil
+	return o, nil
 }
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler

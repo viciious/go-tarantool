@@ -9,7 +9,7 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 
 	requestID := conn.nextID()
 
-	pp := packIproto(0, requestID)
+	pp := packetPool.GetWithID(requestID)
 	defer pp.Release()
 
 	if err = pp.packQuery(r.query, conn.packData); err != nil {

@@ -7,37 +7,30 @@ import (
 )
 
 type Result struct {
-	ErrorCode int
+	ErrorCode uint32
 	Error     error
 	Data      [][]interface{}
 }
 
-func (r *Result) PackMsg(requestID uint32) (*binaryPacket, error) {
-	var err error
-	var pp *binaryPacket
+func (r *Result) GetCommandID() uint32 {
+	if r.Error != nil {
+		return r.ErrorCode | ErrorFlag
+	}
+	return r.ErrorCode
+}
 
-	if r.ErrorCode != OkCode || r.Error != nil {
-		if err = r.Error; err == nil {
-			err = ErrUnknownError
-		}
-		var str = err.Error()
+func (r *Result) PackMsg(data *packData, b []byte) (o []byte, err error) {
+	o = b
 
-		pp = packIprotoError(r.ErrorCode, requestID)
-
-		o := pp.body
+	if r.Error != nil {
 		o = msgp.AppendMapHeader(o, 1)
 		o = msgp.AppendUint(o, KeyError)
-		o = msgp.AppendString(o, str)
+		o = msgp.AppendString(o, err.Error())
 	} else {
-		pp = packIproto(OkCode, requestID)
-
-		o := pp.body
 		o = msgp.AppendMapHeader(o, 1)
 		o = msgp.AppendUint(o, KeyData)
 		if r.Data != nil {
-			o, err = msgp.AppendIntf(o, r.Data)
-			if err != nil {
-				pp.Release()
+			if o, err = msgp.AppendIntf(o, r.Data); err != nil {
 				return nil, err
 			}
 		} else {
@@ -45,7 +38,7 @@ func (r *Result) PackMsg(requestID uint32) (*binaryPacket, error) {
 		}
 	}
 
-	return pp, nil
+	return o, nil
 }
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler

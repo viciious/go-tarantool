@@ -13,7 +13,11 @@ type Call struct {
 
 var _ Query = (*Call)(nil)
 
-func (q Call) PackMsg(data *packData, b []byte) (o []byte, code uint32, err error) {
+func (q Call) GetCommandID() uint32 {
+	return CallCommand
+}
+
+func (q Call) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 2)
 
@@ -26,11 +30,11 @@ func (q Call) PackMsg(data *packData, b []byte) (o []byte, code uint32, err erro
 	} else {
 		o = msgp.AppendUint(o, KeyTuple)
 		if o, err = msgp.AppendIntf(o, q.Tuple); err != nil {
-			return o, ErrorFlag, err
+			return o, err
 		}
 	}
 
-	return o, CallRequest, nil
+	return o, nil
 }
 
 // UnmarshalMsg implements msgp.Unmarshaller
