@@ -1,6 +1,6 @@
 package tarantool
 
-var packetPool *binaryPacketPool
+var packetPool *BinaryPacketPool
 
 func init() {
 	packetPool = newPackedPacketPool()
@@ -8,7 +8,7 @@ func init() {
 
 type request struct {
 	query     Query
-	replyChan chan *binaryPacket
+	replyChan chan *BinaryPacket
 }
 
 // ReplicaSet is used to store params of the Replica Set.

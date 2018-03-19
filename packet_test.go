@@ -10,7 +10,7 @@ func TestDecodePacket(t *testing.T) {
 
 	body := []byte("\x83\x00\xce\x00\x00\x00\x00\x01\xcf\x00\x00\x00\x00\x00\x00\x00\x03\x05\xce\x00\x00\x006\x810\xdd\x00\x00\x00\x03\x92\x01\xacFirst record\x92\x02\xa5Music\x93\x03\xa6Length]")
 
-	pp := &binaryPacket{body: body}
+	pp := &BinaryPacket{body: body}
 	res := &pp.packet
 
 	err := res.UnmarshalBinary(pp.body)
@@ -23,7 +23,7 @@ func TestDecodePacket(t *testing.T) {
 func BenchmarkDecodePacket(b *testing.B) {
 	b.ReportAllocs()
 	body := []byte("\x83\x00\xce\x00\x00\x00\x00\x01\xcf\x00\x00\x00\x00\x00\x00\x00\x03\x05\xce\x00\x00\x006\x810\xdd\x00\x00\x00\x03\x92\x01\xacFirst record\x92\x02\xa5Music\x93\x03\xa6Length]")
-	pp := &binaryPacket{body: body}
+	pp := &BinaryPacket{body: body}
 	res := &pp.packet
 
 	for i := 0; i < b.N; i++ {
@@ -37,7 +37,7 @@ func BenchmarkDecodePacket(b *testing.B) {
 func BenchmarkDecodeHeader(b *testing.B) {
 	b.ReportAllocs()
 	body := []byte("\x83\x00\xce\x00\x00\x00\x00\x01\xcf\x00\x00\x00\x00\x00\x00\x00\x03\x05\xce\x00\x00\x006\x810\xdd\x00\x00\x00\x03\x92\x01\xacFirst record\x92\x02\xa5Music\x93\x03\xa6Length]")
-	pp := &binaryPacket{body: body}
+	pp := &BinaryPacket{body: body}
 	pack := &pp.packet
 
 	for i := 0; i < b.N; i++ {

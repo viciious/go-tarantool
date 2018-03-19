@@ -27,7 +27,7 @@ type IprotoServer struct {
 	cancel     context.CancelFunc
 	handler    QueryHandler
 	onShutdown OnShutdownCallback
-	output     chan *binaryPacket
+	output     chan *BinaryPacket
 	closeOnce  sync.Once
 	firstError error
 }
@@ -48,7 +48,7 @@ func (s *IprotoServer) Accept(conn net.Conn) {
 	s.reader = bufio.NewReader(conn)
 	s.writer = bufio.NewWriter(conn)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
-	s.output = make(chan *binaryPacket, 1024)
+	s.output = make(chan *BinaryPacket, 1024)
 
 	err := s.greet()
 	if err != nil {
@@ -142,7 +142,7 @@ func (s *IprotoServer) loop() {
 
 func (s *IprotoServer) read() {
 	var err error
-	var pp *binaryPacket
+	var pp *BinaryPacket
 
 	r := s.reader
 
@@ -159,7 +159,7 @@ READER_LOOP:
 				break READER_LOOP
 			}
 
-			go func(pp *binaryPacket) {
+			go func(pp *BinaryPacket) {
 				packet := &pp.packet
 				err := packet.UnmarshalBinary(pp.body)
 
@@ -184,7 +184,7 @@ READER_LOOP:
 					}
 
 					// reuse the same binary packet object for result marshalling
-					pp.packQuery(res, nil)
+					pp.packMsg(res, nil)
 
 					select {
 					case s.output <- pp:
@@ -218,7 +218,7 @@ func (s *IprotoServer) write() {
 	var err error
 
 	w := s.writer
-	wp := func(w io.Writer, packet *binaryPacket) error {
+	wp := func(w io.Writer, packet *BinaryPacket) error {
 		_, err = packet.WriteTo(w)
 		defer packet.Release()
 		return err
