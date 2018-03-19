@@ -4,9 +4,8 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
-	"io"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 type Auth struct {
@@ -56,63 +55,70 @@ func xor(left, right []byte, size int) []byte {
 	return result
 }
 
-func (auth *Auth) Pack(data *packData, w io.Writer) (uint32, error) {
-	scr, err := scramble(auth.GreetingAuth, auth.Password)
-	if err != nil {
-		return ErrorFlag, fmt.Errorf("auth: scrambling failure: %s", err.Error())
-	}
-
-	encoder := msgpack.NewEncoder(w)
-
-	encoder.EncodeMapLen(2) // User, Password
-	encoder.EncodeUint(KeyUserName)
-	encoder.EncodeString(auth.User)
-
-	encoder.EncodeUint(KeyTuple)
-	encoder.EncodeArrayLen(2)
-	encoder.EncodeString(authHash)
-	encoder.EncodeBytes(scr)
-
-	return AuthRequest, nil
+func (auth Auth) GetCommandID() int {
+	return AuthCommand
 }
 
-func (auth *Auth) Unpack(r io.Reader) (err error) {
-	var i, l int
-	var k uint64
+func (auth Auth) PackMsg(data *packData, b []byte) (o []byte, err error) {
+	scr, err := scramble(auth.GreetingAuth, auth.Password)
+	if err != nil {
+		return o, fmt.Errorf("auth: scrambling failure: %s", err.Error())
+	}
 
-	decoder := msgpack.NewDecoder(r)
-	decoder.UseDecodeInterfaceLoose(true)
+	o = b
+	o = msgp.AppendMapHeader(o, 2)
+	o = msgp.AppendUint(o, KeyUserName)
+	o = msgp.AppendString(o, auth.User)
 
-	if i, err = decoder.DecodeMapLen(); err != nil {
+	o = msgp.AppendUint(o, KeyTuple)
+	o = msgp.AppendArrayHeader(o, 2)
+	o = msgp.AppendString(o, authHash)
+	o = msgp.AppendBytes(o, scr)
+
+	return o, nil
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (auth *Auth) UnmarshalMsg(data []byte) (buf []byte, err error) {
+	var i, l uint32
+	var k int
+
+	buf = data
+	if i, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
 
 	for ; i > 0; i-- {
-		if k, err = decoder.DecodeUint64(); err != nil {
+		if k, buf, err = msgp.ReadIntBytes(buf); err != nil {
 			return
 		}
 
 		switch k {
 		case KeyUserName:
-			if auth.User, err = decoder.DecodeString(); err != nil {
+			if auth.User, buf, err = msgp.ReadStringBytes(buf); err != nil {
 				return
 			}
 		case KeyTuple:
-			if l, err = decoder.DecodeArrayLen(); err != nil {
+			if l, buf, err = msgp.ReadArrayHeaderBytes(buf); err != nil {
 				return
 			}
 			if l == 2 {
-				if _, err = decoder.DecodeString(); err != nil {
+				if buf, err = msgp.Skip(buf); err != nil {
 					return
 				}
-				if auth.GreetingAuth, err = decoder.DecodeBytes(); err != nil {
+				if auth.GreetingAuth, buf, err = msgp.ReadBytesBytes(buf, nil); err != nil {
 					return
 				}
 			}
 		default:
-			return fmt.Errorf("Auth.Unpack: Expected KeyUserName or KeyTuple")
+			return buf, fmt.Errorf("Auth.Unpack: Expected KeyUserName or KeyTuple")
 		}
 	}
+	return
+}
 
-	return nil
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (auth *Auth) UnmarshalBinary(data []byte) (err error) {
+	_, err = auth.UnmarshalMsg(data)
+	return err
 }

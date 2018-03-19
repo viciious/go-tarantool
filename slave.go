@@ -194,11 +194,12 @@ func (s *Slave) LastSnapVClock() (VectorClock, error) {
 	}
 	defer pp.Release()
 
-	p, err := decodePacket(pp)
+	p := &pp.packet
+	err = p.UnmarshalBinary(pp.body)
 	if err != nil {
 		return nil, err
 	}
-	if p.code != OKRequest {
+	if p.Cmd != OKCommand {
 		s.p = p
 		if p.Result == nil {
 			return nil, ErrBadResult
@@ -257,11 +258,12 @@ func (s *Slave) subscribe(lsns ...int64) error {
 	}
 	defer pp.Release()
 
-	p, err := decodePacket(pp)
+	p := &pp.packet
+	err = p.UnmarshalBinary(pp.body)
 	if err != nil {
 		return err
 	}
-	if p.code != OKRequest {
+	if p.Cmd != OKCommand {
 		s.p = p
 		if p.Result == nil {
 			return ErrBadResult
@@ -324,7 +326,8 @@ func (s *Slave) nextXlog() (p *Packet, err error) {
 	}
 	defer pp.Release()
 
-	p, err = decodePacket(pp)
+	p = &Packet{}
+	err = p.UnmarshalBinary(pp.body)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +349,8 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 	}
 	defer pp.Release()
 
-	p, err = decodePacket(pp)
+	p = &Packet{}
+	err = p.UnmarshalBinary(pp.body)
 	if err != nil {
 		return nil, err
 	}
@@ -356,8 +360,8 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 	// this response error type means that UUID had been joined Replica Set already
 	joined := ErrorFlag | ErrTupleFound
 
-	switch p.code {
-	case InsertRequest:
+	switch p.Cmd {
+	case InsertCommand:
 		q := p.Request.(*Insert)
 		switch q.Space {
 		case SpaceSchema:
@@ -381,7 +385,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 			// uuid
 			s.ReplicaSet.SetInstance(instanceID, q.Tuple[1].(string))
 		}
-	case OKRequest:
+	case OKCommand:
 		v := new(VClock)
 		err = v.UnmarshalBinary(pp.body)
 		if err != nil {
@@ -426,7 +430,7 @@ func (s *Slave) disconnect() (err error) {
 }
 
 // send packed packet to the connection buffer, flush buffer.
-func (s *Slave) send(pp *packedPacket) (err error) {
+func (s *Slave) send(pp *BinaryPacket) (err error) {
 	if _, err = pp.WriteTo(s.cw); err != nil {
 		return
 	}
@@ -434,18 +438,18 @@ func (s *Slave) send(pp *packedPacket) (err error) {
 }
 
 // receive new response packet.
-func (s *Slave) receive() (*packedPacket, error) {
-	return readPacked(s.cr)
+func (s *Slave) receive() (*BinaryPacket, error) {
+	pp := packetPool.Get()
+	_, err := pp.ReadFrom(s.cr)
+	return pp, err
 }
 
 // newPacket compose packet from body.
-func (s *Slave) newPacket(q Query) (pp *packedPacket, err error) {
-	pp = packetPool.Get()
-	pp.code, err = q.Pack(s.c.packData, &pp.buffer)
-	if err != nil {
+func (s *Slave) newPacket(q Query) (pp *BinaryPacket, err error) {
+	pp = packetPool.GetWithID(s.c.nextID())
+	if err = pp.packMsg(q, s.c.packData); err != nil {
 		pp.Release()
 		return nil, err
 	}
-	pp.requestID = s.c.nextID()
 	return
 }

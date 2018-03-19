@@ -2,9 +2,8 @@ package tarantool
 
 import (
 	"errors"
-	"io"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 type Call struct {
@@ -14,65 +13,65 @@ type Call struct {
 
 var _ Query = (*Call)(nil)
 
-func (q *Call) Pack(data *packData, w io.Writer) (uint32, error) {
-	var err error
-
-	encoder := msgpack.NewEncoder(w)
-
-	encoder.EncodeMapLen(2) // Name, Tuple
-
-	// Name
-	encoder.EncodeUint(KeyFunctionName)
-	encoder.EncodeString(q.Name)
-
-	if q.Tuple != nil {
-		encoder.EncodeUint(KeyTuple)
-		encoder.EncodeArrayLen(len(q.Tuple))
-		for _, key := range q.Tuple {
-			if err = encoder.Encode(key); err != nil {
-				return ErrorFlag, err
-			}
-		}
-	} else {
-		encoder.EncodeUint(KeyTuple)
-		encoder.EncodeArrayLen(0)
-	}
-
-	return CallRequest, nil
+func (q Call) GetCommandID() int {
+	return CallCommand
 }
 
-func (q *Call) Unpack(r io.Reader) (err error) {
-	var i int
+func (q Call) PackMsg(data *packData, b []byte) (o []byte, err error) {
+	o = b
+	o = msgp.AppendMapHeader(o, 2)
+
+	o = msgp.AppendUint(o, KeyFunctionName)
+	o = msgp.AppendString(o, q.Name)
+
+	if q.Tuple == nil {
+		o = msgp.AppendUint(o, KeyTuple)
+		o = msgp.AppendArrayHeader(o, 0)
+	} else {
+		o = msgp.AppendUint(o, KeyTuple)
+		if o, err = msgp.AppendIntf(o, q.Tuple); err != nil {
+			return o, err
+		}
+	}
+
+	return o, nil
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (q *Call) UnmarshalMsg(data []byte) (buf []byte, err error) {
+	var i uint32
 	var k int
+	var t interface{}
 
 	q.Name = ""
 	q.Tuple = nil
 
-	decoder := msgpack.NewDecoder(r)
-	decoder.UseDecodeInterfaceLoose(true)
-
-	if i, err = decoder.DecodeMapLen(); err != nil {
+	buf = data
+	if i, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
-
 	if i != 2 {
-		return errors.New("Call.Unpack: expected map of length 2")
+		return buf, errors.New("Call.Unpack: expected map of length 2")
 	}
 
 	for ; i > 0; i-- {
-		if k, err = decoder.DecodeInt(); err != nil {
+		if k, buf, err = msgp.ReadIntBytes(buf); err != nil {
 			return
 		}
 
 		switch k {
 		case KeyFunctionName:
-			if q.Name, err = decoder.DecodeString(); err != nil {
+			if q.Name, buf, err = msgp.ReadStringBytes(buf); err != nil {
 				return
 			}
 		case KeyTuple:
-			q.Tuple, err = decoder.DecodeSlice()
+			t, buf, err = msgp.ReadIntfBytes(buf)
 			if err != nil {
-				return err
+				return buf, err
+			}
+
+			if q.Tuple = t.([]interface{}); q.Tuple == nil {
+				return buf, errors.New("Interface type is not []interface{}")
 			}
 			if len(q.Tuple) == 0 {
 				q.Tuple = nil
@@ -81,8 +80,14 @@ func (q *Call) Unpack(r io.Reader) (err error) {
 	}
 
 	if q.Name == "" {
-		return errors.New("Call.Unpack: no space specified")
+		return buf, errors.New("Call.Unpack: no space specified")
 	}
 
-	return nil
+	return
+}
+
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (q *Call) UnmarshalBinary(data []byte) (err error) {
+	_, err = q.UnmarshalMsg(data)
+	return err
 }

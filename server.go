@@ -27,7 +27,7 @@ type IprotoServer struct {
 	cancel     context.CancelFunc
 	handler    QueryHandler
 	onShutdown OnShutdownCallback
-	output     chan *packedPacket
+	output     chan *BinaryPacket
 	closeOnce  sync.Once
 	firstError error
 }
@@ -48,7 +48,7 @@ func (s *IprotoServer) Accept(conn net.Conn) {
 	s.reader = bufio.NewReader(conn)
 	s.writer = bufio.NewWriter(conn)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
-	s.output = make(chan *packedPacket, 1024)
+	s.output = make(chan *BinaryPacket, 1024)
 
 	err := s.greet()
 	if err != nil {
@@ -142,7 +142,7 @@ func (s *IprotoServer) loop() {
 
 func (s *IprotoServer) read() {
 	var err error
-	var pp *packedPacket
+	var pp *BinaryPacket
 
 	r := s.reader
 
@@ -153,34 +153,46 @@ READER_LOOP:
 			break READER_LOOP
 		default:
 			// read raw bytes
-			pp, err = readPacked(r)
+			pp = packetPool.Get()
+			_, err = pp.ReadFrom(r)
 			if err != nil {
 				break READER_LOOP
 			}
 
-			go func(pp *packedPacket) {
-				packet, err := decodePacket(pp)
+			go func(pp *BinaryPacket) {
+				packet := &pp.packet
+				err := packet.UnmarshalBinary(pp.body)
+
 				if err != nil {
-					s.setError(err)
+					s.setError(fmt.Errorf("Error decoding packet type %d: %s", packet.Cmd, err))
 					s.Shutdown()
 					return
 				}
 
-				code := byte(packet.code)
-				if code == PingRequest {
+				code := byte(packet.Cmd)
+				if code == PingCommand {
 					select {
-					case s.output <- packIprotoOk(packet.requestID):
+					case s.output <- packetPool.GetWithID(packet.requestID):
 						break
 					case <-s.ctx.Done():
 						break
 					}
 				} else {
 					res := s.handler(s.ctx, packet.Request)
+					if res.ErrorCode != OKCommand && res.Error == nil {
+						res.Error = ErrUnknownError
+					}
 
-					outBody, _ := res.pack(packet.requestID)
+					// reuse the same binary packet object for result marshalling
+					if err = pp.packMsg(res, nil); err != nil {
+						s.setError(err)
+						s.Shutdown()
+						return
+					}
+
 					select {
-					case s.output <- outBody:
-						break
+					case s.output <- pp:
+						return
 					case <-s.ctx.Done():
 						break
 					}
@@ -210,7 +222,8 @@ func (s *IprotoServer) write() {
 	var err error
 
 	w := s.writer
-	wp := func(w io.Writer, packet *packedPacket) error {
+	wp := func(w io.Writer, packet *BinaryPacket) error {
+		fmt.Println(packet.Bytes())
 		_, err = packet.WriteTo(w)
 		defer packet.Release()
 		return err

@@ -34,9 +34,9 @@ type Greeting struct {
 }
 
 type Connection struct {
-	requestID uint32
+	requestID uint64
 	requests  *requestMap
-	writeChan chan *packedPacket // packed messages with header
+	writeChan chan *BinaryPacket // packed messages with header
 	closeOnce sync.Once
 	exit      chan bool
 	closed    chan bool
@@ -97,7 +97,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 	conn = &Connection{
 		remoteAddr:     addr,
 		requests:       newRequestMap(),
-		writeChan:      make(chan *packedPacket, 256),
+		writeChan:      make(chan *BinaryPacket, 256),
 		exit:           make(chan bool),
 		closed:         make(chan bool),
 		firstErrorLock: &sync.Mutex{},
@@ -129,16 +129,15 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 
 	// try to authenticate if user have been provided
 	if len(opts.User) > 0 {
-		var authResponse *Packet
-
 		requestID := conn.nextID()
 
-		pp := packIproto(0, requestID)
-		pp.code, err = (&Auth{
+		pp := packetPool.GetWithID(requestID)
+
+		err = pp.packMsg(&Auth{
 			User:         opts.User,
 			Password:     opts.Password,
 			GreetingAuth: conn.Greeting.Auth,
-		}).Pack(conn.packData, &pp.buffer)
+		}, conn.packData)
 		if err != nil {
 			pp.Release()
 			return
@@ -150,17 +149,14 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 			return
 		}
 
-		pp, err = readPacked(conn.tcpConn)
-		if err != nil {
-			return
-		}
+		pp = packetPool.Get()
 		defer pp.Release()
 
-		authResponse, err = decodePacket(pp)
-		if err != nil {
+		if err = pp.readPacket(conn.tcpConn); err != nil {
 			return
 		}
 
+		authResponse := &pp.packet
 		if authResponse.requestID != requestID {
 			err = ErrSyncFailed
 			return
@@ -237,9 +233,8 @@ func (conn *Connection) pullSchema() (err error) {
 
 		requestID := conn.nextID()
 
-		pp := packIproto(0, requestID)
-		pp.code, err = q.Pack(conn.packData, &pp.buffer)
-		if err != nil {
+		pp := packetPool.GetWithID(requestID)
+		if err = pp.packMsg(q, conn.packData); err != nil {
 			pp.Release()
 			return nil, err
 		}
@@ -250,17 +245,14 @@ func (conn *Connection) pullSchema() (err error) {
 			return nil, err
 		}
 
-		pp, err = readPacked(conn.tcpConn)
-		if err != nil {
-			return nil, err
-		}
+		pp = packetPool.Get()
 		defer pp.Release()
 
-		response, err := decodePacket(pp)
-		if err != nil {
+		if err = pp.readPacket(conn.tcpConn); err != nil {
 			return nil, err
 		}
 
+		response := &pp.packet
 		if response.requestID != requestID {
 			return nil, errors.New("Bad response requestID")
 		}
@@ -318,7 +310,8 @@ func (conn *Connection) pullSchema() (err error) {
 			if unique, ok := indexAttr["unique"]; ok && unique.(bool) {
 				pk := make([]int, len(indexFields))
 				for i := range indexFields {
-					f, _ := conn.packData.fieldNo(indexFields[i].([]interface{}))
+					descr := indexFields[i].([]interface{})
+					f, _ := conn.packData.fieldNo(descr[0])
 					pk[i] = int(f)
 				}
 				conn.packData.primaryKeyMap[spaceID] = pk
@@ -329,8 +322,8 @@ func (conn *Connection) pullSchema() (err error) {
 	return
 }
 
-func (conn *Connection) nextID() uint32 {
-	return atomic.AddUint32(&conn.requestID, 1)
+func (conn *Connection) nextID() uint64 {
+	return atomic.AddUint64(&conn.requestID, 1)
 }
 
 func (conn *Connection) stop() {
@@ -343,23 +336,13 @@ func (conn *Connection) stop() {
 }
 
 func (conn *Connection) GetPrimaryKeyFields(space interface{}) ([]int, bool) {
+	var spaceID uint64
+	var err error
+
 	if conn.packData == nil {
 		return nil, false
 	}
-
-	var spaceID uint64
-	switch space := space.(type) {
-	case int:
-		spaceID = uint64(space)
-	case uint:
-		spaceID = uint64(space)
-	case uint32:
-		spaceID = uint64(space)
-	case uint64:
-		spaceID = space
-	case string:
-		spaceID = conn.packData.spaceMap[space]
-	default:
+	if spaceID, err = conn.packData.spaceNo(space); err != nil {
 		return nil, false
 	}
 
@@ -438,16 +421,13 @@ CLEANUP_LOOP:
 
 	// send error reply to all pending requests
 	conn.requests.CleanUp(func(req *request) {
-		req.replyChan <- &Result{
-			Error: ConnectionClosedError(conn),
-		}
 		close(req.replyChan)
 	})
 
 	close(conn.closed)
 }
 
-func writer(tcpConn io.Writer, writeChan chan *packedPacket, stopChan chan bool) (err error) {
+func writer(tcpConn io.Writer, writeChan chan *BinaryPacket, stopChan chan bool) (err error) {
 	w := bufio.NewWriterSize(tcpConn, DefaultWriterBufSize)
 
 WRITER_LOOP:
@@ -490,36 +470,32 @@ WRITER_LOOP:
 }
 
 func (conn *Connection) reader(tcpConn io.Reader) (err error) {
-	var packet *Packet
-	var pp *packedPacket
-	var req *request
+	var pp *BinaryPacket
+	var requestID uint64
 
 	r := bufio.NewReaderSize(tcpConn, DefaultReaderBufSize)
 
 READER_LOOP:
 	for {
-		// read raw bytes
-		pp, err = readPacked(r)
-		if err != nil {
+		pp := packetPool.Get()
+		if requestID, err = pp.readRawPacket(r); err != nil {
 			break READER_LOOP
 		}
 
-		packet, err = decodePacket(pp)
-		if err != nil {
-			break READER_LOOP
+		req := conn.requests.Pop(requestID)
+		if req == nil {
+			pp.Release()
+			pp = nil
+			continue
 		}
 
-		req = conn.requests.Pop(packet.requestID)
-		if req != nil {
-			res := &Result{}
-			if packet.Result != nil {
-				res = packet.Result
-			}
-			req.replyChan <- res
-			close(req.replyChan)
+		select {
+		case req.replyChan <- pp:
+			break
+		default:
+			pp.Release()
 		}
-
-		pp.Release()
+		close(req.replyChan)
 		pp = nil
 	}
 

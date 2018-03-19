@@ -1,9 +1,7 @@
 package tarantool
 
 import (
-	"io"
-
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 // Join is the JOIN command
@@ -13,17 +11,25 @@ type Join struct {
 
 var _ Query = (*Join)(nil)
 
-// Pack implements a part of the Query interface
-func (q *Join) Pack(data *packData, w io.Writer) (uint32, error) {
-	enc := msgpack.NewEncoder(w)
-
-	enc.EncodeMapLen(1)
-	enc.EncodeUint(KeyInstanceUUID)
-	enc.EncodeString(q.UUID)
-	return JoinCommand, nil
+func (q Join) GetCommandID() int {
+	return JoinCommand
 }
 
-// Unpack implements a part of the Query interface
-func (q *Join) Unpack(r io.Reader) (err error) {
-	return ErrNotSupported
+func (q Join) PackMsg(data *packData, b []byte) (o []byte, err error) {
+	o = b
+	o = msgp.AppendMapHeader(o, 1)
+	o = msgp.AppendUint(o, KeyInstanceUUID)
+	o = msgp.AppendString(o, q.UUID)
+	return o, nil
+}
+
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (q *Join) UnmarshalBinary(data []byte) (err error) {
+	_, err = q.UnmarshalMsg(data)
+	return err
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (q *Join) UnmarshalMsg([]byte) (buf []byte, err error) {
+	return buf, ErrNotSupported
 }

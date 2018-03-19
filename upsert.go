@@ -1,9 +1,7 @@
 package tarantool
 
 import (
-	"io"
-
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 type Upsert struct {
@@ -14,47 +12,41 @@ type Upsert struct {
 
 var _ Query = (*Upsert)(nil)
 
-func (q *Upsert) Pack(data *packData, w io.Writer) (uint32, error) {
-	var err error
-
-	encoder := msgpack.NewEncoder(w)
-
-	encoder.EncodeMapLen(3) // Space, Tuple, Update operators
-
-	// Space
-	if err = data.writeSpace(q.Space, w, encoder); err != nil {
-		return ErrorFlag, err
-	}
-
-	// Tuple (to insert)
-	encoder.EncodeUint(KeyTuple)
-	encoder.EncodeArrayLen(len(q.Tuple))
-	for _, key := range q.Tuple {
-		if err = encoder.Encode(key); err != nil {
-			return ErrorFlag, err
-		}
-	}
-
-	// Update ops
-	encoder.EncodeUint(KeyDefTuple)
-	encoder.EncodeArrayLen(len(q.Set))
-	for _, op := range q.Set {
-		t := op.AsTuple()
-		encoder.EncodeArrayLen(len(t))
-		for _, value := range t {
-			if err = encoder.Encode(value); err != nil {
-				return ErrorFlag, err
-			}
-		}
-	}
-
-	return UpsertRequest, nil
+func (q Upsert) GetCommandID() int {
+	return UpsertCommand
 }
 
-func (q *Upsert) Unpack(r io.Reader) error {
-	decoder := msgpack.NewDecoder(r)
-	decoder.UseDecodeInterfaceLoose(true)
+func (q Upsert) PackMsg(data *packData, b []byte) (o []byte, err error) {
+	o = b
+	o = msgp.AppendMapHeader(o, 3)
 
-	err := decoder.Skip()
+	if o, err = data.packSpace(q.Space, o); err != nil {
+		return o, err
+	}
+
+	o = msgp.AppendUint(o, KeyTuple)
+	if o, err = msgp.AppendIntf(o, q.Tuple); err != nil {
+		return o, err
+	}
+
+	o = msgp.AppendUint(o, KeyDefTuple)
+	o = msgp.AppendArrayHeader(o, uint32(len(q.Set)))
+	for _, op := range q.Set {
+		if o, err = msgp.AppendIntf(o, op.AsTuple()); err != nil {
+			return o, err
+		}
+	}
+
+	return o, nil
+}
+
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (q *Upsert) UnmarshalBinary(data []byte) error {
+	_, err := q.UnmarshalMsg(data)
 	return err
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (q *Upsert) UnmarshalMsg(data []byte) ([]byte, error) {
+	return msgp.Skip(data)
 }

@@ -6,7 +6,7 @@ const requestMapShardNum = 16
 
 type requestMapShard struct {
 	sync.Mutex
-	data map[uint32]*request
+	data map[uint64]*request
 }
 type requestMap struct {
 	shard []*requestMapShard
@@ -17,7 +17,7 @@ func newRequestMap() *requestMap {
 
 	for i := 0; i < requestMapShardNum; i++ {
 		shard[i] = &requestMapShard{
-			data: make(map[uint32]*request),
+			data: make(map[uint64]*request),
 		}
 	}
 
@@ -28,7 +28,7 @@ func newRequestMap() *requestMap {
 }
 
 // Put returns old request associated with given key
-func (m *requestMap) Put(key uint32, value *request) *request {
+func (m *requestMap) Put(key uint64, value *request) *request {
 	shard := m.shard[key%requestMapShardNum]
 	shard.Lock()
 	oldValue := shard.data[key]
@@ -38,7 +38,7 @@ func (m *requestMap) Put(key uint32, value *request) *request {
 }
 
 // Pop returns request associated with given key and remove it from map
-func (m *requestMap) Pop(key uint32) *request {
+func (m *requestMap) Pop(key uint64) *request {
 	shard := m.shard[key%requestMapShardNum]
 	shard.Lock()
 	value, exists := shard.data[key]

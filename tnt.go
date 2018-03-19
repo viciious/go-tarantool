@@ -1,21 +1,14 @@
 package tarantool
 
-import "io"
-
-var packetPool *packedPacketPool
+var packetPool *BinaryPacketPool
 
 func init() {
 	packetPool = newPackedPacketPool()
 }
 
-type Query interface {
-	Pack(data *packData, w io.Writer) (uint32, error)
-	Unpack(r io.Reader) error
-}
-
 type request struct {
 	query     Query
-	replyChan chan *Result
+	replyChan chan *BinaryPacket
 }
 
 // ReplicaSet is used to store params of the Replica Set.

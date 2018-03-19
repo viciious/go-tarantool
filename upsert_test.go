@@ -116,11 +116,10 @@ func TestUpsert(t *testing.T) {
 
 func BenchmarkUpsertPack(b *testing.B) {
 	d := newPackData(42)
+	buf := make([]byte, 0)
 
 	for i := 0; i < b.N; i++ {
-		pp := packetPool.Get()
-
-		(&Upsert{
+		buf, _ = (&Upsert{
 			Space: 1,
 			Tuple: []interface{}{1},
 			Set: []Operator{
@@ -133,8 +132,6 @@ func BenchmarkUpsertPack(b *testing.B) {
 					Argument: "Hello World",
 				},
 			},
-		}).Pack(d, &pp.buffer)
-
-		pp.Release()
+		}).PackMsg(d, buf)
 	}
 }

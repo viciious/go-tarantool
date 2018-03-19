@@ -1,11 +1,9 @@
 package tarantool
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 // VClock response (in OK).
@@ -23,91 +21,93 @@ func (p *VClock) String() string {
 }
 
 // UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (p *VClock) UnmarshalBinary(data []byte) (err error) {
-	r := bytes.NewReader(data)
-	if err = p.decodeHeader(r); err != nil {
-		return err
-	}
-
-	if r.Len() == 0 {
-		return nil
-	}
-	return p.decodeBody(r)
+func (p *VClock) UnmarshalBinary(data []byte) error {
+	_, err := p.UnmarshalMsg(data)
+	return err
 }
 
-func (p *VClock) decodeHeader(r io.Reader) (err error) {
-	var l int
+// UnmarshalMsg implements msgp.Unmarshaller
+func (p *VClock) UnmarshalMsg(data []byte) (buf []byte, err error) {
+	buf = data
+	if buf, err = p.UnmarshalBinaryHeader(buf); err != nil {
+		return buf, err
+	}
+	if len(buf) == 0 {
+		return buf, nil
+	}
+	return p.UnmarshalBinaryBody(buf)
+}
 
-	d := msgpack.NewDecoder(r)
-	d.UseDecodeInterfaceLoose(true)
+func (p *VClock) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
+	var i uint32
 
-	if l, err = d.DecodeMapLen(); err != nil {
+	buf = data
+	if i, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
-	for ; l > 0; l-- {
-		var cd int
-		if cd, err = d.DecodeInt(); err != nil {
+
+	for ; i > 0; i-- {
+		var key int
+
+		if key, buf, err = msgp.ReadIntBytes(buf); err != nil {
 			return
 		}
-		switch cd {
+
+		switch key {
 		case KeySync:
-			if p.RequestID, err = d.DecodeUint64(); err != nil {
-				return
-			}
-		case KeySchemaID:
-			if _, err = d.DecodeUint32(); err != nil {
+			if p.RequestID, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
 				return
 			}
 		case KeyInstanceID:
-			if p.InstanceID, err = d.DecodeUint32(); err != nil {
+			if p.InstanceID, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 				return
 			}
 		default:
-			if err = d.Skip(); err != nil {
+			if buf, err = msgp.Skip(buf); err != nil {
 				return
 			}
 		}
 	}
-	return nil
+	return
 }
 
-func (p *VClock) decodeBody(r io.Reader) (err error) {
-	var count int
+func (p *VClock) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
+	var count uint32
 
-	d := msgpack.NewDecoder(r)
-	d.UseDecodeInterfaceLoose(true)
-
-	if count, err = d.DecodeMapLen(); err != nil {
+	buf = data
+	if count, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
 
 	for ; count > 0; count-- {
 		var key int
-		if key, err = d.DecodeInt(); err != nil {
+
+		if key, buf, err = msgp.ReadIntBytes(buf); err != nil {
 			return
 		}
 		switch key {
 		case KeyVClock:
-			var n int
-			if n, err = d.DecodeMapLen(); err != nil {
-				return err
+			var n uint32
+			var id uint32
+			var lsn int64
+
+			if n, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
+				return
 			}
 			p.VClock = NewVectorClock()
 			for ; n > 0; n-- {
-				id, err := d.DecodeUint32()
-				if err != nil {
-					return err
+				if id, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
+					return
 				}
-				lsn, err := d.DecodeInt64()
-				if err != nil {
-					return err
+				if lsn, buf, err = msgp.ReadInt64Bytes(buf); err != nil {
+					return
 				}
 				if !p.VClock.Follow(id, lsn) {
-					return ErrVectorClock
+					return buf, ErrVectorClock
 				}
 			}
 		default:
-			if err = d.Skip(); err != nil {
+			if buf, err = msgp.Skip(buf); err != nil {
 				return
 			}
 		}

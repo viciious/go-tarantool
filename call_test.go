@@ -1,7 +1,6 @@
 package tarantool
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,7 +50,7 @@ func TestCall(t *testing.T) {
 	defer box.Close()
 
 	do := func(connectOptions *Options, query *Call, expected [][]interface{}) {
-		var buf bytes.Buffer
+		var buf []byte
 
 		conn, err := box.Connect(connectOptions)
 		assert.NoError(err)
@@ -59,11 +58,11 @@ func TestCall(t *testing.T) {
 
 		defer conn.Close()
 
-		_, err = query.Pack(conn.packData, &buf)
+		buf, err = query.PackMsg(conn.packData, buf)
 
 		if assert.NoError(err) {
 			var query2 = &Call{}
-			err = query2.Unpack(&buf)
+			err = query2.UnmarshalBinary(buf)
 
 			if assert.NoError(err) {
 				assert.Equal(query.Name, query2.Name)
@@ -104,10 +103,9 @@ func TestCall(t *testing.T) {
 }
 
 func BenchmarkCallPack(b *testing.B) {
+	buf := make([]byte, 0)
 	d := newPackData(42)
 	for i := 0; i < b.N; i++ {
-		pp := packetPool.Get()
-		(&Call{Name: "sel_all"}).Pack(d, &pp.buffer)
-		pp.Release()
+		buf, _ = (&Call{Name: "sel_all"}).PackMsg(d, buf)
 	}
 }

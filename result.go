@@ -1,11 +1,9 @@
 package tarantool
 
 import (
-	"encoding/binary"
 	"fmt"
-	"io"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/tinylib/msgp/msgp"
 )
 
 type Result struct {
@@ -14,86 +12,98 @@ type Result struct {
 	Data      [][]interface{}
 }
 
-func (r *Result) pack(requestID uint32) (*packedPacket, error) {
-	var err error
-	var pp *packedPacket
-
-	if r.ErrorCode != OkCode || r.Error != nil {
-		if err = r.Error; err == nil {
-			err = ErrUnknownError
-		}
-		var str = err.Error()
-
-		pp = packIprotoError(r.ErrorCode, requestID)
-		encoder := msgpack.NewEncoder(&pp.buffer)
-		encoder.EncodeMapLen(1)
-		encoder.EncodeUint(KeyError)
-		encoder.EncodeString(str)
-	} else {
-		pp = packIproto(OkCode, requestID)
-		encoder := msgpack.NewEncoder(&pp.buffer)
-		encoder.EncodeMapLen(1)
-		encoder.EncodeUint(KeyData)
-		encoder.EncodeArrayLen(65536) // force encoding as uin32, to be replaced later
-
-		if r.Data != nil {
-			for i := 0; i < len(r.Data); i++ {
-				if err = encoder.Encode(r.Data[i]); err != nil {
-					pp.Release()
-					return nil, err
-				}
-			}
-		}
-
-		b := pp.buffer.Bytes()
-		if r.Data != nil {
-			binary.BigEndian.PutUint32(b[3:], uint32(len(r.Data)))
-		} else {
-			binary.BigEndian.PutUint32(b[3:], 0)
-		}
+func (r *Result) GetCommandID() int {
+	if r.Error != nil {
+		return r.ErrorCode | ErrorFlag
 	}
-
-	return pp, nil
+	return r.ErrorCode
 }
 
-func (r *Result) unpack(rr io.Reader) (err error) {
-	var l int
+func (r *Result) PackMsg(data *packData, b []byte) (o []byte, err error) {
+	o = b
 
-	d := msgpack.NewDecoder(rr)
-	d.UseDecodeInterfaceLoose(true)
+	if r.Error != nil {
+		o = msgp.AppendMapHeader(o, 1)
+		o = msgp.AppendUint(o, KeyError)
+		o = msgp.AppendString(o, r.Error.Error())
+	} else {
+		o = msgp.AppendMapHeader(o, 1)
+		o = msgp.AppendUint(o, KeyData)
+		if r.Data != nil {
+			if o, err = msgp.AppendIntf(o, r.Data); err != nil {
+				return nil, err
+			}
+		} else {
+			o = msgp.AppendArrayHeader(o, 0)
+		}
+	}
 
-	if l, err = d.DecodeMapLen(); err != nil {
+	return o, nil
+}
+
+// UnmarshalBinary implements encoding.BinaryUnmarshaler
+func (r *Result) UnmarshalBinary(data []byte) (err error) {
+	_, err = r.UnmarshalMsg(data)
+	return err
+}
+
+// UnmarshalMsg implements msgp.Unmarshaller
+func (r *Result) UnmarshalMsg(data []byte) (buf []byte, err error) {
+	var l uint32
+	var dl, tl uint32
+	var errorMessage string
+	var val interface{}
+
+	buf = data
+	if l, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
+
 	for ; l > 0; l-- {
 		var cd int
-		if cd, err = d.DecodeInt(); err != nil {
+
+		if cd, buf, err = msgp.ReadIntBytes(buf); err != nil {
 			return
 		}
+
 		switch cd {
 		case KeyData:
-			value, err := d.DecodeInterfaceLoose()
-			if err != nil {
-				return err
+			var i, j uint32
+
+			if dl, buf, err = msgp.ReadArrayHeaderBytes(buf); err != nil {
+				return
 			}
-			v := value.([]interface{})
-			r.Data = make([][]interface{}, len(v))
-			for i := 0; i < len(v); i++ {
-				switch vi := v[i].(type) {
-				case []interface{}:
-					r.Data[i] = vi
-				default:
-					r.Data[i] = []interface{}{vi}
+
+			r.Data = make([][]interface{}, dl)
+			for i = 0; i < dl; i++ {
+				obuf := buf
+				if tl, buf, err = msgp.ReadArrayHeaderBytes(buf); err != nil {
+					buf = obuf
+					if _, ok := err.(msgp.TypeError); ok {
+						if val, buf, err = msgp.ReadIntfBytes(buf); err != nil {
+							return
+						}
+						r.Data[i] = []interface{}{val}
+						continue
+					}
+					return
+				}
+
+				r.Data[i] = make([]interface{}, tl)
+				for j = 0; j < tl; j++ {
+					if r.Data[i][j], buf, err = msgp.ReadIntfBytes(buf); err != nil {
+						return
+					}
 				}
 			}
 		case KeyError:
-			errorMessage, err := d.DecodeString()
+			errorMessage, buf, err = msgp.ReadStringBytes(buf)
 			if err != nil {
-				return err
+				return
 			}
 			r.Error = NewQueryError(r.ErrorCode, errorMessage)
 		default:
-			if err = d.Skip(); err != nil {
+			if buf, err = msgp.Skip(buf); err != nil {
 				return
 			}
 		}
