@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-func (conn *Connection) doExecute(ctx context.Context, r *request) (*binaryPacket, *Result) {
+func (conn *Connection) doExecute(ctx context.Context, r *request) (*BinaryPacket, *Result) {
 	var err error
 
 	requestID := conn.nextID()
@@ -12,7 +12,7 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) (*binaryPacke
 	pp := packetPool.GetWithID(requestID)
 	defer pp.Release()
 
-	if err = pp.packQuery(r.query, conn.packData); err != nil {
+	if err = pp.packMsg(r.query, conn.packData); err != nil {
 		return nil, &Result{
 			Error: &QueryError{
 				Code:  ErrInvalidMsgpack,
@@ -71,7 +71,7 @@ func (conn *Connection) Exec(ctx context.Context, q Query) *Result {
 
 	request := &request{
 		query:     q,
-		replyChan: make(chan *binaryPacket, 1),
+		replyChan: make(chan *BinaryPacket, 1),
 	}
 
 	if _, ok := ctx.Deadline(); !ok && conn.queryTimeout != 0 {
@@ -90,6 +90,9 @@ func (conn *Connection) Exec(ctx context.Context, q Query) *Result {
 		result = &Result{Error: err, ErrorCode: ErrInvalidMsgpack}
 	} else {
 		result = pp.packet.Result
+		if result == nil {
+			result = &Result{}
+		}
 	}
 	pp.Release()
 

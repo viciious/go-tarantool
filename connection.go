@@ -36,7 +36,7 @@ type Greeting struct {
 type Connection struct {
 	requestID uint64
 	requests  *requestMap
-	writeChan chan *binaryPacket // packed messages with header
+	writeChan chan *BinaryPacket // packed messages with header
 	closeOnce sync.Once
 	exit      chan bool
 	closed    chan bool
@@ -97,7 +97,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 	conn = &Connection{
 		remoteAddr:     addr,
 		requests:       newRequestMap(),
-		writeChan:      make(chan *binaryPacket, 256),
+		writeChan:      make(chan *BinaryPacket, 256),
 		exit:           make(chan bool),
 		closed:         make(chan bool),
 		firstErrorLock: &sync.Mutex{},
@@ -133,7 +133,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 
 		pp := packetPool.GetWithID(requestID)
 
-		err = pp.packQuery(&Auth{
+		err = pp.packMsg(&Auth{
 			User:         opts.User,
 			Password:     opts.Password,
 			GreetingAuth: conn.Greeting.Auth,
@@ -152,7 +152,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		pp = packetPool.Get()
 		defer pp.Release()
 
-		if err = pp.ReadPacket(conn.tcpConn); err != nil {
+		if err = pp.readPacket(conn.tcpConn); err != nil {
 			return
 		}
 
@@ -234,7 +234,7 @@ func (conn *Connection) pullSchema() (err error) {
 		requestID := conn.nextID()
 
 		pp := packetPool.GetWithID(requestID)
-		if err = pp.packQuery(q, conn.packData); err != nil {
+		if err = pp.packMsg(q, conn.packData); err != nil {
 			pp.Release()
 			return nil, err
 		}
@@ -248,7 +248,7 @@ func (conn *Connection) pullSchema() (err error) {
 		pp = packetPool.Get()
 		defer pp.Release()
 
-		if err = pp.ReadPacket(conn.tcpConn); err != nil {
+		if err = pp.readPacket(conn.tcpConn); err != nil {
 			return nil, err
 		}
 
@@ -436,7 +436,7 @@ CLEANUP_LOOP:
 	close(conn.closed)
 }
 
-func writer(tcpConn io.Writer, writeChan chan *binaryPacket, stopChan chan bool) (err error) {
+func writer(tcpConn io.Writer, writeChan chan *BinaryPacket, stopChan chan bool) (err error) {
 	w := bufio.NewWriterSize(tcpConn, DefaultWriterBufSize)
 
 WRITER_LOOP:
@@ -479,7 +479,7 @@ WRITER_LOOP:
 }
 
 func (conn *Connection) reader(tcpConn io.Reader) (err error) {
-	var pp *binaryPacket
+	var pp *BinaryPacket
 	var requestID uint64
 
 	r := bufio.NewReaderSize(tcpConn, DefaultReaderBufSize)
@@ -487,7 +487,7 @@ func (conn *Connection) reader(tcpConn io.Reader) (err error) {
 READER_LOOP:
 	for {
 		pp := packetPool.Get()
-		if requestID, err = pp.ReadRawPacket(r); err != nil {
+		if requestID, err = pp.readRawPacket(r); err != nil {
 			break READER_LOOP
 		}
 

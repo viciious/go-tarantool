@@ -430,7 +430,7 @@ func (s *Slave) disconnect() (err error) {
 }
 
 // send packed packet to the connection buffer, flush buffer.
-func (s *Slave) send(pp *binaryPacket) (err error) {
+func (s *Slave) send(pp *BinaryPacket) (err error) {
 	if _, err = pp.WriteTo(s.cw); err != nil {
 		return
 	}
@@ -438,16 +438,16 @@ func (s *Slave) send(pp *binaryPacket) (err error) {
 }
 
 // receive new response packet.
-func (s *Slave) receive() (*binaryPacket, error) {
+func (s *Slave) receive() (*BinaryPacket, error) {
 	pp := packetPool.Get()
 	_, err := pp.ReadFrom(s.cr)
 	return pp, err
 }
 
 // newPacket compose packet from body.
-func (s *Slave) newPacket(q Query) (pp *binaryPacket, err error) {
+func (s *Slave) newPacket(q Query) (pp *BinaryPacket, err error) {
 	pp = packetPool.GetWithID(s.c.nextID())
-	if err = pp.packQuery(q, s.c.packData); err != nil {
+	if err = pp.packMsg(q, s.c.packData); err != nil {
 		pp.Release()
 		return nil, err
 	}
