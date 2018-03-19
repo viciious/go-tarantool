@@ -7,12 +7,12 @@ import (
 )
 
 type Result struct {
-	ErrorCode uint32
+	ErrorCode int
 	Error     error
 	Data      [][]interface{}
 }
 
-func (r *Result) GetCommandID() uint32 {
+func (r *Result) GetCommandID() int {
 	if r.Error != nil {
 		return r.ErrorCode | ErrorFlag
 	}
@@ -25,7 +25,7 @@ func (r *Result) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	if r.Error != nil {
 		o = msgp.AppendMapHeader(o, 1)
 		o = msgp.AppendUint(o, KeyError)
-		o = msgp.AppendString(o, err.Error())
+		o = msgp.AppendString(o, r.Error.Error())
 	} else {
 		o = msgp.AppendMapHeader(o, 1)
 		o = msgp.AppendUint(o, KeyData)

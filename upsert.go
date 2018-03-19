@@ -12,7 +12,7 @@ type Upsert struct {
 
 var _ Query = (*Upsert)(nil)
 
-func (q Upsert) GetCommandID() uint32 {
+func (q Upsert) GetCommandID() int {
 	return UpsertCommand
 }
 

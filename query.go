@@ -1,13 +1,13 @@
 package tarantool
 
 type Query interface {
-	GetCommandID() uint32
+	GetCommandID() int
 	UnmarshalBinary(data []byte) error
 	UnmarshalMsg(data []byte) ([]byte, error)
 	PackMsg(data *packData, b []byte) ([]byte, error)
 }
 
-func NewQuery(cmd uint32) Query {
+func NewQuery(cmd int) Query {
 	switch cmd {
 	case SelectCommand:
 		return &Select{}

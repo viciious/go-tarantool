@@ -18,7 +18,7 @@ type Select struct {
 
 var _ Query = (*Select)(nil)
 
-func (q Select) GetCommandID() uint32 {
+func (q Select) GetCommandID() int {
 	return SelectCommand
 }
 

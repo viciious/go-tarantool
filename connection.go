@@ -310,7 +310,8 @@ func (conn *Connection) pullSchema() (err error) {
 			if unique, ok := indexAttr["unique"]; ok && unique.(bool) {
 				pk := make([]int, len(indexFields))
 				for i := range indexFields {
-					f, _ := conn.packData.fieldNo(indexFields[i].([]interface{}))
+					descr := indexFields[i].([]interface{})
+					f, _ := conn.packData.fieldNo(descr[0])
 					pk[i] = int(f)
 				}
 				conn.packData.primaryKeyMap[spaceID] = pk
@@ -335,23 +336,13 @@ func (conn *Connection) stop() {
 }
 
 func (conn *Connection) GetPrimaryKeyFields(space interface{}) ([]int, bool) {
+	var spaceID uint64
+	var err error
+
 	if conn.packData == nil {
 		return nil, false
 	}
-
-	var spaceID uint64
-	switch space := space.(type) {
-	case int:
-		spaceID = uint64(space)
-	case uint:
-		spaceID = uint64(space)
-	case uint32:
-		spaceID = uint64(space)
-	case uint64:
-		spaceID = space
-	case string:
-		spaceID = conn.packData.spaceMap[space]
-	default:
+	if spaceID, err = conn.packData.spaceNo(space); err != nil {
 		return nil, false
 	}
 

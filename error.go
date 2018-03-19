@@ -77,11 +77,11 @@ func (e *ContextError) Temporary() bool {
 // It has error Code.
 type QueryError struct {
 	error
-	Code uint32
+	Code int
 }
 
 // NewQueryError returns ContextError with message and Code.
-func NewQueryError(code uint32, message string) *QueryError {
+func NewQueryError(code int, message string) *QueryError {
 	return &QueryError{
 		Code:  code,
 		error: errors.New(message),

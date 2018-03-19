@@ -13,7 +13,7 @@ type Insert struct {
 
 var _ Query = (*Insert)(nil)
 
-func (q Insert) GetCommandID() uint32 {
+func (q Insert) GetCommandID() int {
 	return InsertCommand
 }
 
