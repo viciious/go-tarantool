@@ -9,14 +9,14 @@ import (
 	"github.com/tinylib/msgp/msgp"
 )
 
-type binaryPacket struct {
+type BinaryPacket struct {
 	body   []byte
-	pool   *binaryPacketPool
+	pool   *BinaryPacketPool
 	packet Packet
 }
 
 // WriteTo implements the io.WriterTo interface
-func (pp *binaryPacket) WriteTo(w io.Writer) (n int64, err error) {
+func (pp *BinaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 	h32 := [32]byte{0xce, 0, 0, 0, 0}
 
 	h := h32[5:5]
@@ -45,20 +45,20 @@ func (pp *binaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 	return
 }
 
-func (pp *binaryPacket) Reset() {
+func (pp *BinaryPacket) Reset() {
 	pp.packet.Cmd = OKCommand
 	pp.packet.requestID = 0
 	pp.body = pp.body[:0]
 }
 
-func (pp *binaryPacket) Release() {
+func (pp *BinaryPacket) Release() {
 	if pp.pool != nil {
 		pp.pool.Put(pp)
 	}
 }
 
 // ReadFrom implements the io.ReaderFrom interface
-func (pp *binaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
+func (pp *BinaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
 	var h [8]byte
 	var bodyLength int
 	var headerLength int
@@ -105,7 +105,11 @@ func (pp *binaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
 	return int64(rr) + int64(crr), err
 }
 
-func (pp *binaryPacket) ReadPacket(r io.Reader) (err error) {
+func (pp *BinaryPacket) Bytes() []byte {
+	return pp.body
+}
+
+func (pp *BinaryPacket) readPacket(r io.Reader) (err error) {
 	if _, err = pp.ReadFrom(r); err != nil {
 		return
 	}
@@ -113,7 +117,7 @@ func (pp *binaryPacket) ReadPacket(r io.Reader) (err error) {
 }
 
 // ReadRawPacket reads the whole packet body and only unpacks request ID for routing purposes
-func (pp *binaryPacket) ReadRawPacket(r io.Reader) (requestID uint64, err error) {
+func (pp *BinaryPacket) readRawPacket(r io.Reader) (requestID uint64, err error) {
 	var l uint32
 
 	requestID = 0
@@ -143,7 +147,7 @@ func (pp *binaryPacket) ReadRawPacket(r io.Reader) (requestID uint64, err error)
 	return
 }
 
-func (pp *binaryPacket) packQuery(q Query, packdata *packData) (err error) {
+func (pp *BinaryPacket) packMsg(q Query, packdata *packData) (err error) {
 	if pp.body, err = q.PackMsg(packdata, pp.body[:0]); err != nil {
 		pp.packet.Cmd = ErrorFlag
 		return err
