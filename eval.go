@@ -14,7 +14,7 @@ type Eval struct {
 
 var _ Query = (*Eval)(nil)
 
-func (q Eval) GetCommandID() uint32 {
+func (q Eval) GetCommandID() int {
 	return EvalCommand
 }
 

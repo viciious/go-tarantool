@@ -13,7 +13,7 @@ type Call struct {
 
 var _ Query = (*Call)(nil)
 
-func (q Call) GetCommandID() uint32 {
+func (q Call) GetCommandID() int {
 	return CallCommand
 }
 

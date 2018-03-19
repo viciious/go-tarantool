@@ -5,7 +5,7 @@ type Ping struct {
 
 var _ Query = (*Ping)(nil)
 
-func (q Ping) GetCommandID() uint32 {
+func (q Ping) GetCommandID() int {
 	return PingCommand
 }
 

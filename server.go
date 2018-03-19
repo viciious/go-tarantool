@@ -164,7 +164,7 @@ READER_LOOP:
 				err := packet.UnmarshalBinary(pp.body)
 
 				if err != nil {
-					s.setError(err)
+					s.setError(fmt.Errorf("Error decoding packet type %d: %s", packet.Cmd, err))
 					s.Shutdown()
 					return
 				}
@@ -184,7 +184,11 @@ READER_LOOP:
 					}
 
 					// reuse the same binary packet object for result marshalling
-					pp.packMsg(res, nil)
+					if err = pp.packMsg(res, nil); err != nil {
+						s.setError(err)
+						s.Shutdown()
+						return
+					}
 
 					select {
 					case s.output <- pp:
@@ -219,6 +223,7 @@ func (s *IprotoServer) write() {
 
 	w := s.writer
 	wp := func(w io.Writer, packet *BinaryPacket) error {
+		fmt.Println(packet.Bytes())
 		_, err = packet.WriteTo(w)
 		defer packet.Release()
 		return err

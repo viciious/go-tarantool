@@ -14,7 +14,7 @@ type Update struct {
 
 var _ Query = (*Update)(nil)
 
-func (q Update) GetCommandID() uint32 {
+func (q Update) GetCommandID() int {
 	return UpdateCommand
 }
 

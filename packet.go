@@ -8,7 +8,7 @@ import (
 )
 
 type Packet struct {
-	Cmd        uint32
+	Cmd        int
 	LSN        int64
 	requestID  uint64
 	InstanceID uint32
@@ -55,7 +55,7 @@ func (pack *Packet) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
 				return
 			}
 		case KeyCode:
-			if pack.Cmd, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
+			if pack.Cmd, buf, err = msgp.ReadIntBytes(buf); err != nil {
 				return
 			}
 		case KeySchemaID:
@@ -96,7 +96,7 @@ func (pack *Packet) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
 		return
 	}
 
-	unpackr := func(errorCode uint32, data []byte) (buf []byte, err error) {
+	unpackr := func(errorCode int, data []byte) (buf []byte, err error) {
 		buf = data
 		res := &Result{ErrorCode: errorCode}
 		if buf, err = res.UnmarshalMsg(buf); err != nil {

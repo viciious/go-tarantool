@@ -358,7 +358,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 	// we have to parse snapshot logs to find replica set instances, UUID
 
 	// this response error type means that UUID had been joined Replica Set already
-	joined := uint32(ErrorFlag | ErrTupleFound)
+	joined := ErrorFlag | ErrTupleFound
 
 	switch p.Cmd {
 	case InsertCommand:

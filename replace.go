@@ -13,7 +13,7 @@ type Replace struct {
 
 var _ Query = (*Replace)(nil)
 
-func (q Replace) GetCommandID() uint32 {
+func (q Replace) GetCommandID() int {
 	return ReplaceCommand
 }
 

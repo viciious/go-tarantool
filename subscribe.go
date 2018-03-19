@@ -13,7 +13,7 @@ type Subscribe struct {
 
 var _ Query = (*Subscribe)(nil)
 
-func (q Subscribe) GetCommandID() uint32 {
+func (q Subscribe) GetCommandID() int {
 	return SubscribeCommand
 }
 
