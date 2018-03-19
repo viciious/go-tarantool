@@ -15,7 +15,7 @@ type Delete struct {
 
 var _ Query = (*Delete)(nil)
 
-func (q Delete) GetCommandID() uint32 {
+func (q Delete) GetCommandID() int {
 	return DeleteCommand
 }
 

@@ -11,7 +11,7 @@ type Join struct {
 
 var _ Query = (*Join)(nil)
 
-func (q Join) GetCommandID() uint32 {
+func (q Join) GetCommandID() int {
 	return JoinCommand
 }
 

@@ -24,7 +24,7 @@ func (pp *BinaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 
 	h = msgp.AppendMapHeader(h, 2)
 	h = msgp.AppendUint(h, KeyCode)
-	h = msgp.AppendUint32(h, pp.packet.Cmd)
+	h = msgp.AppendInt(h, pp.packet.Cmd)
 	h = msgp.AppendUint(h, KeySync)
 	h = msgp.AppendUint64(h, pp.packet.requestID)
 

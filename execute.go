@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"context"
+	"fmt"
 )
 
 func (conn *Connection) doExecute(ctx context.Context, r *request) (*BinaryPacket, *Result) {
@@ -62,8 +63,6 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) (*BinaryPacke
 			ErrorCode: ErrNoConnection,
 		}
 	}
-
-	return nil, &Result{Error: err, ErrorCode: ErrUnknown}
 }
 
 func (conn *Connection) Exec(ctx context.Context, q Query) *Result {
@@ -87,7 +86,7 @@ func (conn *Connection) Exec(ctx context.Context, q Query) *Result {
 
 	var result *Result
 	if err := pp.packet.UnmarshalBinary(pp.body); err != nil {
-		result = &Result{Error: err, ErrorCode: ErrInvalidMsgpack}
+		result = &Result{Error: (fmt.Errorf("Error decoding packet type %d: %s", pp.packet.Cmd, err)), ErrorCode: ErrInvalidMsgpack}
 	} else {
 		result = pp.packet.Result
 		if result == nil {
