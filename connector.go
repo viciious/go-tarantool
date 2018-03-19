@@ -11,6 +11,7 @@ type Connector struct {
 	conn       *Connection
 }
 
+// New Connector instance.
 func New(remoteAddr string, option *Options) *Connector {
 	return &Connector{
 		RemoteAddr: remoteAddr,
@@ -18,33 +19,22 @@ func New(remoteAddr string, option *Options) *Connector {
 	}
 }
 
+// Connect returns existing connection or will establish another one.
 func (c *Connector) Connect() (*Connection, error) {
-	var err error
-	var conn *Connection
-
 	c.Lock()
-	isClosed := c.conn == nil
-	if c.conn != nil {
-		isClosed, _ = c.conn.IsClosed()
+	defer c.Unlock()
+	if c.conn != nil && !c.conn.IsClosed() {
+		return c.conn, nil
 	}
-	if isClosed {
-		c.conn, err = Connect(c.RemoteAddr, c.options)
-	}
-	conn = c.conn
-	c.Unlock()
-
-	return conn, err
+	return Connect(c.RemoteAddr, c.options)
 }
 
+// Close underlying connection.
 func (c *Connector) Close() {
 	c.Lock()
-	isClosed := c.conn == nil
-	if c.conn != nil {
-		isClosed, _ = c.conn.IsClosed()
-	}
-	if !isClosed {
+	defer c.Unlock()
+	if c.conn != nil && !c.conn.IsClosed() {
 		c.conn.Close()
 	}
 	c.conn = nil
-	c.Unlock()
 }

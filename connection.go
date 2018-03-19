@@ -376,12 +376,12 @@ func (conn *Connection) String() string {
 	return conn.remoteAddr
 }
 
-func (conn *Connection) IsClosed() (bool, error) {
+func (conn *Connection) IsClosed() bool {
 	select {
 	case <-conn.exit:
-		return true, conn.getError()
+		return true
 	default:
-		return false, conn.getError()
+		return false
 	}
 }
 
