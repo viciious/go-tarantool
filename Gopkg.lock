@@ -35,14 +35,14 @@
   version = "v1.2.1"
 
 [[projects]]
+  branch = "master"
   name = "github.com/tinylib/msgp"
   packages = ["msgp"]
-  revision = "b2b6a672cf1e5b90748f79b8b81fc8c5cf0571a1"
-  version = "1.0.2"
+  revision = "3b5c87ab5fb00c660bf85b888445d9a01db64db4"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c6c6594cbe8c6bf8161df15783026183fa00356933ba8ffbe87da433f944d2c2"
+  inputs-digest = "09037b5fab0f0bce40a687fb8f3414adf7d209e518c0f2f53eceb7d5451bc190"
   solver-name = "gps-cdcl"
   solver-version = 1
