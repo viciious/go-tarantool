@@ -169,7 +169,7 @@ READER_LOOP:
 					return
 				}
 
-				code := byte(packet.Cmd)
+				code := packet.Cmd
 				if code == PingCommand {
 					select {
 					case s.output <- packetPool.GetWithID(packet.requestID):
