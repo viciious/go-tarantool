@@ -635,7 +635,7 @@ func TestSlaveParseOptionsRSParams(t *testing.T) {
 	for tc, item := range tt {
 		s, err := NewSlave(uri, item.opts)
 		if item.isParseErr {
-			require.Error(err, "case %v", tc+1)
+			require.Error(err, fmt.Sprintf("case %v", tc+1))
 			// prepare handmade for second check
 			s = &Slave{UUID: item.opts.UUID}
 			s.ReplicaSet.UUID = item.opts.ReplicaSetUUID
