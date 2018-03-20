@@ -47,9 +47,9 @@ func (p *VClock) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
 	}
 
 	for ; i > 0; i-- {
-		var key int
+		var key uint
 
-		if key, buf, err = msgp.ReadIntBytes(buf); err != nil {
+		if key, buf, err = msgp.ReadUintBytes(buf); err != nil {
 			return
 		}
 
@@ -80,16 +80,16 @@ func (p *VClock) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
 	}
 
 	for ; count > 0; count-- {
-		var key int
+		var key uint
 
-		if key, buf, err = msgp.ReadIntBytes(buf); err != nil {
+		if key, buf, err = msgp.ReadUintBytes(buf); err != nil {
 			return
 		}
 		switch key {
 		case KeyVClock:
 			var n uint32
 			var id uint32
-			var lsn int64
+			var lsn uint64
 
 			if n, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 				return
@@ -99,7 +99,7 @@ func (p *VClock) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
 				if id, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 					return
 				}
-				if lsn, buf, err = msgp.ReadInt64Bytes(buf); err != nil {
+				if lsn, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
 					return
 				}
 				if !p.VClock.Follow(id, lsn) {

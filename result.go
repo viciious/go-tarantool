@@ -7,12 +7,12 @@ import (
 )
 
 type Result struct {
-	ErrorCode int
+	ErrorCode uint
 	Error     error
 	Data      [][]interface{}
 }
 
-func (r *Result) GetCommandID() int {
+func (r *Result) GetCommandID() uint {
 	if r.Error != nil {
 		return r.ErrorCode | ErrorFlag
 	}
@@ -60,9 +60,9 @@ func (r *Result) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	}
 
 	for ; l > 0; l-- {
-		var cd int
+		var cd uint
 
-		if cd, buf, err = msgp.ReadIntBytes(buf); err != nil {
+		if cd, buf, err = msgp.ReadUintBytes(buf); err != nil {
 			return
 		}
 

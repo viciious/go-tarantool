@@ -156,7 +156,7 @@ func (s *Slave) isEmptyChan(out ...chan *Packet) bool {
 // One lsn is enough for master-slave replica set.
 // Replica Set and self UUID should be set before call subscribe. Use options in New or Join for it.
 // Subscribe sends requests asynchronously to out channel specified or use synchronous PacketIterator otherwise.
-func (s *Slave) Subscribe(lsns ...int64) (it PacketIterator, err error) {
+func (s *Slave) Subscribe(lsns ...uint64) (it PacketIterator, err error) {
 	if len(lsns) == 0 || len(lsns) >= VClockMax {
 		return nil, ErrVectorClock
 	}
@@ -213,11 +213,11 @@ func (s *Slave) LastSnapVClock() (VectorClock, error) {
 	}
 	vc := NewVectorClock()
 	for i, lsnu64 := range res[0] {
-		lsn, ok := lsnu64.(int64)
-		if !ok {
+		lsn, rerr := numberToUint64(lsnu64)
+		if rerr != nil {
 			return nil, ErrBadResult
 		}
-		vc.Follow(uint32(i+1), int64(lsn))
+		vc.Follow(uint32(i+1), lsn)
 	}
 	return vc, nil
 }
@@ -238,7 +238,7 @@ func (s *Slave) join() (err error) {
 }
 
 // subscribe sends SUBSCRIBE request and waits for VCLOCK response.
-func (s *Slave) subscribe(lsns ...int64) error {
+func (s *Slave) subscribe(lsns ...uint64) error {
 	vc := NewVectorClock(lsns...)
 	pp, err := s.newPacket(&Subscribe{
 		UUID:           s.UUID,
@@ -358,7 +358,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 	// we have to parse snapshot logs to find replica set instances, UUID
 
 	// this response error type means that UUID had been joined Replica Set already
-	joined := ErrorFlag | ErrTupleFound
+	joined := uint(ErrorFlag | ErrTupleFound)
 
 	switch p.Cmd {
 	case InsertCommand:
@@ -372,7 +372,6 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 			if key == SchemaKeyClusterUUID {
 				s.ReplicaSet.UUID = q.Tuple[1].(string)
 			}
-
 		case SpaceCluster:
 			// fill in Replica Set from _cluster space; format:
 			// {0x1, "89b1203b-acda-4ff1-ae76-8069145344b8"}

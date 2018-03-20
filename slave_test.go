@@ -603,8 +603,8 @@ func TestSlaveAttachAsync(t *testing.T) {
 	for {
 		select {
 		case qi := <-out:
-			if qi.Space.(int) > SpaceSystemMax {
-				if num, ok := qi.Tuple[0].(int64); ok && num > 1 {
+			if qi.Space.(uint) > SpaceSystemMax {
+				if num, err := numberToUint64(qi.Tuple[0]); err == nil && num > 1 {
 					require.EqualValues(expected, qi.Tuple)
 					return
 				}
@@ -697,10 +697,10 @@ func TestSlaveLastSnapVClock(t *testing.T) {
 
 func TestVectorClock(t *testing.T) {
 	assert := assert.New(t)
-	expected := make([]int64, VClockMax)
-	expectedLSN := int64(0)
+	expected := make([]uint64, VClockMax)
+	expectedLSN := uint64(0)
 	for i := range expected {
-		lsn := int64(i * 10)
+		lsn := uint64(i * 10)
 		expected[i] = lsn
 		expectedLSN += lsn
 	}
@@ -708,20 +708,19 @@ func TestVectorClock(t *testing.T) {
 	vc := NewVectorClock()
 	// zebra filling is special test
 	for i := 0; i < VClockMax; i = i + 2 {
-		assert.True(vc.Follow(uint32(i), int64(10*i)), "id=%v", i)
+		assert.True(vc.Follow(uint32(i), uint64(10*i)), "id=%v", i)
 	}
 	for i := 1; i < VClockMax; i = i + 2 {
-		assert.True(vc.Follow(uint32(i), int64(10*i)), "id=%v", i)
+		assert.True(vc.Follow(uint32(i), uint64(10*i)), "id=%v", i)
 	}
 	// updating existing lsns
 	for i := VClockMax - 1; i >= 0; i-- {
-		assert.True(vc.Follow(uint32(i), int64(10*i)), "id=%v", i)
+		assert.True(vc.Follow(uint32(i), uint64(10*i)), "id=%v", i)
 	}
 	assert.EqualValues(expected, vc)
 
 	assert.False(vc.Follow(VClockMax, 0), "VClockMax")
 	assert.False(vc.Follow(VClockMax+1, 0), "VClockMax+1")
-	assert.False(vc.Follow(0, -1), "Negative LSN")
 
 	assert.EqualValues(expected, vc)
 

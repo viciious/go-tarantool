@@ -13,7 +13,7 @@ type Subscribe struct {
 
 var _ Query = (*Subscribe)(nil)
 
-func (q Subscribe) GetCommandID() int {
+func (q Subscribe) GetCommandID() uint {
 	return SubscribeCommand
 }
 
@@ -31,7 +31,7 @@ func (q Subscribe) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	o = msgp.AppendMapHeader(o, uint32(len(q.VClock)))
 	for id, lsn := range q.VClock {
 		o = msgp.AppendUint(o, uint(id))
-		o = msgp.AppendInt64(o, lsn)
+		o = msgp.AppendUint64(o, lsn)
 	}
 
 	return o, nil
