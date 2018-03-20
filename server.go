@@ -223,7 +223,6 @@ func (s *IprotoServer) write() {
 
 	w := s.writer
 	wp := func(w io.Writer, packet *BinaryPacket) error {
-		fmt.Println(packet.Bytes())
 		_, err = packet.WriteTo(w)
 		defer packet.Release()
 		return err
