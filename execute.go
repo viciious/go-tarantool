@@ -84,9 +84,19 @@ func (conn *Connection) Exec(ctx context.Context, q Query) *Result {
 		return rerr
 	}
 
+	if pp == nil {
+		return &Result{
+			Error:     ConnectionClosedError(conn),
+			ErrorCode: ErrNoConnection,
+		}
+	}
+
 	var result *Result
 	if err := pp.packet.UnmarshalBinary(pp.body); err != nil {
-		result = &Result{Error: (fmt.Errorf("Error decoding packet type %d: %s", pp.packet.Cmd, err)), ErrorCode: ErrInvalidMsgpack}
+		result = &Result{
+			Error:     fmt.Errorf("Error decoding packet type %d: %s", pp.packet.Cmd, err),
+			ErrorCode: ErrInvalidMsgpack,
+		}
 	} else {
 		result = pp.packet.Result
 		if result == nil {
