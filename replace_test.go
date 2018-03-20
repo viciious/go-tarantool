@@ -46,7 +46,7 @@ func TestReplace(t *testing.T) {
 			err = query2.UnmarshalBinary(buf)
 
 			if assert.NoError(err) {
-				assert.Equal(42, query2.Space)
+				assert.Equal(uint(42), query2.Space)
 				assert.Equal(query.Tuple, query2.Tuple)
 			}
 		}

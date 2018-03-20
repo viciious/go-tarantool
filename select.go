@@ -18,7 +18,7 @@ type Select struct {
 
 var _ Query = (*Select)(nil)
 
-func (q Select) GetCommandID() int {
+func (q Select) GetCommandID() uint {
 	return SelectCommand
 }
 
@@ -82,7 +82,7 @@ func (q *Select) UnmarshalBinary(data []byte) (err error) {
 // UnmarshalMsg implements msgp.Unmarshaller
 func (q *Select) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i uint32
-	var k int
+	var k uint
 	var t interface{}
 
 	q.Space = nil
@@ -97,17 +97,17 @@ func (q *Select) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	}
 
 	for ; i > 0; i-- {
-		if k, buf, err = msgp.ReadIntBytes(buf); err != nil {
+		if k, buf, err = msgp.ReadUintBytes(buf); err != nil {
 			return
 		}
 
 		switch k {
 		case KeySpaceNo:
-			if q.Space, buf, err = msgp.ReadIntBytes(buf); err != nil {
+			if q.Space, buf, err = msgp.ReadUintBytes(buf); err != nil {
 				return
 			}
 		case KeyIndexNo:
-			if q.Index, buf, err = msgp.ReadIntBytes(buf); err != nil {
+			if q.Index, buf, err = msgp.ReadUintBytes(buf); err != nil {
 				return
 			}
 		case KeyOffset:

@@ -8,8 +8,8 @@ import (
 )
 
 type Packet struct {
-	Cmd        int
-	LSN        int64
+	Cmd        uint
+	LSN        uint64
 	requestID  uint64
 	InstanceID uint32
 	Timestamp  time.Time
@@ -45,17 +45,19 @@ func (pack *Packet) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
 	}
 
 	for ; l > 0; l-- {
-		var cd int
-		if cd, buf, err = msgp.ReadIntBytes(buf); err != nil {
+		var cd uint
+
+		if cd, buf, err = msgp.ReadUintBytes(buf); err != nil {
 			return
 		}
+
 		switch cd {
 		case KeySync:
 			if pack.requestID, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
 				return
 			}
 		case KeyCode:
-			if pack.Cmd, buf, err = msgp.ReadIntBytes(buf); err != nil {
+			if pack.Cmd, buf, err = msgp.ReadUintBytes(buf); err != nil {
 				return
 			}
 		case KeySchemaID:
@@ -63,7 +65,7 @@ func (pack *Packet) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
 				return
 			}
 		case KeyLSN:
-			if pack.LSN, buf, err = msgp.ReadInt64Bytes(buf); err != nil {
+			if pack.LSN, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
 				return
 			}
 		case KeyInstanceID:
@@ -96,7 +98,7 @@ func (pack *Packet) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
 		return
 	}
 
-	unpackr := func(errorCode int, data []byte) (buf []byte, err error) {
+	unpackr := func(errorCode uint, data []byte) (buf []byte, err error) {
 		buf = data
 		res := &Result{ErrorCode: errorCode}
 		if buf, err = res.UnmarshalMsg(buf); err != nil {

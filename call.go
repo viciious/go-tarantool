@@ -13,7 +13,7 @@ type Call struct {
 
 var _ Query = (*Call)(nil)
 
-func (q Call) GetCommandID() int {
+func (q Call) GetCommandID() uint {
 	return CallCommand
 }
 
@@ -40,7 +40,7 @@ func (q Call) PackMsg(data *packData, b []byte) (o []byte, err error) {
 // UnmarshalMsg implements msgp.Unmarshaller
 func (q *Call) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i uint32
-	var k int
+	var k uint
 	var t interface{}
 
 	q.Name = ""
@@ -55,7 +55,7 @@ func (q *Call) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	}
 
 	for ; i > 0; i-- {
-		if k, buf, err = msgp.ReadIntBytes(buf); err != nil {
+		if k, buf, err = msgp.ReadUintBytes(buf); err != nil {
 			return
 		}
 

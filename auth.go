@@ -55,7 +55,7 @@ func xor(left, right []byte, size int) []byte {
 	return result
 }
 
-func (auth Auth) GetCommandID() int {
+func (auth Auth) GetCommandID() uint {
 	return AuthCommand
 }
 
@@ -81,7 +81,7 @@ func (auth Auth) PackMsg(data *packData, b []byte) (o []byte, err error) {
 // UnmarshalMsg implements msgp.Unmarshaller
 func (auth *Auth) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i, l uint32
-	var k int
+	var k uint
 
 	buf = data
 	if i, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
@@ -89,7 +89,7 @@ func (auth *Auth) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	}
 
 	for ; i > 0; i-- {
-		if k, buf, err = msgp.ReadIntBytes(buf); err != nil {
+		if k, buf, err = msgp.ReadUintBytes(buf); err != nil {
 			return
 		}
 

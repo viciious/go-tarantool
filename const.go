@@ -68,16 +68,16 @@ const (
 )
 
 const (
-	SpaceSchema    = 272
-	SpaceSpace     = 280
-	ViewSpace      = 281
-	SpaceIndex     = 288
-	ViewIndex      = 289
-	SpaceFunc      = 296
-	SpaceUser      = 304
-	SpacePriv      = 312
-	SpaceCluster   = 320
-	SpaceSystemMax = 511
+	SpaceSchema    = uint(272)
+	SpaceSpace     = uint(280)
+	ViewSpace      = uint(281)
+	SpaceIndex     = uint(288)
+	ViewIndex      = uint(289)
+	SpaceFunc      = uint(296)
+	SpaceUser      = uint(304)
+	SpacePriv      = uint(312)
+	SpaceCluster   = uint(320)
+	SpaceSystemMax = uint(511)
 )
 
 // Tarantool server error codes

@@ -14,7 +14,7 @@ type Eval struct {
 
 var _ Query = (*Eval)(nil)
 
-func (q Eval) GetCommandID() int {
+func (q Eval) GetCommandID() uint {
 	return EvalCommand
 }
 
@@ -47,7 +47,7 @@ func (q *Eval) UnmarshalBinary(data []byte) (err error) {
 // UnmarshalMsg implements msgp.Unmarshaller
 func (q *Eval) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i uint32
-	var k int
+	var k uint
 	var t interface{}
 
 	buf = data
@@ -60,7 +60,7 @@ func (q *Eval) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	}
 
 	for ; i > 0; i-- {
-		if k, buf, err = msgp.ReadIntBytes(buf); err != nil {
+		if k, buf, err = msgp.ReadUintBytes(buf); err != nil {
 			return
 		}
 

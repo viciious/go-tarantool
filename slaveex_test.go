@@ -27,7 +27,7 @@ func ExampleSlave_subscribeExisted() {
 	defer s.Close()
 
 	// let's start from the beginning
-	var lsn int64 = 0
+	var lsn uint64 = 0
 	it, err := s.Subscribe(lsn)
 	if err != nil {
 		log.Printf("Tnt Slave subscribing error:%v", err)
@@ -223,7 +223,7 @@ func ExampleSlave_Subscribe_sync() {
 	defer s.Close()
 
 	// let's start from the beginning
-	var lsn int64 = 0
+	var lsn uint64 = 0
 	it, err := s.Subscribe(lsn)
 	if err != nil {
 		log.Printf("Tnt Slave subscribing error:%v", err)
@@ -301,7 +301,7 @@ func ExampleSlave_Subscribe_async() {
 	}(xlogChan)
 
 	// let's start from the beginning
-	var lsn int64 = 0
+	var lsn uint64 = 0
 	it, err := s.Subscribe(lsn)
 	if err != nil {
 		log.Printf("Tnt Slave subscribing error:%v", err)

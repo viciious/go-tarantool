@@ -24,7 +24,7 @@ func (pp *BinaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 
 	h = msgp.AppendMapHeader(h, 2)
 	h = msgp.AppendUint(h, KeyCode)
-	h = msgp.AppendInt(h, pp.packet.Cmd)
+	h = msgp.AppendUint(h, pp.packet.Cmd)
 	h = msgp.AppendUint(h, KeySync)
 	h = msgp.AppendUint64(h, pp.packet.requestID)
 
@@ -60,8 +60,8 @@ func (pp *BinaryPacket) Release() {
 // ReadFrom implements the io.ReaderFrom interface
 func (pp *BinaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
 	var h [8]byte
-	var bodyLength int
-	var headerLength int
+	var bodyLength uint
+	var headerLength uint
 	var rr, crr int
 
 	if rr, err = io.ReadFull(r, h[:1]); err != nil {
@@ -89,15 +89,14 @@ func (pp *BinaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
 		}
 	}
 
-	if bodyLength, _, err = msgp.ReadIntBytes(h[:headerLength]); err != nil {
+	if bodyLength, _, err = msgp.ReadUintBytes(h[:headerLength]); err != nil {
 		return int64(rr), err
 	}
-
 	if bodyLength == 0 {
 		return int64(rr), errors.New("Packet should not be 0 length")
 	}
 
-	if cap(pp.body) < bodyLength {
+	if uint(cap(pp.body)) < bodyLength {
 		pp.body = make([]byte, bodyLength+bodyLength/2)
 	}
 
@@ -131,8 +130,8 @@ func (pp *BinaryPacket) readRawPacket(r io.Reader) (requestID uint64, err error)
 	}
 
 	for ; l > 0; l-- {
-		var cd int
-		if cd, buf, err = msgp.ReadIntBytes(buf); err != nil {
+		var cd uint
+		if cd, buf, err = msgp.ReadUintBytes(buf); err != nil {
 			return
 		}
 		if cd == KeySync {

@@ -52,7 +52,7 @@ func TestSelect(t *testing.T) {
 			err = query2.UnmarshalBinary(buf)
 
 			if assert.NoError(err) {
-				assert.Equal(42, query2.Space)
+				assert.Equal(uint(42), query2.Space)
 				if query.Key != nil {
 					switch query.Key.(type) {
 					case int:
@@ -67,7 +67,7 @@ func TestSelect(t *testing.T) {
 				if query.Index != nil {
 					switch query.Index.(type) {
 					case string:
-						assert.Equal(conn.packData.indexMap[42][query.Index.(string)], uint64(query2.Index.(int)))
+						assert.Equal(conn.packData.indexMap[42][query.Index.(string)], uint64(query2.Index.(uint)))
 					default:
 						assert.Equal(query.Index, query2.Index)
 					}
@@ -86,7 +86,7 @@ func TestSelect(t *testing.T) {
 	// simple select
 	do(nil,
 		&Select{
-			Space: 42,
+			Space: uint(42),
 			Key:   int64(3),
 		},
 		[][]interface{}{
@@ -120,7 +120,7 @@ func TestSelect(t *testing.T) {
 	// composite key
 	do(nil,
 		&Select{
-			Space:    42,
+			Space:    uint(42),
 			Index:    "id_name",
 			KeyTuple: []interface{}{int64(2), "Music"},
 		},
@@ -132,7 +132,7 @@ func TestSelect(t *testing.T) {
 	// composite key empty response
 	do(nil,
 		&Select{
-			Space:    42,
+			Space:    uint(42),
 			Index:    "id_name",
 			KeyTuple: []interface{}{int64(2), "Length"},
 		},
@@ -141,7 +141,7 @@ func TestSelect(t *testing.T) {
 	// iterate all using NUM index
 	do(nil,
 		&Select{
-			Space:    42,
+			Space:    uint(42),
 			Iterator: IterAll,
 		},
 		[][]interface{}{
@@ -153,7 +153,7 @@ func TestSelect(t *testing.T) {
 	// iterate all using STR index
 	do(nil,
 		&Select{
-			Space:    42,
+			Space:    uint(42),
 			Index:    "tester_name",
 			Iterator: IterAll,
 		},
@@ -166,7 +166,7 @@ func TestSelect(t *testing.T) {
 	// iterate Eq using STR index
 	do(nil,
 		&Select{
-			Space:    42,
+			Space:    uint(42),
 			Index:    "tester_name",
 			Key:      "Length",
 			Iterator: IterEq,
