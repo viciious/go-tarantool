@@ -1,3 +1,0 @@
-[submodule "vendor/github.com/tinylib/msgp"]
-	path = vendor/github.com/tinylib/msgp
-	url = https://github.com/tinylib/msgp.git
