@@ -63,28 +63,15 @@ func (data *packData) spaceNo(space interface{}) (uint64, error) {
 	}
 
 	switch value := space.(type) {
-	default:
-		return 0, fmt.Errorf("Wrong space %#v", space)
-	case int:
-		return uint64(value), nil
-	case uint:
-		return uint64(value), nil
-	case int64:
-		return uint64(value), nil
-	case uint64:
-		return value, nil
-	case int32:
-		return uint64(value), nil
-	case uint32:
-		return uint64(value), nil
 	case string:
 		spaceNo, exists := data.spaceMap[value]
 		if exists {
 			return spaceNo, nil
-		} else {
-			return 0, fmt.Errorf("Unknown space %#v", space)
 		}
+		return 0, fmt.Errorf("Unknown space %#v", space)
 	}
+
+	return numberToUint64(space)
 }
 
 func (data *packData) encodeSpace(space interface{}, encoder *msgpack.Encoder) error {
@@ -112,22 +99,7 @@ func (data *packData) indexNo(space interface{}, index interface{}) (uint64, err
 		return 0, nil
 	}
 
-	switch value := index.(type) {
-	default:
-		return 0, fmt.Errorf("Wrong index %#v", space)
-	case int:
-		return uint64(value), nil
-	case uint:
-		return uint64(value), nil
-	case int64:
-		return uint64(value), nil
-	case uint64:
-		return value, nil
-	case int32:
-		return uint64(value), nil
-	case uint32:
-		return uint64(value), nil
-	case string:
+	if value, ok := index.(string); ok {
 		spaceNo, err := data.spaceNo(space)
 		if err != nil {
 			return 0, nil
@@ -141,10 +113,42 @@ func (data *packData) indexNo(space interface{}, index interface{}) (uint64, err
 		indexNo, exists := spaceData[value]
 		if exists {
 			return indexNo, nil
-		} else {
-			return 0, fmt.Errorf("Unknown index %#v", index)
 		}
+		return 0, fmt.Errorf("Unknown index %#v", index)
 	}
+
+	return numberToUint64(index)
+}
+
+func numberToUint64(number interface{}) (uint64, error) {
+	switch value := number.(type) {
+	default:
+		return 0, fmt.Errorf("Bad number %#v", number)
+	case int:
+		return uint64(value), nil
+	case uint:
+		return uint64(value), nil
+	case int8:
+		return uint64(value), nil
+	case uint8:
+		return uint64(value), nil
+	case int16:
+		return uint64(value), nil
+	case uint16:
+		return uint64(value), nil
+	case int32:
+		return uint64(value), nil
+	case uint32:
+		return uint64(value), nil
+	case int64:
+		return uint64(value), nil
+	case uint64:
+		return value, nil
+	}
+}
+
+func (data *packData) fieldNo(field interface{}) (uint64, error) {
+	return numberToUint64(field)
 }
 
 func (data *packData) writeIndex(space interface{}, index interface{}, w io.Writer, encoder *msgpack.Encoder) error {

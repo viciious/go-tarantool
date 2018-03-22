@@ -274,7 +274,8 @@ func (conn *Connection) pullSchema() (err error) {
 	}
 
 	for _, space := range res.Data {
-		conn.packData.spaceMap[space[2].(string)] = space[0].(uint64)
+		spaceID, _ := conn.packData.spaceNo(space[0])
+		conn.packData.spaceMap[space[2].(string)] = spaceID
 	}
 
 	res, err = request(&Select{
@@ -287,8 +288,8 @@ func (conn *Connection) pullSchema() (err error) {
 	}
 
 	for _, index := range res.Data {
-		spaceID := index[0].(uint64)
-		indexID := index[1].(uint64)
+		spaceID, _ := conn.packData.fieldNo(index[0])
+		indexID, _ := conn.packData.fieldNo(index[1])
 		indexName := index[2].(string)
 		indexAttr := index[4].(map[interface{}]interface{}) // e.g: {"unique": true}
 		indexFields := index[5].([]interface{})             // e.g: [[0 num] [1 str]]
@@ -302,11 +303,12 @@ func (conn *Connection) pullSchema() (err error) {
 
 		// build list of primary key field numbers for this space, if the PK is detected
 		if indexAttr != nil && indexID == 0 {
-			if unique, ok := indexAttr["unique"]; ok && unique.(bool) {
+			if _, ok := indexAttr["unique"]; ok {
 				pk := make([]int, len(indexFields))
 				for i := range indexFields {
-					f := indexFields[i].([]interface{})
-					pk[i] = int(f[0].(uint64))
+					descr := indexFields[i].([]interface{})
+					f, _ := conn.packData.fieldNo(descr[0])
+					pk[i] = int(f)
 				}
 				conn.packData.primaryKeyMap[spaceID] = pk
 			}
@@ -334,19 +336,8 @@ func (conn *Connection) GetPrimaryKeyFields(space interface{}) ([]int, bool) {
 		return nil, false
 	}
 
-	var spaceID uint64
-	switch space := space.(type) {
-	case int:
-		spaceID = uint64(space)
-	case uint:
-		spaceID = uint64(space)
-	case uint32:
-		spaceID = uint64(space)
-	case uint64:
-		spaceID = space
-	case string:
-		spaceID = conn.packData.spaceMap[space]
-	default:
+	spaceID, err := conn.packData.spaceNo(space)
+	if err != nil {
 		return nil, false
 	}
 
