@@ -26,6 +26,11 @@ type Options struct {
 	Password       string
 	UUID           string
 	ReplicaSetUUID string
+
+	ReadCount      *uint64
+	WriteCount     *uint64
+	InPacketCount  *uint64
+	OutPacketCount *uint64
 }
 
 type Greeting struct {
@@ -41,6 +46,10 @@ type Connection struct {
 	exit      chan bool
 	closed    chan bool
 	tcpConn   net.Conn
+
+	ccr io.Reader
+	ccw io.Writer
+
 	// options
 	queryTimeout   time.Duration
 	Greeting       *Greeting
@@ -48,12 +57,17 @@ type Connection struct {
 	remoteAddr     string
 	firstError     error
 	firstErrorLock *sync.Mutex
+
+	// counters
+	readCount      *uint64
+	writeCount     *uint64
+	inPacketCount  *uint64
+	outPacketCount *uint64
 }
 
 // Connect to tarantool instance with options.
 // Returned Connection could be used to execute queries.
 func Connect(dsnString string, options *Options) (conn *Connection, err error) {
-
 	dsn, opts, err := parseOptions(dsnString, options)
 	if err != nil {
 		return nil, err
@@ -78,7 +92,7 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	// remove deadline
 	conn.tcpConn.SetDeadline(time.Time{})
 
-	go conn.worker(conn.tcpConn)
+	go conn.worker()
 
 	return
 }
@@ -103,11 +117,27 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		firstErrorLock: &sync.Mutex{},
 		packData:       newPackData(opts.DefaultSpace),
 		queryTimeout:   opts.QueryTimeout,
+		readCount:      opts.ReadCount,
+		writeCount:     opts.WriteCount,
+		inPacketCount:  opts.InPacketCount,
+		outPacketCount: opts.OutPacketCount,
 	}
 
 	conn.tcpConn, err = net.DialTimeout(scheme, conn.remoteAddr, opts.ConnectTimeout)
 	if err != nil {
 		return nil, err
+	}
+
+	if conn.readCount != nil {
+		conn.ccr = NewCountedReader(conn.tcpConn, conn.readCount)
+	} else {
+		conn.ccr = conn.tcpConn
+	}
+
+	if conn.writeCount != nil {
+		conn.ccw = NewCountedWriter(conn.tcpConn, conn.writeCount)
+	} else {
+		conn.ccw = conn.tcpConn
 	}
 
 	greeting := make([]byte, 128)
@@ -117,7 +147,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 	// removing deadline deferred
 	defer conn.tcpConn.SetDeadline(time.Time{})
 
-	_, err = io.ReadFull(conn.tcpConn, greeting)
+	_, err = io.ReadFull(conn.ccr, greeting)
 	if err != nil {
 		return
 	}
@@ -143,7 +173,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 			return
 		}
 
-		_, err = pp.WriteTo(conn.tcpConn)
+		_, err = pp.WriteTo(conn.ccw)
 		pp.Release()
 		if err != nil {
 			return
@@ -152,7 +182,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		pp = packetPool.Get()
 		defer pp.Release()
 
-		if err = pp.readPacket(conn.tcpConn); err != nil {
+		if err = pp.readPacket(conn.ccr); err != nil {
 			return
 		}
 
@@ -239,7 +269,7 @@ func (conn *Connection) pullSchema() (err error) {
 			return nil, err
 		}
 
-		_, err = pp.WriteTo(conn.tcpConn)
+		_, err = pp.WriteTo(conn.ccw)
 		pp.Release()
 		if err != nil {
 			return nil, err
@@ -248,7 +278,7 @@ func (conn *Connection) pullSchema() (err error) {
 		pp = packetPool.Get()
 		defer pp.Release()
 
-		if err = pp.readPacket(conn.tcpConn); err != nil {
+		if err = pp.readPacket(conn.ccr); err != nil {
 			return nil, err
 		}
 
@@ -384,20 +414,20 @@ func (conn *Connection) setError(err error) {
 	}
 }
 
-func (conn *Connection) worker(tcpConn net.Conn) {
+func (conn *Connection) worker() {
 	var wg sync.WaitGroup
 
 	wg.Add(2)
 
 	go func() {
-		err := writer(tcpConn, conn.writeChan, conn.exit)
+		err := conn.writer()
 		conn.setError(err)
 		conn.stop()
 		wg.Done()
 	}()
 
 	go func() {
-		err := conn.reader(tcpConn)
+		err := conn.reader()
 		conn.setError(err)
 		conn.stop()
 		wg.Done()
@@ -427,8 +457,10 @@ CLEANUP_LOOP:
 	close(conn.closed)
 }
 
-func writer(tcpConn io.Writer, writeChan chan *BinaryPacket, stopChan chan bool) (err error) {
-	w := bufio.NewWriterSize(tcpConn, DefaultWriterBufSize)
+func (conn *Connection) writer() (err error) {
+	writeChan := conn.writeChan
+	stopChan := conn.exit
+	w := bufio.NewWriterSize(conn.ccw, DefaultWriterBufSize)
 
 WRITER_LOOP:
 	for {
@@ -436,6 +468,10 @@ WRITER_LOOP:
 		case packet, ok := <-writeChan:
 			if !ok {
 				break WRITER_LOOP
+			}
+
+			if conn.outPacketCount != nil {
+				atomic.AddUint64(conn.outPacketCount, 1)
 			}
 
 			_, err = packet.WriteTo(w)
@@ -456,6 +492,10 @@ WRITER_LOOP:
 					break WRITER_LOOP
 				}
 
+				if conn.outPacketCount != nil {
+					atomic.AddUint64(conn.outPacketCount, 1)
+				}
+
 				_, err = packet.WriteTo(w)
 				if err != nil {
 					break WRITER_LOOP
@@ -469,17 +509,21 @@ WRITER_LOOP:
 	return
 }
 
-func (conn *Connection) reader(tcpConn io.Reader) (err error) {
+func (conn *Connection) reader() (err error) {
 	var pp *BinaryPacket
 	var requestID uint64
 
-	r := bufio.NewReaderSize(tcpConn, DefaultReaderBufSize)
+	r := bufio.NewReaderSize(conn.ccr, DefaultReaderBufSize)
 
 READER_LOOP:
 	for {
 		pp := packetPool.Get()
 		if requestID, err = pp.readRawPacket(r); err != nil {
 			break READER_LOOP
+		}
+
+		if conn.inPacketCount != nil {
+			atomic.AddUint64(conn.inPacketCount, 1)
 		}
 
 		req := conn.requests.Pop(requestID)
