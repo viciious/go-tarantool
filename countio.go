@@ -1,34 +1,34 @@
 package tarantool
 
 import (
+	"expvar"
 	"io"
-	"sync/atomic"
 )
 
 type CountedReader struct {
 	r io.Reader
-	c *uint64
+	c *expvar.Int
 }
 
-func NewCountedReader(r io.Reader, c *uint64) *CountedReader {
+func NewCountedReader(r io.Reader, c *expvar.Int) *CountedReader {
 	return &CountedReader{r, c}
 }
 
 func (cr *CountedReader) Read(p []byte) (int, error) {
-	atomic.AddUint64(cr.c, 1)
+	cr.c.Add(1)
 	return cr.r.Read(p)
 }
 
 type CountedWriter struct {
 	w io.Writer
-	c *uint64
+	c *expvar.Int
 }
 
-func NewCountedWriter(w io.Writer, c *uint64) *CountedWriter {
+func NewCountedWriter(w io.Writer, c *expvar.Int) *CountedWriter {
 	return &CountedWriter{w, c}
 }
 
 func (cw *CountedWriter) Write(p []byte) (int, error) {
-	atomic.AddUint64(cw.c, 1)
+	cw.c.Add(1)
 	return cw.w.Write(p)
 }

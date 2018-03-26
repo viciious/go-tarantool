@@ -1,5 +1,7 @@
 package tarantool
 
+import "expvar"
+
 var packetPool *BinaryPacketPool
 
 func init() {
@@ -9,6 +11,13 @@ func init() {
 type request struct {
 	query     Query
 	replyChan chan *BinaryPacket
+}
+
+type PerfCount struct {
+	NetRead       *expvar.Int
+	NetWrite      *expvar.Int
+	NetPacketsIn  *expvar.Int
+	NetPacketsOut *expvar.Int
 }
 
 // ReplicaSet is used to store params of the Replica Set.

@@ -26,11 +26,7 @@ type Options struct {
 	Password       string
 	UUID           string
 	ReplicaSetUUID string
-
-	ReadCount      *uint64
-	WriteCount     *uint64
-	InPacketCount  *uint64
-	OutPacketCount *uint64
+	Perf           PerfCount
 }
 
 type Greeting struct {
@@ -57,12 +53,7 @@ type Connection struct {
 	remoteAddr     string
 	firstError     error
 	firstErrorLock *sync.Mutex
-
-	// counters
-	readCount      *uint64
-	writeCount     *uint64
-	inPacketCount  *uint64
-	outPacketCount *uint64
+	perf           PerfCount
 }
 
 // Connect to tarantool instance with options.
@@ -117,10 +108,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		firstErrorLock: &sync.Mutex{},
 		packData:       newPackData(opts.DefaultSpace),
 		queryTimeout:   opts.QueryTimeout,
-		readCount:      opts.ReadCount,
-		writeCount:     opts.WriteCount,
-		inPacketCount:  opts.InPacketCount,
-		outPacketCount: opts.OutPacketCount,
+		perf:           opts.Perf,
 	}
 
 	conn.tcpConn, err = net.DialTimeout(scheme, conn.remoteAddr, opts.ConnectTimeout)
@@ -128,14 +116,14 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		return nil, err
 	}
 
-	if conn.readCount != nil {
-		conn.ccr = NewCountedReader(conn.tcpConn, conn.readCount)
+	if conn.perf.NetRead != nil {
+		conn.ccr = NewCountedReader(conn.tcpConn, conn.perf.NetRead)
 	} else {
 		conn.ccr = conn.tcpConn
 	}
 
-	if conn.writeCount != nil {
-		conn.ccw = NewCountedWriter(conn.tcpConn, conn.writeCount)
+	if conn.perf.NetWrite != nil {
+		conn.ccw = NewCountedWriter(conn.tcpConn, conn.perf.NetWrite)
 	} else {
 		conn.ccw = conn.tcpConn
 	}
@@ -462,6 +450,14 @@ func (conn *Connection) writer() (err error) {
 	stopChan := conn.exit
 	w := bufio.NewWriterSize(conn.ccw, DefaultWriterBufSize)
 
+	wp := func(w io.Writer, packet *BinaryPacket) error {
+		if conn.perf.NetPacketsOut != nil {
+			conn.perf.NetPacketsOut.Add(1)
+		}
+		_, err := packet.WriteTo(w)
+		return err
+	}
+
 WRITER_LOOP:
 	for {
 		select {
@@ -469,13 +465,7 @@ WRITER_LOOP:
 			if !ok {
 				break WRITER_LOOP
 			}
-
-			if conn.outPacketCount != nil {
-				atomic.AddUint64(conn.outPacketCount, 1)
-			}
-
-			_, err = packet.WriteTo(w)
-			if err != nil {
+			if err = wp(w, packet); err != nil {
 				break WRITER_LOOP
 			}
 		case <-stopChan:
@@ -491,13 +481,7 @@ WRITER_LOOP:
 				if !ok {
 					break WRITER_LOOP
 				}
-
-				if conn.outPacketCount != nil {
-					atomic.AddUint64(conn.outPacketCount, 1)
-				}
-
-				_, err = packet.WriteTo(w)
-				if err != nil {
+				if err = wp(w, packet); err != nil {
 					break WRITER_LOOP
 				}
 			case <-stopChan:
@@ -522,8 +506,8 @@ READER_LOOP:
 			break READER_LOOP
 		}
 
-		if conn.inPacketCount != nil {
-			atomic.AddUint64(conn.inPacketCount, 1)
+		if conn.perf.NetPacketsIn != nil {
+			conn.perf.NetPacketsIn.Add(1)
 		}
 
 		req := conn.requests.Pop(requestID)

@@ -30,6 +30,11 @@ type IprotoServer struct {
 	output     chan *BinaryPacket
 	closeOnce  sync.Once
 	firstError error
+	perf       PerfCount
+}
+
+type IprotoServerOptions struct {
+	Perf PerfCount
 }
 
 func NewIprotoServer(uuid string, handler QueryHandler, onShutdown OnShutdownCallback) *IprotoServer {
@@ -43,10 +48,33 @@ func NewIprotoServer(uuid string, handler QueryHandler, onShutdown OnShutdownCal
 	}
 }
 
+func (s *IprotoServer) WithOptions(opts *IprotoServerOptions) *IprotoServer {
+	if opts == nil {
+		opts = &IprotoServerOptions{}
+	}
+	s.perf = opts.Perf
+	return s
+}
+
 func (s *IprotoServer) Accept(conn net.Conn) {
+	var ccr io.Reader
+	var ccw io.Writer
+
+	if s.perf.NetRead != nil {
+		ccr = NewCountedReader(conn, s.perf.NetRead)
+	} else {
+		ccr = conn
+	}
+
+	if s.perf.NetWrite != nil {
+		ccw = NewCountedWriter(conn, s.perf.NetWrite)
+	} else {
+		ccw = conn
+	}
+
 	s.conn = conn
-	s.reader = bufio.NewReader(conn)
-	s.writer = bufio.NewWriter(conn)
+	s.reader = bufio.NewReader(ccr)
+	s.writer = bufio.NewWriter(ccw)
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.output = make(chan *BinaryPacket, 1024)
 
@@ -159,6 +187,10 @@ READER_LOOP:
 				break READER_LOOP
 			}
 
+			if s.perf.NetPacketsIn != nil {
+				s.perf.NetPacketsIn.Add(1)
+			}
+
 			go func(pp *BinaryPacket) {
 				packet := &pp.packet
 				err := packet.UnmarshalBinary(pp.body)
@@ -223,6 +255,9 @@ func (s *IprotoServer) write() {
 
 	w := s.writer
 	wp := func(w io.Writer, packet *BinaryPacket) error {
+		if s.perf.NetPacketsOut != nil {
+			s.perf.NetPacketsOut.Add(1)
+		}
 		_, err = packet.WriteTo(w)
 		defer packet.Release()
 		return err
@@ -235,9 +270,7 @@ WRITER_LOOP:
 			if !ok {
 				break WRITER_LOOP
 			}
-
-			err = wp(w, packet)
-			if err != nil {
+			if err = wp(w, packet); err != nil {
 				break WRITER_LOOP
 			}
 		case <-s.ctx.Done():
@@ -254,8 +287,7 @@ WRITER_LOOP:
 				if !ok {
 					break WRITER_LOOP
 				}
-				err = wp(w, packet)
-				if err != nil {
+				if err = wp(w, packet); err != nil {
 					break WRITER_LOOP
 				}
 			case <-s.ctx.Done():
