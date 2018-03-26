@@ -51,6 +51,8 @@ func TestPerfCount(t *testing.T) {
 	assert.True(nw > 0)
 	assert.True(pin > 0)
 	assert.True(pout > 0)
+	assert.True(nr >= pin)
+	assert.True(nw >= pout)
 
 	tuples, err := conn.Execute(&Select{
 		KeyTuple: []interface{}{int64(1)},
@@ -60,6 +62,6 @@ func TestPerfCount(t *testing.T) {
 
 	assert.True(perf.NetRead.Value() > nr)
 	assert.True(perf.NetWrite.Value() > nw)
-	assert.Equal(pin + 1, perf.NetPacketsIn.Value())
-	assert.Equal(pout + 1, perf.NetPacketsOut.Value())
+	assert.Equal(pin+1, perf.NetPacketsIn.Value())
+	assert.Equal(pout+1, perf.NetPacketsOut.Value())
 }
