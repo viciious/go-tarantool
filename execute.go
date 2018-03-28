@@ -37,6 +37,9 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) (*BinaryPacke
 	select {
 	case writeChan <- pp:
 	case <-ctx.Done():
+		if conn.perf.QueryTimeouts != nil {
+			conn.perf.QueryTimeouts.Add(1)
+		}
 		conn.requests.Pop(requestID)
 		return nil, &Result{
 			Error:     NewContextError(ctx, conn, "Send error"),
@@ -53,6 +56,9 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) (*BinaryPacke
 	case pp := <-r.replyChan:
 		return pp, nil
 	case <-ctx.Done():
+		if conn.perf.QueryTimeouts != nil {
+			conn.perf.QueryTimeouts.Add(1)
+		}
 		return nil, &Result{
 			Error:     NewContextError(ctx, conn, "Recv error"),
 			ErrorCode: ErrTimeout,

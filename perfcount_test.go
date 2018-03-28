@@ -14,6 +14,7 @@ func TestPerfCount(t *testing.T) {
 		expvar.NewInt("net_write"),
 		expvar.NewInt("net_packets_in"),
 		expvar.NewInt("net_packets_out"),
+		nil,
 	}
 
 	assert := assert.New(t)
