@@ -18,6 +18,7 @@ type PerfCount struct {
 	NetWrite      *expvar.Int
 	NetPacketsIn  *expvar.Int
 	NetPacketsOut *expvar.Int
+	QueryTimeouts *expvar.Int
 }
 
 // ReplicaSet is used to store params of the Replica Set.
