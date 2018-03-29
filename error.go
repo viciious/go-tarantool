@@ -15,7 +15,7 @@ var (
 	ErrBadResult = NewQueryError(0, "invalid result")
 	// ErrVectorClock is returns in case of bad manipulation with vector clock.
 	ErrVectorClock = NewQueryError(0, "vclock manipulation")
-	// ErrUnknown is returns when ErrorCode isn't OK but Error is nil in Result.
+	// ErrUnknownError is returns when ErrorCode isn't OK but Error is nil in Result.
 	ErrUnknownError = NewQueryError(ErrUnknown, "unknown error")
 )
 
@@ -42,8 +42,8 @@ func NewConnectionError(con *Connection, message string) *ConnectionError {
 // or error depending on the connection state. It is also has remoteAddr in error text.
 func ConnectionClosedError(con *Connection) *ConnectionError {
 	var message = "Connection closed"
-	if _, err := con.IsClosed(); err != nil {
-		message = fmt.Sprintf("Connection error: %s", err)
+	if err := con.getError(); err != nil {
+		message = "Connection error: " + err.Error()
 	}
 	return NewConnectionError(con, message)
 }

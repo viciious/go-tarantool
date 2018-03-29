@@ -32,7 +32,8 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) *Result {
 	writeChan := conn.writeChan
 	if writeChan == nil {
 		return &Result{
-			Error: NewConnectionError(conn, "Connection closed"),
+			Error:     ConnectionClosedError(conn),
+			ErrorCode: ErrNoConnection,
 		}
 	}
 
