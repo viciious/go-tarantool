@@ -30,7 +30,8 @@ func (conn *Connection) doExecute(ctx context.Context, r *request) (*BinaryPacke
 	writeChan := conn.writeChan
 	if writeChan == nil {
 		return nil, &Result{
-			Error: NewConnectionError(conn, "Connection closed"),
+			Error:     ConnectionClosedError(conn),
+			ErrorCode: ErrNoConnection,
 		}
 	}
 
