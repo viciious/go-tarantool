@@ -100,7 +100,8 @@ func (pp *BinaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
 		pp.body = make([]byte, bodyLength+bodyLength/2)
 	}
 
-	crr, err = io.ReadFull(r, pp.body[:bodyLength])
+	pp.body = pp.body[:bodyLength]
+	crr, err = io.ReadFull(r, pp.body)
 	return int64(rr) + int64(crr), err
 }
 
