@@ -20,15 +20,15 @@ func New(remoteAddr string, option *Options) *Connector {
 }
 
 // Connect returns existing connection or will establish another one.
-func (c *Connector) Connect() (*Connection, error) {
-	var err error
+func (c *Connector) Connect() (conn *Connection, err error) {
 	c.Lock()
-	defer c.Unlock()
-	if c.conn != nil && !c.conn.IsClosed() {
-		return c.conn, nil
+	if c.conn == nil || c.conn.IsClosed() {
+		c.conn, err = Connect(c.RemoteAddr, c.options)
 	}
-	c.conn, err = Connect(c.RemoteAddr, c.options)
-	return c.conn, err
+	conn = c.conn
+	c.Unlock()
+
+	return conn, err
 }
 
 // Close underlying connection.
