@@ -109,6 +109,10 @@ func (pp *BinaryPacket) Bytes() []byte {
 	return pp.body
 }
 
+func (pp *BinaryPacket) Result() *Result {
+	return pp.packet.Result
+}
+
 func (pp *BinaryPacket) readPacket(r io.Reader) (err error) {
 	if _, err = pp.ReadFrom(r); err != nil {
 		return

@@ -9,8 +9,15 @@ func init() {
 }
 
 type request struct {
-	query     Query
-	replyChan chan *BinaryPacket
+	//query     Query
+	replyChan chan *AsyncResult
+}
+
+type AsyncResult struct {
+	ErrorCode    uint
+	Error        error
+	BinaryPacket *BinaryPacket
+	Connection   *Connection
 }
 
 type PerfCount struct {
