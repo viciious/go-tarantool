@@ -48,7 +48,7 @@ type Connection struct {
 
 	// options
 	queryTimeout   time.Duration
-	Greeting       *Greeting
+	greeting       *Greeting
 	packData       *packData
 	remoteAddr     string
 	firstError     error
@@ -140,7 +140,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		return
 	}
 
-	conn.Greeting = &Greeting{
+	conn.greeting = &Greeting{
 		Version: greeting[:64],
 		Auth:    greeting[64:108],
 	}
@@ -154,7 +154,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		err = pp.packMsg(&Auth{
 			User:         opts.User,
 			Password:     opts.Password,
-			GreetingAuth: conn.Greeting.Auth,
+			GreetingAuth: conn.greeting.Auth,
 		}, conn.packData)
 		if err != nil {
 			pp.Release()
@@ -439,7 +439,13 @@ CLEANUP_LOOP:
 
 	// send error reply to all pending requests
 	conn.requests.CleanUp(func(req *request) {
-		close(req.replyChan)
+		select {
+		case req.replyChan <- &AsyncResult{
+			Error:     ConnectionClosedError(conn),
+			ErrorCode: ErrNoConnection,
+		}:
+		default:
+		}
 	})
 
 	close(conn.closed)
@@ -455,6 +461,7 @@ func (conn *Connection) writer() (err error) {
 			conn.perf.NetPacketsOut.Add(1)
 		}
 		_, err := packet.WriteTo(w)
+		packet.Release()
 		return err
 	}
 
@@ -518,13 +525,10 @@ READER_LOOP:
 		}
 
 		select {
-		case req.replyChan <- pp:
-			break
+		case req.replyChan <- &AsyncResult{0, nil, pp, conn}:
+			pp = nil
 		default:
-			pp.Release()
 		}
-		close(req.replyChan)
-		pp = nil
 	}
 
 	if pp != nil {

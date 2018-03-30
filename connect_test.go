@@ -19,7 +19,7 @@ func TestConnect(t *testing.T) {
 	require.NoError(err)
 	defer conn.Close()
 
-	assert.Contains(string(conn.Greeting.Version), "Tarantool")
+	assert.Contains(string(conn.greeting.Version), "Tarantool")
 }
 
 func TestDefaultSpace(t *testing.T) {
