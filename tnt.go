@@ -9,7 +9,7 @@ func init() {
 }
 
 type request struct {
-	//query     Query
+	opaque    interface{}
 	replyChan chan *AsyncResult
 }
 
@@ -18,6 +18,7 @@ type AsyncResult struct {
 	Error        error
 	BinaryPacket *BinaryPacket
 	Connection   *Connection
+	Opaque       interface{}
 }
 
 type PerfCount struct {

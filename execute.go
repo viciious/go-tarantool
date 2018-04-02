@@ -6,11 +6,12 @@ import (
 )
 
 // the Result type is used to return write errors here
-func (conn *Connection) writeRequest(ctx context.Context, q Query, replyChan chan *AsyncResult) (*request, *Result) {
+func (conn *Connection) writeRequest(ctx context.Context, q Query, opaque interface{}, replyChan chan *AsyncResult) (*request, *Result) {
 	var err error
 
 	requestID := conn.nextID()
 	request := &request{
+		opaque:    opaque,
 		replyChan: replyChan,
 	}
 
@@ -97,7 +98,7 @@ func (conn *Connection) Exec(ctx context.Context, q Query) (result *Result) {
 
 	replyChan := make(chan *AsyncResult, 1)
 
-	if _, rerr := conn.writeRequest(ctx, q, replyChan); rerr != nil {
+	if _, rerr := conn.writeRequest(ctx, q, nil, replyChan); rerr != nil {
 		cancel()
 		return rerr
 	}
@@ -136,9 +137,9 @@ func (conn *Connection) Exec(ctx context.Context, q Query) (result *Result) {
 	return result
 }
 
-func (conn *Connection) ExecAsync(ctx context.Context, q Query, replyChan chan *AsyncResult) (result *Result) {
-	if _, rerr := conn.writeRequest(ctx, q, replyChan); rerr != nil {
-		return rerr
+func (conn *Connection) ExecAsync(ctx context.Context, q Query, opaque interface{}, replyChan chan *AsyncResult) error {
+	if _, rerr := conn.writeRequest(ctx, q, opaque, replyChan); rerr != nil {
+		return rerr.Error
 	}
 	return nil
 }
