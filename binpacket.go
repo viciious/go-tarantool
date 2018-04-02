@@ -48,6 +48,7 @@ func (pp *BinaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 func (pp *BinaryPacket) Reset() {
 	pp.packet.Cmd = OKCommand
 	pp.packet.requestID = 0
+	pp.packet.Result = nil
 	pp.body = pp.body[:0]
 }
 
@@ -103,6 +104,13 @@ func (pp *BinaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
 	pp.body = pp.body[:bodyLength]
 	crr, err = io.ReadFull(r, pp.body)
 	return int64(rr) + int64(crr), err
+}
+
+func (pp *BinaryPacket) Unmarshal() error {
+	if err := pp.packet.UnmarshalBinary(pp.body); err != nil {
+		return fmt.Errorf("Error decoding packet type %d: %s", pp.packet.Cmd, err)
+	}
+	return nil
 }
 
 func (pp *BinaryPacket) Bytes() []byte {
