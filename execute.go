@@ -2,7 +2,6 @@ package tarantool
 
 import (
 	"context"
-	"fmt"
 )
 
 // the Result type is used to return write errors here
@@ -121,9 +120,9 @@ func (conn *Connection) Exec(ctx context.Context, q Query) (result *Result) {
 		}
 	}
 
-	if err := pp.packet.UnmarshalBinary(pp.body); err != nil {
+	if err := pp.Unmarshal(); err != nil {
 		result = &Result{
-			Error:     fmt.Errorf("Error decoding packet type %d: %s", pp.packet.Cmd, err),
+			Error:     err,
 			ErrorCode: ErrInvalidMsgpack,
 		}
 	} else {
