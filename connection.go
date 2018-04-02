@@ -525,7 +525,7 @@ READER_LOOP:
 		}
 
 		select {
-		case req.replyChan <- &AsyncResult{0, nil, pp, conn}:
+		case req.replyChan <- &AsyncResult{0, nil, pp, conn, req.opaque}:
 			pp = nil
 		default:
 		}
