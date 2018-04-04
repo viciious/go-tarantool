@@ -443,6 +443,7 @@ CLEANUP_LOOP:
 		case req.replyChan <- &AsyncResult{
 			Error:     ConnectionClosedError(conn),
 			ErrorCode: ErrNoConnection,
+			Opaque:    req.opaque,
 		}:
 		default:
 		}
