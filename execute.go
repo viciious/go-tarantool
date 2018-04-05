@@ -28,6 +28,7 @@ func (conn *Connection) writeRequest(ctx context.Context, q Query, opaque interf
 		case oldRequest.replyChan <- &AsyncResult{
 			Error:     ConnectionClosedError(conn),
 			ErrorCode: ErrNoConnection,
+			Opaque:    oldRequest.opaque,
 		}:
 		default:
 		}
