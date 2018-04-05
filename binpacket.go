@@ -11,13 +11,15 @@ import (
 
 type BinaryPacket struct {
 	body   []byte
+	header [32]byte
 	pool   *BinaryPacketPool
 	packet Packet
 }
 
 // WriteTo implements the io.WriterTo interface
 func (pp *BinaryPacket) WriteTo(w io.Writer) (n int64, err error) {
-	h32 := [32]byte{0xce, 0, 0, 0, 0}
+	h32 := pp.header[:32]
+	h32[0], h32[1], h32[2], h32[3], h32[4] = 0xce, 0, 0, 0, 0
 
 	h := h32[5:5]
 	body := pp.body
@@ -60,7 +62,7 @@ func (pp *BinaryPacket) Release() {
 
 // ReadFrom implements the io.ReaderFrom interface
 func (pp *BinaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
-	var h [8]byte
+	var h = pp.header[:8]
 	var bodyLength uint
 	var headerLength uint
 	var rr, crr int
