@@ -103,14 +103,23 @@ func (auth *Auth) UnmarshalMsg(data []byte) (buf []byte, err error) {
 				return
 			}
 			if l == 2 {
-				var greeting string
+				var obuf []byte
+
 				if buf, err = msgp.Skip(buf); err != nil {
 					return
 				}
-				if greeting, buf, err = msgp.ReadStringBytes(buf); err != nil {
-					return
+
+				obuf = buf
+				if auth.GreetingAuth, buf, err = msgp.ReadBytesBytes(buf, nil); err != nil {
+					if _, ok := err.(msgp.TypeError); ok {
+						buf = obuf
+						var greetingStr string
+						if greetingStr, buf, err = msgp.ReadStringBytes(buf); err != nil {
+							return
+						}
+						auth.GreetingAuth = []byte(greetingStr)
+					}
 				}
-				auth.GreetingAuth = []byte(greeting)
 			}
 		default:
 			return buf, fmt.Errorf("Auth.Unpack: Expected KeyUserName or KeyTuple")
