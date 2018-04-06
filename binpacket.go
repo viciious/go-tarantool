@@ -16,6 +16,8 @@ type BinaryPacket struct {
 	packet Packet
 }
 
+type UnmarshalBinaryBodyFunc func(*Packet, []byte) error
+
 // WriteTo implements the io.WriterTo interface
 func (pp *BinaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 	h32 := pp.header[:32]
@@ -112,6 +114,20 @@ func (pp *BinaryPacket) Unmarshal() error {
 	if err := pp.packet.UnmarshalBinary(pp.body); err != nil {
 		return fmt.Errorf("Error decoding packet type %d: %s", pp.packet.Cmd, err)
 	}
+	return nil
+}
+
+func (pp *BinaryPacket) UnmarshalCustomBody(um UnmarshalBinaryBodyFunc) (err error) {
+	buf := pp.body
+
+	if buf, err = pp.packet.UnmarshalBinaryHeader(buf); err != nil {
+		return fmt.Errorf("Error decoding packet type %d: %s", pp.packet.Cmd, err)
+	}
+
+	if err = um(&pp.packet, buf); err != nil {
+		return fmt.Errorf("Error decoding packet type %d: %s", pp.packet.Cmd, err)
+	}
+
 	return nil
 }
 

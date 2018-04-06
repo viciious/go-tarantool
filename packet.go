@@ -130,13 +130,12 @@ func (pack *Packet) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	*pack = Packet{}
 
 	buf = data
-	buf, err = pack.UnmarshalBinaryHeader(data)
-	if err != nil {
+
+	if buf, err = pack.UnmarshalBinaryHeader(buf); err != nil {
 		return
 	}
 
-	buf, err = pack.UnmarshalBinaryBody(buf)
-	if err != nil {
+	if buf, err = pack.UnmarshalBinaryBody(buf); err != nil {
 		return
 	}
 	return
