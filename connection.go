@@ -353,6 +353,10 @@ func (conn *Connection) stop() {
 	})
 }
 
+func (conn *Connection) GetPerf() PerfCount {
+	return conn.perf
+}
+
 func (conn *Connection) GetPrimaryKeyFields(space interface{}) ([]int, bool) {
 	var spaceID uint64
 	var err error
