@@ -37,7 +37,7 @@ type Greeting struct {
 type Connection struct {
 	requestID uint64
 	requests  *requestMap
-	writeChan chan *BinaryPacket // packed messages with header
+	writeChan chan *request // packed messages with header
 	closeOnce sync.Once
 	exit      chan bool
 	closed    chan bool
@@ -102,7 +102,7 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 	conn = &Connection{
 		remoteAddr:     addr,
 		requests:       newRequestMap(),
-		writeChan:      make(chan *BinaryPacket, 256),
+		writeChan:      make(chan *request, 256),
 		exit:           make(chan bool),
 		closed:         make(chan bool),
 		firstErrorLock: &sync.Mutex{},
@@ -429,13 +429,16 @@ func (conn *Connection) worker() {
 
 	// release all pending packets
 	writeChan := conn.writeChan
-	conn.writeChan = nil
 
 CLEANUP_LOOP:
 	for {
 		select {
-		case pp := <-writeChan:
-			pp.Release()
+		case req := <-writeChan:
+			pp := req.packet
+			if pp != nil {
+				req.packet = nil
+				pp.Release()
+			}
 		default:
 			break CLEANUP_LOOP
 		}
@@ -461,11 +464,18 @@ func (conn *Connection) writer() (err error) {
 	stopChan := conn.exit
 	w := bufio.NewWriterSize(conn.ccw, DefaultWriterBufSize)
 
-	wp := func(w io.Writer, packet *BinaryPacket) error {
+	wr := func(w io.Writer, req *request) error {
+		packet := req.packet
+
 		if conn.perf.NetPacketsOut != nil {
 			conn.perf.NetPacketsOut.Add(1)
 		}
+		if conn.perf.QueryComplete != nil {
+			req.startedAt = time.Now()
+		}
+
 		_, err := packet.WriteTo(w)
+		req.packet = nil
 		packet.Release()
 		return err
 	}
@@ -473,11 +483,11 @@ func (conn *Connection) writer() (err error) {
 WRITER_LOOP:
 	for {
 		select {
-		case packet, ok := <-writeChan:
+		case req, ok := <-writeChan:
 			if !ok {
 				break WRITER_LOOP
 			}
-			if err = wp(w, packet); err != nil {
+			if err = wr(w, req); err != nil {
 				break WRITER_LOOP
 			}
 		case <-stopChan:
@@ -489,11 +499,11 @@ WRITER_LOOP:
 
 			// same without flush
 			select {
-			case packet, ok := <-writeChan:
+			case req, ok := <-writeChan:
 				if !ok {
 					break WRITER_LOOP
 				}
-				if err = wp(w, packet); err != nil {
+				if err = wr(w, req); err != nil {
 					break WRITER_LOOP
 				}
 			case <-stopChan:
@@ -527,6 +537,10 @@ READER_LOOP:
 			pp.Release()
 			pp = nil
 			continue
+		}
+
+		if conn.perf.QueryComplete != nil {
+			conn.perf.QueryComplete(req.opaque, time.Since(req.startedAt))
 		}
 
 		select {

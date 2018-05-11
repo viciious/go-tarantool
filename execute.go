@@ -9,11 +9,6 @@ func (conn *Connection) writeRequest(ctx context.Context, q Query, opaque interf
 	var err error
 
 	requestID := conn.nextID()
-	request := &request{
-		opaque:    opaque,
-		replyChan: replyChan,
-	}
-
 	pp := packetPool.GetWithID(requestID)
 
 	if err = pp.packMsg(q, conn.packData); err != nil {
@@ -21,6 +16,12 @@ func (conn *Connection) writeRequest(ctx context.Context, q Query, opaque interf
 			Error:     NewQueryError(ErrInvalidMsgpack, err.Error()),
 			ErrorCode: ErrInvalidMsgpack,
 		}
+	}
+
+	request := &request{
+		packet:    pp,
+		opaque:    opaque,
+		replyChan: replyChan,
 	}
 
 	if oldRequest := conn.requests.Put(requestID, request); oldRequest != nil {
@@ -43,7 +44,7 @@ func (conn *Connection) writeRequest(ctx context.Context, q Query, opaque interf
 	}
 
 	select {
-	case writeChan <- pp:
+	case writeChan <- request:
 	case <-ctx.Done():
 		if conn.perf.QueryTimeouts != nil {
 			conn.perf.QueryTimeouts.Add(1)
