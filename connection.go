@@ -470,7 +470,7 @@ func (conn *Connection) writer() (err error) {
 		if conn.perf.NetPacketsOut != nil {
 			conn.perf.NetPacketsOut.Add(1)
 		}
-		if conn.perf.QueryComplete != nil {
+		if conn.perf.QueryComplete != nil && req.opaque != nil {
 			req.startedAt = time.Now()
 		}
 
@@ -539,7 +539,7 @@ READER_LOOP:
 			continue
 		}
 
-		if conn.perf.QueryComplete != nil {
+		if conn.perf.QueryComplete != nil && req.opaque != nil {
 			conn.perf.QueryComplete(req.opaque, time.Since(req.startedAt))
 		}
 
