@@ -13,8 +13,8 @@ func init() {
 
 type request struct {
 	opaque    interface{}
-	packet    *BinaryPacket
 	replyChan chan *AsyncResult
+	packet    *BinaryPacket
 	startedAt time.Time
 }
 
