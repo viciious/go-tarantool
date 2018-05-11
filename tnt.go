@@ -1,6 +1,9 @@
 package tarantool
 
-import "expvar"
+import (
+	"expvar"
+	"time"
+)
 
 var packetPool *BinaryPacketPool
 
@@ -10,8 +13,12 @@ func init() {
 
 type request struct {
 	opaque    interface{}
+	packet    *BinaryPacket
 	replyChan chan *AsyncResult
+	startedAt time.Time
 }
+
+type QueryCompleteFn func(interface{}, time.Duration)
 
 type AsyncResult struct {
 	ErrorCode    uint
@@ -27,6 +34,7 @@ type PerfCount struct {
 	NetPacketsIn  *expvar.Int
 	NetPacketsOut *expvar.Int
 	QueryTimeouts *expvar.Int
+	QueryComplete QueryCompleteFn
 }
 
 // ReplicaSet is used to store params of the Replica Set.
