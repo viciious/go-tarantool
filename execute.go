@@ -25,6 +25,7 @@ func (conn *Connection) writeRequest(ctx context.Context, request *request, q Qu
 	var err error
 
 	requestID := conn.nextID()
+
 	pp := packetPool.GetWithID(requestID)
 
 	if err = pp.packMsg(q, conn.packData); err != nil {
@@ -61,7 +62,8 @@ func (conn *Connection) writeRequest(ctx context.Context, request *request, q Qu
 		if conn.perf.QueryTimeouts != nil {
 			conn.perf.QueryTimeouts.Add(1)
 		}
-		conn.requests.Pop(requestID)
+		r := conn.requests.Pop(requestID)
+		requestPool.Put(r)
 		return nil, &Result{
 			Error:     NewContextError(ctx, conn, "Send error"),
 			ErrorCode: ErrTimeout,
@@ -109,7 +111,7 @@ func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption
 		ctx, cancel = context.WithTimeout(ctx, conn.queryTimeout)
 	}
 
-	request := &request{}
+	request := requestPool.Get()
 	request.replyChan = make(chan *AsyncResult, 1)
 	for i := 0; i < len(options); i++ {
 		options[i].apply(request)
@@ -155,7 +157,7 @@ func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption
 }
 
 func (conn *Connection) ExecAsync(ctx context.Context, q Query, opaque interface{}, replyChan chan *AsyncResult) error {
-	request := &request{}
+	request := requestPool.Get()
 	request.opaque = opaque
 	request.replyChan = replyChan
 

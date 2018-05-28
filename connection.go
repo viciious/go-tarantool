@@ -454,6 +454,7 @@ CLEANUP_LOOP:
 		}:
 		default:
 		}
+		requestPool.Put(req)
 	})
 
 	close(conn.closed)
@@ -548,6 +549,8 @@ READER_LOOP:
 			pp = nil
 		default:
 		}
+
+		requestPool.Put(req)
 	}
 
 	if pp != nil {
