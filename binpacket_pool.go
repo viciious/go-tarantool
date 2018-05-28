@@ -4,7 +4,7 @@ type BinaryPacketPool struct {
 	queue chan *BinaryPacket
 }
 
-func newPackedPacketPool() *BinaryPacketPool {
+func newBinaryPacketPool() *BinaryPacketPool {
 	return &BinaryPacketPool{
 		queue: make(chan *BinaryPacket, 1024),
 	}

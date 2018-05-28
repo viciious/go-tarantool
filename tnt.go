@@ -6,9 +6,11 @@ import (
 )
 
 var packetPool *BinaryPacketPool
+var requestPool *cappedRequestPool
 
 func init() {
-	packetPool = newPackedPacketPool()
+	packetPool = newBinaryPacketPool()
+	requestPool = newCappedRequestPool()
 }
 
 type request struct {
