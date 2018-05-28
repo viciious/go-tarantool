@@ -4,16 +4,27 @@ import (
 	"context"
 )
 
+type ExecOption interface {
+	apply(*request)
+}
+
+type opaqueOption struct {
+	opaque interface{}
+}
+
+func (o *opaqueOption) apply(r *request) {
+	r.opaque = o.opaque
+}
+
+func OpaqueExecOption(opaque interface{}) ExecOption {
+	return &opaqueOption{opaque: opaque}
+}
+
 // the Result type is used to return write errors here
-func (conn *Connection) writeRequest(ctx context.Context, q Query, opaque interface{}, replyChan chan *AsyncResult) (*request, *Result) {
+func (conn *Connection) writeRequest(ctx context.Context, request *request, q Query) (*request, *Result) {
 	var err error
 
 	requestID := conn.nextID()
-	request := &request{
-		opaque:    opaque,
-		replyChan: replyChan,
-	}
-
 	pp := packetPool.GetWithID(requestID)
 
 	if err = pp.packMsg(q, conn.packData); err != nil {
@@ -22,6 +33,8 @@ func (conn *Connection) writeRequest(ctx context.Context, q Query, opaque interf
 			ErrorCode: ErrInvalidMsgpack,
 		}
 	}
+
+	request.packet = pp
 
 	if oldRequest := conn.requests.Put(requestID, request); oldRequest != nil {
 		select {
@@ -43,7 +56,7 @@ func (conn *Connection) writeRequest(ctx context.Context, q Query, opaque interf
 	}
 
 	select {
-	case writeChan <- pp:
+	case writeChan <- request:
 	case <-ctx.Done():
 		if conn.perf.QueryTimeouts != nil {
 			conn.perf.QueryTimeouts.Add(1)
@@ -89,21 +102,25 @@ func (conn *Connection) readResult(ctx context.Context, arc chan *AsyncResult) *
 	}
 }
 
-func (conn *Connection) Exec(ctx context.Context, q Query) (result *Result) {
+func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption) (result *Result) {
 	var cancel context.CancelFunc = func() {}
 
 	if _, ok := ctx.Deadline(); !ok && conn.queryTimeout != 0 {
 		ctx, cancel = context.WithTimeout(ctx, conn.queryTimeout)
 	}
 
-	replyChan := make(chan *AsyncResult, 1)
+	request := &request{}
+	request.replyChan = make(chan *AsyncResult, 1)
+	for i := 0; i < len(options); i++ {
+		options[i].apply(request)
+	}
 
-	if _, rerr := conn.writeRequest(ctx, q, nil, replyChan); rerr != nil {
+	if _, rerr := conn.writeRequest(ctx, request, q); rerr != nil {
 		cancel()
 		return rerr
 	}
 
-	ar := conn.readResult(ctx, replyChan)
+	ar := conn.readResult(ctx, request.replyChan)
 	cancel()
 
 	if rerr := ar.Error; rerr != nil {
@@ -138,7 +155,11 @@ func (conn *Connection) Exec(ctx context.Context, q Query) (result *Result) {
 }
 
 func (conn *Connection) ExecAsync(ctx context.Context, q Query, opaque interface{}, replyChan chan *AsyncResult) error {
-	if _, rerr := conn.writeRequest(ctx, q, opaque, replyChan); rerr != nil {
+	request := &request{}
+	request.opaque = opaque
+	request.replyChan = replyChan
+
+	if _, rerr := conn.writeRequest(ctx, request, q); rerr != nil {
 		return rerr.Error
 	}
 	return nil
