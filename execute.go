@@ -59,7 +59,7 @@ func (conn *Connection) writeRequest(ctx context.Context, request *request, q Qu
 	select {
 	case writeChan <- request:
 	case <-ctx.Done():
-		if conn.perf.QueryTimeouts != nil {
+		if conn.perf.QueryTimeouts != nil && ctx.Err() == context.DeadlineExceeded {
 			conn.perf.QueryTimeouts.Add(1)
 		}
 		r := conn.requests.Pop(requestID)
@@ -89,7 +89,7 @@ func (conn *Connection) readResult(ctx context.Context, arc chan *AsyncResult) *
 		}
 		return ar
 	case <-ctx.Done():
-		if conn.perf.QueryTimeouts != nil {
+		if conn.perf.QueryTimeouts != nil && ctx.Err() == context.DeadlineExceeded {
 			conn.perf.QueryTimeouts.Add(1)
 		}
 		return &AsyncResult{
