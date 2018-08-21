@@ -2,6 +2,7 @@ package tarantool
 
 type Query interface {
 	GetCommandID() uint
+	MarshalBinary() (data []byte, err error)
 	UnmarshalBinary(data []byte) error
 	UnmarshalMsg(data []byte) ([]byte, error)
 	PackMsg(data *packData, b []byte) ([]byte, error)

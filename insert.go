@@ -33,6 +33,11 @@ func (q Insert) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return msgp.AppendIntf(o, q.Tuple)
 }
 
+// MarshalBinary implements encoding.BinaryMarshaler
+func (q *Insert) MarshalBinary() (data []byte, err error) {
+	return q.PackMsg(defaultPackData, nil)
+}
+
 // UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (q *Insert) UnmarshalBinary(data []byte) (err error) {
 	_, err = q.UnmarshalMsg(data)
