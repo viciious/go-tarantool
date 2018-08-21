@@ -7,10 +7,12 @@ import (
 
 var packetPool *BinaryPacketPool
 var requestPool *cappedRequestPool
+var defaultPackData *packData
 
 func init() {
 	packetPool = newBinaryPacketPool()
 	requestPool = newCappedRequestPool()
+	defaultPackData = newPackData(10000)
 }
 
 type request struct {

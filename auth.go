@@ -78,6 +78,11 @@ func (auth Auth) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
+// MarshalBinary implements encoding.BinaryMarshaler
+func (auth *Auth) MarshalBinary() (data []byte, err error) {
+	return auth.PackMsg(nil, nil)
+}
+
 // UnmarshalMsg implements msgp.Unmarshaller
 func (auth *Auth) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i, l uint32

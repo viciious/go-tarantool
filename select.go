@@ -73,6 +73,11 @@ func (q Select) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
+// MarshalBinary implements encoding.BinaryMarshaler
+func (q *Select) MarshalBinary() (data []byte, err error) {
+	return q.PackMsg(defaultPackData, nil)
+}
+
 // UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (q *Select) UnmarshalBinary(data []byte) (err error) {
 	_, err = q.UnmarshalMsg(data)

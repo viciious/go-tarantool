@@ -37,6 +37,11 @@ func (q Subscribe) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
+// MarshalBinary implements encoding.BinaryMarshaler
+func (q *Subscribe) MarshalBinary() (data []byte, err error) {
+	return q.PackMsg(nil, nil)
+}
+
 // UnmarshalBinary implements encoding.BinaryUnmarshaler
 func (q *Subscribe) UnmarshalBinary(data []byte) (err error) {
 	_, err = q.UnmarshalMsg(data)

@@ -37,6 +37,11 @@ func (q Call) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
+// MarshalBinary implements encoding.BinaryMarshaler
+func (q *Call) MarshalBinary() (data []byte, err error) {
+	return q.PackMsg(nil, nil)
+}
+
 // UnmarshalMsg implements msgp.Unmarshaller
 func (q *Call) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i uint32
