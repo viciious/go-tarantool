@@ -111,8 +111,10 @@ func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption
 		ctx, cancel = context.WithTimeout(ctx, conn.queryTimeout)
 	}
 
+	replyChan := make(chan *AsyncResult, 1)
+
 	request := requestPool.Get()
-	request.replyChan = make(chan *AsyncResult, 1)
+	request.replyChan = replyChan
 	for i := 0; i < len(options); i++ {
 		options[i].apply(request)
 	}
@@ -122,7 +124,7 @@ func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption
 		return rerr
 	}
 
-	ar := conn.readResult(ctx, request.replyChan)
+	ar := conn.readResult(ctx, replyChan)
 	cancel()
 
 	if rerr := ar.Error; rerr != nil {
