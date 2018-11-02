@@ -53,6 +53,11 @@ func (e *ConnectionError) Temporary() bool {
 	return true
 }
 
+// Timeout implements net.Error interface.
+func (e *ConnectionError) Timeout() bool {
+	return false
+}
+
 // ContextError is returned when request has been ended with context timeout or cancel.
 type ContextError struct {
 	error
@@ -73,6 +78,11 @@ func (e *ContextError) Temporary() bool {
 	return true
 }
 
+// Timeout implements net.Error interface.
+func (e *ContextError) Timeout() bool {
+	return e.CtxErr == context.DeadlineExceeded
+}
+
 // QueryError is returned when query error has been happened.
 // It has error Code.
 type QueryError struct {
@@ -90,6 +100,11 @@ func NewQueryError(code uint, message string) *QueryError {
 
 // Temporary implements Error interface.
 func (e *QueryError) Temporary() bool {
+	return false
+}
+
+// Timeout implements net.Error interface.
+func (e *QueryError) Timeout() bool {
 	return false
 }
 
