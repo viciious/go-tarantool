@@ -59,12 +59,19 @@ type Connection struct {
 // Connect to tarantool instance with options.
 // Returned Connection could be used to execute queries.
 func Connect(dsnString string, options *Options) (conn *Connection, err error) {
-	dsn, opts, err := parseOptions(dsnString, options)
+	var opts Options
+	if options != nil {
+		opts = *options
+	}
+	dsn, opts, err := parseOptions(dsnString, opts)
 	if err != nil {
 		return nil, err
 	}
+	return connect(dsn.Scheme, dsn.Host, opts)
+}
 
-	conn, err = newConn(dsn.Scheme, dsn.Host, opts)
+func connect(scheme, addr string, opts Options) (conn *Connection, err error) {
+	conn, err = newConn(scheme, addr, opts)
 	if err != nil {
 		return
 	}
@@ -189,14 +196,8 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 	return
 }
 
-func parseOptions(dsnString string, options *Options) (*url.URL, Options, error) {
-	if options == nil {
-		options = &Options{}
-	}
-	opts := *options // copy to new object
-
+func parseOptions(dsnString string, opts Options) (*url.URL, Options, error) {
 	// remove schema, if present
-
 	// === for backward compatibility (only tcp despite of user wishes :)
 	dsnString = strings.TrimPrefix(dsnString, "unix:")
 	// ===
@@ -212,13 +213,6 @@ func parseOptions(dsnString string, options *Options) (*url.URL, Options, error)
 	dsn, err := url.Parse(dsnString)
 	if err != nil {
 		return dsn, opts, err
-	}
-
-	if opts.ConnectTimeout.Nanoseconds() == 0 {
-		opts.ConnectTimeout = DefaultConnectTimeout
-	}
-	if opts.QueryTimeout.Nanoseconds() == 0 {
-		opts.QueryTimeout = DefaultQueryTimeout
 	}
 
 	if len(opts.User) == 0 {
@@ -239,6 +233,13 @@ func parseOptions(dsnString string, options *Options) (*url.URL, Options, error)
 		default:
 			opts.DefaultSpace = path
 		}
+	}
+
+	if opts.ConnectTimeout.Nanoseconds() == 0 {
+		opts.ConnectTimeout = DefaultConnectTimeout
+	}
+	if opts.QueryTimeout.Nanoseconds() == 0 {
+		opts.QueryTimeout = DefaultQueryTimeout
 	}
 
 	return dsn, opts, nil

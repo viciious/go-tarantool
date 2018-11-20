@@ -48,7 +48,7 @@ func NewSlave(uri string, opts ...Options) (s *Slave, err error) {
 	}
 
 	// it is discussable to connect to instance in instance creation
-	if err = s.connect(uri, &options); err != nil {
+	if err = s.connect(uri, options); err != nil {
 		return nil, err
 	}
 	// prevent from NPE in Next method
@@ -406,7 +406,7 @@ func (s *Slave) nextEOF() (*Packet, error) {
 }
 
 // connect to tarantool instance (dial + handshake + auth).
-func (s *Slave) connect(uri string, options *Options) (err error) {
+func (s *Slave) connect(uri string, options Options) (err error) {
 	dsn, opts, err := parseOptions(uri, options)
 	if err != nil {
 		return
