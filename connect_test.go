@@ -80,7 +80,7 @@ func TestConnectOptionsDSN(t *testing.T) {
 		{"127.0.0.1/tester%2Ctwo", "", "", "tcp", "127.0.0.1", "tester,two", nil},
 	}
 	for tc, item := range tt {
-		dsn, opts, err := parseOptions(item.uri, nil)
+		dsn, opts, err := parseOptions(item.uri, Options{})
 		assert.Equal(item.err, err, "case %v (err)", tc+1)
 		if err != nil {
 			continue
