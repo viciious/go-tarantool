@@ -115,7 +115,7 @@ func TestSlaveConnect(t *testing.T) {
 	require.NoError(err)
 
 	// check
-	err = s.connect(box.Listen, &opts)
+	err = s.connect(box.Listen, opts)
 	require.NoError(err)
 	s.c.stop()
 }
