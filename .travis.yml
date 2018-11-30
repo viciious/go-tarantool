@@ -24,7 +24,7 @@ before_install:
 install:
 - sudo apt-get update
 - sudo apt-get -y install tarantool
-- go get github.com/golang/lint/golint
+- go get golang.org/x/lint/golint
 
 matrix:
   include:
