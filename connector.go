@@ -9,13 +9,13 @@ type Connector struct {
 	RemoteAddr string
 	options    Options
 	conn       *Connection
-	ch         chan struct{}
+	ch         chan bool
 }
 
 // New Connector instance.
 func New(dsnString string, options *Options) *Connector {
-	ch := make(chan struct{}, 1)
-	ch <- struct{}{}
+	ch := make(chan bool, 1)
+	ch <- true
 
 	if options != nil {
 		return &Connector{RemoteAddr: dsnString, options: *options, ch: ch}
@@ -45,7 +45,7 @@ func (c *Connector) ConnectContext(ctx context.Context) (conn *Connection, err e
 		var dsn *url.URL
 		dsn, c.options, err = parseOptions(c.RemoteAddr, c.options)
 		if err != nil {
-			c.ch <- struct {}{}
+			c.ch <- true
 			return nil, err
 		}
 		// clear possible user:pass in order to log c.RemoteAddr securely
@@ -53,7 +53,7 @@ func (c *Connector) ConnectContext(ctx context.Context) (conn *Connection, err e
 		c.conn, err = connect(ctx, dsn.Scheme, dsn.Host, c.options)
 	}
 	conn = c.conn
-	c.ch <- struct {}{}
+	c.ch <- true
 
 	return conn, err
 }
@@ -65,5 +65,5 @@ func (c *Connector) Close() {
 		c.conn.Close()
 	}
 	c.conn = nil
-	c.ch <- struct {}{}
+	c.ch <- true
 }
