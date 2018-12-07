@@ -1,8 +1,8 @@
 package tarantool
 
 import (
-	"net/url"
 	"context"
+	"net/url"
 )
 
 type Connector struct {
@@ -50,7 +50,7 @@ func (c *Connector) ConnectContext(ctx context.Context) (conn *Connection, err e
 		}
 		// clear possible user:pass in order to log c.RemoteAddr securely
 		c.RemoteAddr = dsn.Host
-		c.conn, err = connect(dsn.Scheme, dsn.Host, c.options)
+		c.conn, err = connect(ctx, dsn.Scheme, dsn.Host, c.options)
 	}
 	conn = c.conn
 	c.ch <- struct {}{}
