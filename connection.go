@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -67,11 +68,25 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return connect(dsn.Scheme, dsn.Host, opts)
+	return connect(context.Background(), dsn.Scheme, dsn.Host, opts)
 }
 
-func connect(scheme, addr string, opts Options) (conn *Connection, err error) {
-	conn, err = newConn(scheme, addr, opts)
+// Connect to tarantool instance with options and context.
+// Returned Connection could be used to execute queries.
+func ConnectContext(ctx context.Context, dsnString string, options *Options) (conn *Connection, err error) {
+	var opts Options
+	if options != nil {
+		opts = *options
+	}
+	dsn, opts, err := parseOptions(dsnString, opts)
+	if err != nil {
+		return nil, err
+	}
+	return connect(ctx, dsn.Scheme, dsn.Host, opts)
+}
+
+func connect(ctx context.Context, scheme, addr string, opts Options) (conn *Connection, err error) {
+	conn, err = newConn(ctx, scheme, addr, opts)
 	if err != nil {
 		return
 	}
@@ -95,7 +110,7 @@ func connect(scheme, addr string, opts Options) (conn *Connection, err error) {
 	return
 }
 
-func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
+func newConn(ctx context.Context, scheme, addr string, opts Options) (conn *Connection, err error) {
 
 	defer func() { // close opened connection if error
 		if err != nil && conn != nil {
@@ -118,7 +133,11 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		perf:           opts.Perf,
 	}
 
-	conn.tcpConn, err = net.DialTimeout(scheme, conn.remoteAddr, opts.ConnectTimeout)
+	d := net.Dialer{
+		Timeout: opts.ConnectTimeout,
+	}
+
+	conn.tcpConn, err = d.DialContext(ctx, scheme, conn.remoteAddr)
 	if err != nil {
 		return nil, err
 	}

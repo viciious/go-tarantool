@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"bufio"
+	"context"
 	"io"
 
 	uuid "github.com/satori/go.uuid"
@@ -411,7 +412,7 @@ func (s *Slave) connect(uri string, options Options) (err error) {
 	if err != nil {
 		return
 	}
-	conn, err := newConn(dsn.Scheme, dsn.Host, opts)
+	conn, err := newConn(context.Background(), dsn.Scheme, dsn.Host, opts)
 	if err != nil {
 		return
 	}
