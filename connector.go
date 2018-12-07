@@ -38,7 +38,7 @@ func (c *Connector) ConnectContext(ctx context.Context) (conn *Connection, err e
 		case <-c.ch:
 		}
 	} else {
-		<- c.ch
+		<-c.ch
 	}
 
 	if c.conn == nil || c.conn.IsClosed() {
@@ -60,7 +60,7 @@ func (c *Connector) ConnectContext(ctx context.Context) (conn *Connection, err e
 
 // Close underlying connection.
 func (c *Connector) Close() {
-	<- c.ch
+	<-c.ch
 	if c.conn != nil && !c.conn.IsClosed() {
 		c.conn.Close()
 	}
