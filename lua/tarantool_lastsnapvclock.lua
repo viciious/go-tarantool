@@ -1,5 +1,5 @@
 -- version comment below is used for system.d spec file
--- VERSION = '0.3.2'
+-- VERSION = '0.3.3'
 
 local box = require('box')
 local fio = require('fio')
@@ -59,7 +59,7 @@ local function lastsnapvclock()
     local err
     local data
     local vclock
-    local limit = 255
+    local limit = 1024
 
     local snapfilename = lastsnapfilename()
     if not snapfilename then
