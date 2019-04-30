@@ -187,12 +187,12 @@ func (s *Slave) LastSnapVClock() (VectorClock, error) {
 	if err = s.send(pp); err != nil {
 		return nil, err
 	}
-	pp.Release()
+	s.c.releasePacket(pp)
 
 	if pp, err = s.receive(); err != nil {
 		return nil, err
 	}
-	defer pp.Release()
+	defer s.c.releasePacket(pp)
 
 	p := &pp.packet
 	err = p.UnmarshalBinary(pp.body)
@@ -232,7 +232,7 @@ func (s *Slave) join() (err error) {
 	if err = s.send(pp); err != nil {
 		return err
 	}
-	pp.Release()
+	s.c.releasePacket(pp)
 
 	return nil
 }
@@ -251,12 +251,12 @@ func (s *Slave) subscribe(lsns ...uint64) error {
 	if err = s.send(pp); err != nil {
 		return err
 	}
-	pp.Release()
+	s.c.releasePacket(pp)
 
 	if pp, err = s.receive(); err != nil {
 		return err
 	}
-	defer pp.Release()
+	defer s.c.releasePacket(pp)
 
 	p := &pp.packet
 	err = p.UnmarshalBinary(pp.body)
@@ -324,7 +324,7 @@ func (s *Slave) nextXlog() (p *Packet, err error) {
 	if err != nil {
 		return nil, err
 	}
-	defer pp.Release()
+	defer s.c.releasePacket(pp)
 
 	p = &Packet{}
 	err = p.UnmarshalBinary(pp.body)
@@ -347,7 +347,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 	if err != nil {
 		return nil, err
 	}
-	defer pp.Release()
+	defer s.c.releasePacket(pp)
 
 	p = &Packet{}
 	err = p.UnmarshalBinary(pp.body)
@@ -447,7 +447,7 @@ func (s *Slave) receive() (*BinaryPacket, error) {
 func (s *Slave) newPacket(q Query) (pp *BinaryPacket, err error) {
 	pp = packetPool.GetWithID(s.c.nextID())
 	if err = pp.packMsg(q, s.c.packData); err != nil {
-		pp.Release()
+		s.c.releasePacket(pp)
 		return nil, err
 	}
 	return

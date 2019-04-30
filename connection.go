@@ -27,6 +27,11 @@ type Options struct {
 	UUID           string
 	ReplicaSetUUID string
 	Perf           PerfCount
+
+	// PoolMaxPacketSize describes maximum size of packet buffer
+	// that can be added to packet pool.
+	// If the packet size is 0, option is ignored.
+	PoolMaxPacketSize int
 }
 
 type Greeting struct {
@@ -47,13 +52,14 @@ type Connection struct {
 	ccw io.Writer
 
 	// options
-	queryTimeout   time.Duration
-	greeting       *Greeting
-	packData       *packData
-	remoteAddr     string
-	firstError     error
-	firstErrorLock *sync.Mutex
-	perf           PerfCount
+	queryTimeout      time.Duration
+	greeting          *Greeting
+	packData          *packData
+	remoteAddr        string
+	firstError        error
+	firstErrorLock    *sync.Mutex
+	perf              PerfCount
+	poolMaxPacketSize int
 }
 
 // Connect to tarantool instance with options.
@@ -107,15 +113,16 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 	}()
 
 	conn = &Connection{
-		remoteAddr:     addr,
-		requests:       newRequestMap(),
-		writeChan:      make(chan *request, 256),
-		exit:           make(chan bool),
-		closed:         make(chan bool),
-		firstErrorLock: &sync.Mutex{},
-		packData:       newPackData(opts.DefaultSpace),
-		queryTimeout:   opts.QueryTimeout,
-		perf:           opts.Perf,
+		remoteAddr:        addr,
+		requests:          newRequestMap(),
+		writeChan:         make(chan *request, 256),
+		exit:              make(chan bool),
+		closed:            make(chan bool),
+		firstErrorLock:    &sync.Mutex{},
+		packData:          newPackData(opts.DefaultSpace),
+		queryTimeout:      opts.QueryTimeout,
+		perf:              opts.Perf,
+		poolMaxPacketSize: opts.PoolMaxPacketSize,
 	}
 
 	conn.tcpConn, err = net.DialTimeout(scheme, conn.remoteAddr, opts.ConnectTimeout)
@@ -164,18 +171,18 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 			GreetingAuth: conn.greeting.Auth,
 		}, conn.packData)
 		if err != nil {
-			pp.Release()
+			conn.releasePacket(pp)
 			return
 		}
 
 		_, err = pp.WriteTo(conn.ccw)
-		pp.Release()
+		conn.releasePacket(pp)
 		if err != nil {
 			return
 		}
 
 		pp = packetPool.Get()
-		defer pp.Release()
+		defer conn.releasePacket(pp)
 
 		if err = pp.readPacket(conn.ccr); err != nil {
 			return
@@ -254,18 +261,18 @@ func (conn *Connection) pullSchema() (err error) {
 
 		pp := packetPool.GetWithID(requestID)
 		if err = pp.packMsg(q, conn.packData); err != nil {
-			pp.Release()
+			conn.releasePacket(pp)
 			return nil, err
 		}
 
 		_, err = pp.WriteTo(conn.ccw)
-		pp.Release()
+		conn.releasePacket(pp)
 		if err != nil {
 			return nil, err
 		}
 
 		pp = packetPool.Get()
-		defer pp.Release()
+		defer conn.releasePacket(pp)
 
 		if err = pp.readPacket(conn.ccr); err != nil {
 			return nil, err
@@ -391,6 +398,12 @@ func (conn *Connection) IsClosed() bool {
 	}
 }
 
+func (conn *Connection) releasePacket(pp *BinaryPacket) {
+	if conn.poolMaxPacketSize < cap(pp.body) || conn.poolMaxPacketSize == 0 {
+		pp.Release()
+	}
+}
+
 func (conn *Connection) getError() error {
 	conn.firstErrorLock.Lock()
 	defer conn.firstErrorLock.Unlock()
@@ -438,7 +451,7 @@ CLEANUP_LOOP:
 			pp := req.packet
 			if pp != nil {
 				req.packet = nil
-				pp.Release()
+				conn.releasePacket(pp)
 			}
 		default:
 			break CLEANUP_LOOP
@@ -478,7 +491,7 @@ func (conn *Connection) writer() (err error) {
 
 		_, err := packet.WriteTo(w)
 		req.packet = nil
-		packet.Release()
+		conn.releasePacket(packet)
 		return err
 	}
 
@@ -536,7 +549,7 @@ READER_LOOP:
 
 		req := conn.requests.Pop(requestID)
 		if req == nil {
-			pp.Release()
+			conn.releasePacket(pp)
 			pp = nil
 			continue
 		}
@@ -555,7 +568,7 @@ READER_LOOP:
 	}
 
 	if pp != nil {
-		pp.Release()
+		conn.releasePacket(pp)
 	}
 	return
 }
