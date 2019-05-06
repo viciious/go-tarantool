@@ -399,7 +399,7 @@ func (conn *Connection) IsClosed() bool {
 }
 
 func (conn *Connection) releasePacket(pp *BinaryPacket) {
-	if conn.poolMaxPacketSize < cap(pp.body) || conn.poolMaxPacketSize == 0 {
+	if conn.poolMaxPacketSize == 0 || conn.poolMaxPacketSize < cap(pp.body) {
 		pp.Release()
 	}
 }
