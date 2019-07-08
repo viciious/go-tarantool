@@ -70,7 +70,6 @@ func (p *VClock) decodeHeader(r io.Reader) (err error) {
 
 func (p *VClock) decodeBody(r io.Reader) (err error) {
 	var count int
-
 	d := msgpack.NewDecoder(r)
 	if count, err = d.DecodeMapLen(); err != nil {
 		return
@@ -83,23 +82,8 @@ func (p *VClock) decodeBody(r io.Reader) (err error) {
 		}
 		switch key {
 		case KeyVClock:
-			var n int
-			if n, err = d.DecodeMapLen(); err != nil {
-				return err
-			}
-			p.VClock = NewVectorClock()
-			for ; n > 0; n-- {
-				id, err := d.DecodeUint32()
-				if err != nil {
-					return err
-				}
-				lsn, err := d.DecodeInt64()
-				if err != nil {
-					return err
-				}
-				if !p.VClock.Follow(id, lsn) {
-					return ErrVectorClock
-				}
+			if p.VClock, err = decodeVectorClock(d); err != nil {
+				return
 			}
 		default:
 			if err = d.Skip(); err != nil {
@@ -108,4 +92,54 @@ func (p *VClock) decodeBody(r io.Reader) (err error) {
 		}
 	}
 	return
+}
+
+var _ Query = (*VClock)(nil)
+
+// Pack implements a part of the Query interface
+func (p *VClock) Pack(data *packData, w io.Writer) (uint32, error) {
+	var err error
+
+	encoder := msgpack.NewEncoder(w)
+	encoder.EncodeMapLen(1)
+	if err = encoder.EncodeUint8(uint8(KeyVClock)); err != nil {
+		return 0, err
+	}
+	if err := encoder.EncodeMapLen(len(p.VClock[1:])); err != nil {
+		return 0, err
+	}
+	for i, lsn := range p.VClock[1:] {
+		encoder.EncodeUint32(uint32(i))
+		encoder.EncodeInt64(lsn)
+	}
+
+	return OkCode, nil
+}
+
+// Unpack implements a part of the Query interface
+func (p *VClock) Unpack(r io.Reader) (err error) {
+	return ErrNotSupported
+}
+
+func decodeVectorClock(d *msgpack.Decoder) (VClock VectorClock, err error) {
+	var n int
+	if n, err = d.DecodeMapLen(); err != nil {
+		return nil, err
+	}
+	VClock = NewVectorClock()
+	for ; n > 0; n-- {
+		id, err := d.DecodeUint32()
+		if err != nil {
+			return nil, err
+		}
+		lsn, err := d.DecodeInt64()
+		if err != nil {
+			return nil, err
+		}
+		if !VClock.Follow(id, lsn) {
+			return nil, ErrVectorClock
+		}
+	}
+
+	return VClock, nil
 }

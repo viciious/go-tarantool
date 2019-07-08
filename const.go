@@ -18,6 +18,7 @@ const (
 	PingRequest      = 64
 	JoinCommand      = 65
 	SubscribeRequest = 66
+	VoteRequest      = 68 // Tarantool >= 1.9.0
 	ErrorFlag        = 0x8000
 )
 
@@ -44,6 +45,7 @@ const (
 	KeyDefTuple       = 0x28
 	KeyData           = 0x30
 	KeyError          = 0x31
+	KeyBallot         = 0x29 // Tarantool >= 1.9.0
 )
 
 const (
@@ -204,4 +206,11 @@ const (
 
 const (
 	ServerIdent = "Tarantool 1.6.8 (Binary)"
+)
+
+// Consts for Tarantool features which require version check
+const (
+	version1_7_0 = uint32(67328) // VersionID(1, 7, 0)
+	version1_7_7 = uint32(67335) // VersionID(1, 7, 7)
+	version1_9_0 = uint32(67840) // VersionID(1, 9, 0)
 )
