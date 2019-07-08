@@ -59,7 +59,13 @@ func (r *Result) pack(requestID uint32) (*packedPacket, error) {
 func (r *Result) unpack(rr io.Reader) (err error) {
 	var l int
 	d := msgpack.NewDecoder(rr)
-	if l, err = d.DecodeMapLen(); err != nil {
+
+	// Tarantool >= 1.7.7 sends periodic heartbeat messages without body
+	if l, err = d.DecodeMapLen(); err == io.EOF && r.ErrorCode == OkCode {
+		return nil
+	}
+
+	if err != nil {
 		return
 	}
 	for ; l > 0; l-- {

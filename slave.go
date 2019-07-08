@@ -3,8 +3,9 @@ package tarantool
 import (
 	"bufio"
 	"io"
+	"time"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 )
 
 const (
@@ -16,7 +17,7 @@ type PacketIterator interface {
 	Next() (*Packet, error)
 }
 
-// Slave connects to Tarantool 1.6 instance and subscribes for changes.
+// Slave connects to Tarantool 1.6 or 1.10 instance and subscribes for changes.
 // Tarantool instance acting as a master sees Slave like any replica in replication set.
 // Slave can't be used concurrently, route responses from returned channel instead.
 type Slave struct {
@@ -121,10 +122,56 @@ func (s *Slave) Join() (err error) {
 	return s.Err()
 }
 
+func (s *Slave) vote() error {
+	pp, err := s.newPacket(&Vote{})
+	if err != nil {
+		return err
+	}
+
+	if err = s.send(pp); err != nil {
+		return err
+	}
+	pp.Release()
+
+	pp, err = s.receive()
+	if err != nil {
+		return err
+	}
+	defer pp.Release()
+
+	p, err := decodePacket(pp)
+	if err != nil {
+		return err
+	}
+
+	if p.code != OKRequest {
+		s.p = p
+		if p.Result == nil {
+			return ErrBadResult
+		}
+
+		s.err = p.Result.Error
+		return s.err
+	}
+
+	ballot := new(Ballot)
+	if err := ballot.UnmarshalBinary(pp.body); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // JoinWithSnap the Replica Set using Master instance.
 // Snapshot logs is available through the given out channel or returned PacketIterator.
 // (In truth, Slave itself is returned in PacketIterator wrapper)
 func (s *Slave) JoinWithSnap(out ...chan *Packet) (it PacketIterator, err error) {
+	// Send VoteRequest before Join for Tarantool >= 1.9.0
+	if s.Version() >= version1_9_0 {
+		if err = s.vote(); err != nil {
+			return nil, err
+		}
+	}
 
 	if err = s.join(); err != nil {
 		return nil, err
@@ -170,6 +217,15 @@ func (s *Slave) Subscribe(lsns ...int64) (it PacketIterator, err error) {
 
 	// set iterator for the Next method
 	s.next = s.nextXlog
+
+	// Tarantool >= 1.7.7 sends periodic heartbeat messages
+	if s.Version() < version1_7_7 {
+		return s, nil
+	}
+
+	// Start sending heartbeat messages to master
+	go s.heartbeat()
+
 	return s, nil
 }
 
@@ -198,18 +254,23 @@ func (s *Slave) LastSnapVClock() (VectorClock, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if p.code != OKRequest {
+
 		s.p = p
 		if p.Result == nil {
 			return nil, ErrBadResult
 		}
+
 		s.err = p.Result.Error
 		return nil, s.err
 	}
+
 	res := p.Result.Data
 	if len(res) == 0 || len(res[0]) == 0 {
 		return nil, ErrBadResult
 	}
+
 	vc := NewVectorClock()
 	for i, lsnu64 := range res[0] {
 		lsn, ok := lsnu64.(uint64)
@@ -232,6 +293,37 @@ func (s *Slave) join() (err error) {
 		return err
 	}
 	pp.Release()
+
+	// Tarantool < 1.7.0: if JOIN is successful, there is no "OK"
+	// response, but a stream of rows from checkpoint.
+	if s.Version() < version1_7_0 {
+		return nil
+	}
+
+	if pp, err = s.receive(); err != nil {
+		return err
+	}
+	defer pp.Release()
+
+	p, err := decodePacket(pp)
+	if err != nil {
+		return err
+	}
+	if p.code != OKRequest {
+		s.p = p
+		if p.Result == nil {
+			return ErrBadResult
+		}
+		return p.Result.Error
+	}
+
+	v := new(VClock)
+	err = v.UnmarshalBinary(pp.body)
+	if err != nil {
+		return err
+	}
+
+	s.VClock = v.VClock
 
 	return nil
 }
@@ -306,13 +398,73 @@ func (s *Slave) Err() error {
 func (s *Slave) Next() (*Packet, error) {
 	// Next wraps unexported "next" fields.
 	// Because of exported Next field can't implements needed interface itself.
+	var (
+		p   *Packet
+		err error
+	)
 
-	p, err := s.next()
-	if err != nil {
-		// don't iterate after error has been occurred
-		s.next = s.nextEOF
+	for {
+		p, err = s.next()
+		if err != nil {
+			// don't iterate after error has occurred
+			s.next = s.nextEOF
+			break
+		}
+
+		if p != nil && p.Request != nil {
+			break
+		}
 	}
+
 	return p, err
+}
+
+// nextFinalData iterates new packets (response on JOIN request for Tarantool > 1.7.0)
+func (s *Slave) nextFinalData() (p *Packet, err error) {
+	pp, err := s.receive()
+	if err != nil {
+		return nil, err
+	}
+	defer pp.Release()
+
+	p, err = decodePacket(pp)
+	if err != nil {
+		return nil, err
+	}
+
+	if !s.VClock.Follow(p.InstanceID, p.LSN) {
+		return nil, ErrVectorClock
+	}
+
+	switch p.code {
+	case InsertRequest:
+		q := p.Request.(*Insert)
+		switch q.Space {
+		case SpaceSchema:
+			// assert space _schema always has str index on field one
+			// and in "cluster" tuple uuid is string too
+			// {"cluster", "ea74fc91-54fe-4f64-adae-ad2bc3eb4194"}
+			key := q.Tuple[0].(string)
+			if key == SchemaKeyClusterUUID {
+				s.ReplicaSet.UUID = q.Tuple[1].(string)
+			}
+		case SpaceCluster:
+			// fill in Replica Set from _cluster space; format:
+			// {0x1, "89b1203b-acda-4ff1-ae76-8069145344b8"}
+			// {0x2, "7c025e42-2394-11e7-aacf-0242ac110002"}
+
+			// in reality _cluster key field is decoded to uint64
+			// but we know exactly that it can be cast to uint8 without losing data
+			instanceID := uint32(q.Tuple[0].(uint64))
+			// uuid
+			s.ReplicaSet.SetInstance(instanceID, q.Tuple[1].(string))
+		}
+	case OKRequest:
+		// Current vclock. This is not used now, ignore.
+		return nil, io.EOF
+	}
+
+	return p, nil
 }
 
 // nextXlog iterates new packets (responses on SUBSCRIBE request).
@@ -328,7 +480,12 @@ func (s *Slave) nextXlog() (p *Packet, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if !s.VClock.Follow(p.InstanceID, p.LSN) {
+	// Tarantool >= 1.7.7 master sends periodic heartbeat messages without body
+	if s.Version() < version1_7_7 && p.Result == nil && p.Request == nil {
+		return nil, ErrBadResult
+	}
+
+	if p.LSN > s.VClock[p.InstanceID] && !s.VClock.Follow(p.InstanceID, p.LSN) {
 		return nil, ErrVectorClock
 	}
 
@@ -387,7 +544,12 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 			return nil, err
 		}
 		s.VClock = v.VClock
-		return nil, io.EOF
+		if s.Version() < version1_7_0 {
+			return nil, io.EOF
+		}
+
+		s.next = s.nextFinalData
+		return &Packet{}, nil
 	case joined:
 		// already joined
 		return nil, io.EOF
@@ -399,6 +561,41 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 // nextEOF is empty iterator to avoid calling others in inappropriate cases.
 func (s *Slave) nextEOF() (*Packet, error) {
 	return nil, io.EOF
+}
+
+// for Tarantool >= 1.7.7 heartbeat sends encoded vclock to master every second
+func (s *Slave) heartbeat() {
+	if s.Version() < version1_7_7 {
+		return
+	}
+
+	var (
+		err error
+		pp  *packedPacket
+	)
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+loop:
+	for {
+		select {
+		case <-ticker.C:
+			if pp, err = s.newPacket(&VClock{
+				VClock: s.VClock,
+			}); err != nil {
+				break loop
+			}
+
+			if err = s.send(pp); err != nil {
+				pp.Release()
+				break loop
+			}
+
+			pp.Release()
+		}
+	}
+
+	s.disconnect()
 }
 
 // connect to tarantool instance (dial + handshake + auth).
@@ -421,6 +618,7 @@ func (s *Slave) connect(uri string, options *Options) (err error) {
 // disconnect call stop on shadow connection instance.
 func (s *Slave) disconnect() (err error) {
 	s.c.stop()
+
 	return
 }
 
@@ -447,4 +645,8 @@ func (s *Slave) newPacket(q Query) (pp *packedPacket, err error) {
 	}
 	pp.requestID = s.c.nextID()
 	return
+}
+
+func (s *Slave) Version() uint32 {
+	return s.c.Greeting.Version
 }
