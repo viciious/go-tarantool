@@ -23,11 +23,12 @@ func New(dsnString string, options *Options) *Connector {
 // Connect returns existing connection or will establish another one.
 func (c *Connector) Connect() (conn *Connection, err error) {
 	c.Lock()
+	defer c.Unlock()
+
 	if c.conn == nil || c.conn.IsClosed() {
 		var dsn *url.URL
 		dsn, c.options, err = parseOptions(c.RemoteAddr, c.options)
 		if err != nil {
-			c.Unlock()
 			return nil, err
 		}
 		// clear possible user:pass in order to log c.RemoteAddr securely
@@ -35,7 +36,6 @@ func (c *Connector) Connect() (conn *Connection, err error) {
 		c.conn, err = connect(dsn.Scheme, dsn.Host, c.options)
 	}
 	conn = c.conn
-	c.Unlock()
 
 	return conn, err
 }
