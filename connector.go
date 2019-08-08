@@ -27,6 +27,7 @@ func (c *Connector) Connect() (conn *Connection, err error) {
 		var dsn *url.URL
 		dsn, c.options, err = parseOptions(c.RemoteAddr, c.options)
 		if err != nil {
+			c.Unlock()
 			return nil, err
 		}
 		// clear possible user:pass in order to log c.RemoteAddr securely
