@@ -403,6 +403,16 @@ func (s *Slave) Next() (*Packet, error) {
 		err error
 	)
 
+	if s.Version() < version1_7_7 {
+		if p, err = s.next(); err != nil {
+			// don't iterate after error has been occurred
+			s.next = s.nextEOF
+		}
+
+		return p, err
+	}
+
+	// Process periodic heartbeat messages from master for tarantool >= 1.7.7
 	for {
 		p, err = s.next()
 		if err != nil {
@@ -411,9 +421,12 @@ func (s *Slave) Next() (*Packet, error) {
 			break
 		}
 
-		if p != nil && p.Request != nil {
-			break
+		// Skip non DML requests and heartbeat messages
+		if p.Request == nil && p.Result.ErrorCode == OkCode {
+			continue
 		}
+
+		break
 	}
 
 	return p, err
@@ -549,7 +562,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 		}
 
 		s.next = s.nextFinalData
-		return &Packet{}, nil
+		return p, nil
 	case joined:
 		// already joined
 		return nil, io.EOF
