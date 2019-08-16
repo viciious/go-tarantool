@@ -18,11 +18,11 @@ type Select struct {
 
 var _ Query = (*Select)(nil)
 
-func (q Select) GetCommandID() uint {
+func (q *Select) GetCommandID() uint {
 	return SelectCommand
 }
 
-func (q Select) PackMsg(data *packData, b []byte) (o []byte, err error) {
+func (q *Select) packMsg(data *packData, b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 6)
 
@@ -73,18 +73,12 @@ func (q Select) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (q *Select) MarshalBinary() (data []byte, err error) {
-	return q.PackMsg(defaultPackData, nil)
+// MarshalMsg implements msgp.Marshaler
+func (q *Select) MarshalMsg(b []byte) (data []byte, err error) {
+	return q.packMsg(defaultPackData, b)
 }
 
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (q *Select) UnmarshalBinary(data []byte) (err error) {
-	_, err = q.UnmarshalMsg(data)
-	return err
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (q *Select) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i uint32
 	var k uint

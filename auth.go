@@ -55,14 +55,15 @@ func xor(left, right []byte, size int) []byte {
 	return result
 }
 
-func (auth Auth) GetCommandID() uint {
+func (auth *Auth) GetCommandID() uint {
 	return AuthCommand
 }
 
-func (auth Auth) PackMsg(data *packData, b []byte) (o []byte, err error) {
+// MarshalMsg implements msgp.Marshaler
+func (auth *Auth) MarshalMsg(b []byte) (o []byte, err error) {
 	scr, err := scramble(auth.GreetingAuth, auth.Password)
 	if err != nil {
-		return o, fmt.Errorf("auth: scrambling failure: %s", err.Error())
+		return nil, fmt.Errorf("auth: scrambling failure: %s", err.Error())
 	}
 
 	o = b
@@ -78,12 +79,7 @@ func (auth Auth) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (auth *Auth) MarshalBinary() (data []byte, err error) {
-	return auth.PackMsg(nil, nil)
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (auth *Auth) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i, l uint32
 	var k uint
@@ -131,10 +127,4 @@ func (auth *Auth) UnmarshalMsg(data []byte) (buf []byte, err error) {
 		}
 	}
 	return
-}
-
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (auth *Auth) UnmarshalBinary(data []byte) (err error) {
-	_, err = auth.UnmarshalMsg(data)
-	return err
 }

@@ -45,11 +45,11 @@ func TestSelect(t *testing.T) {
 
 		defer conn.Close()
 
-		buf, err = query.PackMsg(conn.packData, buf)
+		buf, err = query.packMsg(conn.packData, buf)
 
 		if assert.NoError(err) {
 			var query2 = &Select{}
-			err = query2.UnmarshalBinary(buf)
+			_, err = query2.UnmarshalMsg(buf)
 
 			if assert.NoError(err) {
 				assert.Equal(uint(42), query2.Space)
@@ -179,9 +179,8 @@ func TestSelect(t *testing.T) {
 }
 
 func BenchmarkSelectPack(b *testing.B) {
-	d := newPackData(42)
 	buf := make([]byte, 0)
 	for i := 0; i < b.N; i++ {
-		buf, _ = (&Select{Key: 3}).PackMsg(d, buf)
+		buf, _ = (&Select{Key: 3}).MarshalMsg(buf[:0])
 	}
 }

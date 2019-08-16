@@ -11,11 +11,12 @@ type Join struct {
 
 var _ Query = (*Join)(nil)
 
-func (q Join) GetCommandID() uint {
+func (q *Join) GetCommandID() uint {
 	return JoinCommand
 }
 
-func (q Join) PackMsg(data *packData, b []byte) (o []byte, err error) {
+// MarshalMsg implements msgp.Marshaler
+func (q *Join) MarshalMsg(b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 1)
 	o = msgp.AppendUint(o, KeyInstanceUUID)
@@ -23,18 +24,7 @@ func (q Join) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (q *Join) MarshalBinary() (data []byte, err error) {
-	return q.PackMsg(nil, nil)
-}
-
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (q *Join) UnmarshalBinary(data []byte) (err error) {
-	_, err = q.UnmarshalMsg(data)
-	return err
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (q *Join) UnmarshalMsg([]byte) (buf []byte, err error) {
 	return buf, ErrNotSupported
 }

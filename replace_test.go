@@ -39,11 +39,11 @@ func TestReplace(t *testing.T) {
 		var err error
 		var buf []byte
 
-		buf, err = query.PackMsg(conn.packData, buf)
+		buf, err = query.packMsg(conn.packData, buf)
 
 		if assert.NoError(err) {
 			var query2 = &Replace{}
-			err = query2.UnmarshalBinary(buf)
+			_, err = query2.UnmarshalMsg(buf)
 
 			if assert.NoError(err) {
 				assert.Equal(uint(42), query2.Space)
@@ -84,9 +84,8 @@ func TestReplace(t *testing.T) {
 }
 
 func BenchmarkReplacePack(b *testing.B) {
-	d := newPackData(42)
 	buf := make([]byte, 0)
 	for i := 0; i < b.N; i++ {
-		buf, _ = (&Replace{Tuple: []interface{}{3, "Hello world"}}).PackMsg(d, buf)
+		buf, _ = (&Replace{Tuple: []interface{}{3, "Hello world"}}).MarshalMsg(buf[:0])
 	}
 }

@@ -91,7 +91,7 @@ func (pack *Packet) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
 func (pack *Packet) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
 	unpackq := func(q Query, data []byte) (buf []byte, err error) {
 		buf = data
-		if buf, err = q.UnmarshalMsg(buf); err != nil {
+		if buf, err = q.(msgp.Unmarshaler).UnmarshalMsg(buf); err != nil {
 			return
 		}
 		pack.Request = q
@@ -125,7 +125,7 @@ func (pack *Packet) UnmarshalBinary(data []byte) error {
 	return err
 }
 
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (pack *Packet) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	*pack = Packet{}
 

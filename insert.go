@@ -13,11 +13,11 @@ type Insert struct {
 
 var _ Query = (*Insert)(nil)
 
-func (q Insert) GetCommandID() uint {
+func (q *Insert) GetCommandID() uint {
 	return InsertCommand
 }
 
-func (q Insert) PackMsg(data *packData, b []byte) (o []byte, err error) {
+func (q *Insert) packMsg(data *packData, b []byte) (o []byte, err error) {
 	if q.Tuple == nil {
 		return o, errors.New("Tuple can not be nil")
 	}
@@ -33,18 +33,12 @@ func (q Insert) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return msgp.AppendIntf(o, q.Tuple)
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (q *Insert) MarshalBinary() (data []byte, err error) {
-	return q.PackMsg(defaultPackData, nil)
+// MarshalMsg implements msgp.Marshaler
+func (q *Insert) MarshalMsg(b []byte) (data []byte, err error) {
+	return q.packMsg(defaultPackData, b)
 }
 
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (q *Insert) UnmarshalBinary(data []byte) (err error) {
-	_, err = q.UnmarshalMsg(data)
-	return err
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (q *Insert) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i uint32
 	var k uint

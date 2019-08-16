@@ -13,11 +13,12 @@ type Call struct {
 
 var _ Query = (*Call)(nil)
 
-func (q Call) GetCommandID() uint {
+func (q *Call) GetCommandID() uint {
 	return CallCommand
 }
 
-func (q Call) PackMsg(data *packData, b []byte) (o []byte, err error) {
+// MarshalMsg implements msgp.Marshaler
+func (q *Call) MarshalMsg(b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 2)
 
@@ -37,12 +38,7 @@ func (q Call) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (q *Call) MarshalBinary() (data []byte, err error) {
-	return q.PackMsg(nil, nil)
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (q *Call) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i uint32
 	var k uint
@@ -89,10 +85,4 @@ func (q *Call) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	}
 
 	return
-}
-
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (q *Call) UnmarshalBinary(data []byte) (err error) {
-	_, err = q.UnmarshalMsg(data)
-	return err
 }

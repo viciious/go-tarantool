@@ -13,11 +13,11 @@ type Replace struct {
 
 var _ Query = (*Replace)(nil)
 
-func (q Replace) GetCommandID() uint {
+func (q *Replace) GetCommandID() uint {
 	return ReplaceCommand
 }
 
-func (q Replace) PackMsg(data *packData, b []byte) (o []byte, err error) {
+func (q *Replace) packMsg(data *packData, b []byte) (o []byte, err error) {
 	if q.Tuple == nil {
 		return o, errors.New("Tuple can not be nil")
 	}
@@ -33,15 +33,9 @@ func (q Replace) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return msgp.AppendIntf(o, q.Tuple)
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (q *Replace) MarshalBinary() (data []byte, err error) {
-	return q.PackMsg(defaultPackData, nil)
-}
-
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (q *Replace) UnmarshalBinary(data []byte) (err error) {
-	_, err = q.UnmarshalMsg(data)
-	return err
+// MarshalMsg implements msgp.Marshaler
+func (q *Replace) MarshalMsg(b []byte) ([]byte, error) {
+	return q.packMsg(defaultPackData, b)
 }
 
 // UnmarshalMsg implements msgp.Unmarshaller

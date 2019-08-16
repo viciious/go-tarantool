@@ -14,11 +14,11 @@ type Update struct {
 
 var _ Query = (*Update)(nil)
 
-func (q Update) GetCommandID() uint {
+func (q *Update) GetCommandID() uint {
 	return UpdateCommand
 }
 
-func (q Update) PackMsg(data *packData, b []byte) (o []byte, err error) {
+func (q *Update) packMsg(data *packData, b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 4)
 
@@ -53,18 +53,12 @@ func (q Update) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (q *Update) MarshalBinary() (data []byte, err error) {
-	return q.PackMsg(defaultPackData, nil)
+// MarshalMsg implements msgp.Marshaler
+func (q *Update) MarshalMsg(b []byte) ([]byte, error) {
+	return q.packMsg(defaultPackData, b)
 }
 
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (q *Update) UnmarshalBinary(data []byte) error {
-	_, err := q.UnmarshalMsg(data)
-	return err
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (q *Update) UnmarshalMsg(data []byte) ([]byte, error) {
 	return msgp.Skip(data)
 }

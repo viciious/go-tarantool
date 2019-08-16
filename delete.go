@@ -15,12 +15,13 @@ type Delete struct {
 
 var _ Query = (*Delete)(nil)
 
-func (q Delete) GetCommandID() uint {
+func (q *Delete) GetCommandID() uint {
 	return DeleteCommand
 }
 
-func (q Delete) PackMsg(data *packData, b []byte) (o []byte, err error) {
-	o = b
+func (q *Delete) packMsg(data *packData, o []byte) ([]byte, error) {
+	var err error
+
 	o = msgp.AppendMapHeader(o, 3)
 
 	if o, err = data.packSpace(q.Space, o); err != nil {
@@ -46,18 +47,12 @@ func (q Delete) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (q *Delete) MarshalBinary() (data []byte, err error) {
-	return q.PackMsg(defaultPackData, nil)
+// MarshalMsg implements msgp.Marshaler
+func (q *Delete) MarshalMsg(b []byte) (data []byte, err error) {
+	return q.packMsg(defaultPackData, b)
 }
 
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (q *Delete) UnmarshalBinary(data []byte) (err error) {
-	_, err = q.UnmarshalMsg(data)
-	return err
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (q *Delete) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i uint32
 	var k uint

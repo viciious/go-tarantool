@@ -29,11 +29,3 @@ func TestPing(t *testing.T) {
 	assert.NoError(err)
 	assert.Nil(data)
 }
-
-func BenchmarkPingPack(b *testing.B) {
-	d := newPackData(42)
-
-	for i := 0; i < b.N; i++ {
-		(&Ping{}).PackMsg(d, nil)
-	}
-}
