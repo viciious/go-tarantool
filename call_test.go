@@ -58,11 +58,11 @@ func TestCall(t *testing.T) {
 
 		defer conn.Close()
 
-		buf, err = query.PackMsg(conn.packData, buf)
+		buf, err = query.MarshalMsg(nil)
 
 		if assert.NoError(err) {
 			var query2 = &Call{}
-			err = query2.UnmarshalBinary(buf)
+			_, err = query2.UnmarshalMsg(buf)
 
 			if assert.NoError(err) {
 				assert.Equal(query.Name, query2.Name)
@@ -104,8 +104,7 @@ func TestCall(t *testing.T) {
 
 func BenchmarkCallPack(b *testing.B) {
 	buf := make([]byte, 0)
-	d := newPackData(42)
 	for i := 0; i < b.N; i++ {
-		buf, _ = (&Call{Name: "sel_all"}).PackMsg(d, buf)
+		buf, _ = (&Call{Name: "sel_all"}).MarshalMsg(buf[:0])
 	}
 }

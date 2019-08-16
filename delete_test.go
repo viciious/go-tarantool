@@ -47,11 +47,11 @@ func TestDelete(t *testing.T) {
 		var err error
 		var buf []byte
 
-		buf, err = query.PackMsg(conn.packData, buf)
+		buf, err = query.packMsg(conn.packData, buf)
 
 		if assert.NoError(err) {
 			var query2 = &Delete{}
-			err = query2.UnmarshalBinary(buf)
+			_, err = query2.UnmarshalMsg(buf)
 
 			if assert.NoError(err) {
 				switch query.Space.(string) {
@@ -140,9 +140,8 @@ func TestDelete(t *testing.T) {
 }
 
 func BenchmarkDeletePack(b *testing.B) {
-	d := newPackData(42)
 	buf := make([]byte, 0)
 	for i := 0; i < b.N; i++ {
-		buf, _ = (&Delete{KeyTuple: []interface{}{3, "Hello world"}}).PackMsg(d, buf)
+		buf, _ = (&Delete{KeyTuple: []interface{}{3, "Hello world"}}).MarshalMsg(buf[:0])
 	}
 }

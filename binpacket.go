@@ -178,10 +178,21 @@ func (pp *BinaryPacket) readRawPacket(r io.Reader) (requestID uint64, err error)
 }
 
 func (pp *BinaryPacket) packMsg(q Query, packdata *packData) (err error) {
-	if pp.body, err = q.PackMsg(packdata, pp.body[:0]); err != nil {
+	if iq, ok := q.(internalQuery); ok {
+		if pp.body, err = iq.packMsg(packdata, pp.body[:0]); err != nil {
+			pp.packet.Cmd = ErrorFlag
+			return err
+		}
+	} else if mp, ok := q.(msgp.Marshaler); ok {
+		if pp.body, err = mp.MarshalMsg(pp.body[:0]); err != nil {
+			pp.packet.Cmd = ErrorFlag
+			return err
+		}
+	} else {
 		pp.packet.Cmd = ErrorFlag
-		return err
+		return errors.New("The Query struct doesn't implement any known marshalling interface")
 	}
+
 	pp.packet.Cmd = q.GetCommandID()
 	return nil
 }

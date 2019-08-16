@@ -12,11 +12,11 @@ type Upsert struct {
 
 var _ Query = (*Upsert)(nil)
 
-func (q Upsert) GetCommandID() uint {
+func (q *Upsert) GetCommandID() uint {
 	return UpsertCommand
 }
 
-func (q Upsert) PackMsg(data *packData, b []byte) (o []byte, err error) {
+func (q *Upsert) packMsg(data *packData, b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 3)
 
@@ -40,18 +40,12 @@ func (q Upsert) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (q *Upsert) MarshalBinary() (data []byte, err error) {
-	return q.PackMsg(defaultPackData, nil)
+// MarshalMsg implements msgp.Marshaler
+func (q *Upsert) MarshalMsg(b []byte) ([]byte, error) {
+	return q.packMsg(defaultPackData, b)
 }
 
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (q *Upsert) UnmarshalBinary(data []byte) error {
-	_, err := q.UnmarshalMsg(data)
-	return err
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (q *Upsert) UnmarshalMsg(data []byte) ([]byte, error) {
 	return msgp.Skip(data)
 }

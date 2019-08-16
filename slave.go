@@ -272,7 +272,7 @@ func (s *Slave) subscribe(lsns ...uint64) error {
 	}
 
 	v := new(VClock)
-	err = v.UnmarshalBinary(pp.body)
+	_, err = v.UnmarshalMsg(pp.body)
 	if err != nil {
 		return err
 	}
@@ -386,7 +386,7 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 		}
 	case OKCommand:
 		v := new(VClock)
-		err = v.UnmarshalBinary(pp.body)
+		_, err = v.UnmarshalMsg(pp.body)
 		if err != nil {
 			return nil, err
 		}

@@ -115,7 +115,6 @@ func TestUpsert(t *testing.T) {
 }
 
 func BenchmarkUpsertPack(b *testing.B) {
-	d := newPackData(42)
 	buf := make([]byte, 0)
 
 	for i := 0; i < b.N; i++ {
@@ -132,6 +131,6 @@ func BenchmarkUpsertPack(b *testing.B) {
 					Argument: "Hello World",
 				},
 			},
-		}).PackMsg(d, buf)
+		}).MarshalMsg(buf[:0])
 	}
 }

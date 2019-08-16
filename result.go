@@ -19,9 +19,9 @@ func (r *Result) GetCommandID() uint {
 	return r.ErrorCode
 }
 
-func (r *Result) PackMsg(data *packData, b []byte) (o []byte, err error) {
+// MarshalMsg implements msgp.Marshaler
+func (r *Result) MarshalMsg(b []byte) (o []byte, err error) {
 	o = b
-
 	if r.Error != nil {
 		o = msgp.AppendMapHeader(o, 1)
 		o = msgp.AppendUint(o, KeyError)
@@ -41,18 +41,7 @@ func (r *Result) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (r *Result) MarshalBinary() (data []byte, err error) {
-	return r.PackMsg(nil, nil)
-}
-
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (r *Result) UnmarshalBinary(data []byte) (err error) {
-	_, err = r.UnmarshalMsg(data)
-	return err
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (r *Result) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var l uint32
 	var dl, tl uint32

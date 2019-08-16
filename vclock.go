@@ -20,12 +20,6 @@ func (p *VClock) String() string {
 		p.RequestID, p.InstanceID, p.VClock)
 }
 
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (p *VClock) UnmarshalBinary(data []byte) error {
-	_, err := p.UnmarshalMsg(data)
-	return err
-}
-
 // UnmarshalMsg implements msgp.Unmarshaller
 func (p *VClock) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	buf = data

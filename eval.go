@@ -14,11 +14,12 @@ type Eval struct {
 
 var _ Query = (*Eval)(nil)
 
-func (q Eval) GetCommandID() uint {
+func (q *Eval) GetCommandID() uint {
 	return EvalCommand
 }
 
-func (q Eval) PackMsg(data *packData, b []byte) (o []byte, err error) {
+// MarshalMsg implements msgp.Marshaler
+func (q *Eval) MarshalMsg(b []byte) (o []byte, err error) {
 	o = b
 	o = msgp.AppendMapHeader(o, 2)
 
@@ -38,18 +39,7 @@ func (q Eval) PackMsg(data *packData, b []byte) (o []byte, err error) {
 	return o, nil
 }
 
-// MarshalBinary implements encoding.BinaryMarshaler
-func (q *Eval) MarshalBinary() (data []byte, err error) {
-	return q.PackMsg(nil, nil)
-}
-
-// UnmarshalBinary implements encoding.BinaryUnmarshaler
-func (q *Eval) UnmarshalBinary(data []byte) (err error) {
-	_, err = q.UnmarshalMsg(data)
-	return err
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
+// UnmarshalMsg implements msgp.Unmarshaler
 func (q *Eval) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var i uint32
 	var k uint

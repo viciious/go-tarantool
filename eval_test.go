@@ -18,12 +18,11 @@ func schemeGrantUserEval(username string) string {
 func TestEvalPackUnpack(t *testing.T) {
 	q := &Eval{Expression: "return 2+2", Tuple: []interface{}{"test"}}
 	// check unpack
-	buf := make([]byte, 0)
-	buf, err := q.PackMsg(nil, buf)
+	buf, err := q.MarshalMsg(nil)
 	require.NoError(t, err)
 
 	qa := &Eval{}
-	err = qa.UnmarshalBinary(buf)
+	_, err = qa.UnmarshalMsg(buf)
 	require.NoError(t, err)
 	assert.Equal(t, q, qa)
 }
@@ -56,9 +55,8 @@ func TestEvalExecute(t *testing.T) {
 }
 
 func BenchmarkEvalPack(b *testing.B) {
-	d := newPackData(42)
 	buf := make([]byte, 0)
 	for i := 0; i < b.N; i++ {
-		buf, _ = (&Eval{Expression: "return 2+2"}).PackMsg(d, buf)
+		buf, _ = (&Eval{Expression: "return 2+2"}).MarshalMsg(buf[:0])
 	}
 }
