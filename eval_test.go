@@ -11,7 +11,7 @@ import (
 
 func schemeGrantUserEval(username string) string {
 	scheme := `
-    box.schema.user.grant('{username}', 'execute', 'universe', {if_not_exists = true})
+    box.schema.user.grant('{username}', 'execute', 'universe')
     `
 	return strings.Replace(scheme, "{username}", username, -1)
 }

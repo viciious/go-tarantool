@@ -89,19 +89,21 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 			fmt.Println("Tarantool log path:", logPath)
 		}
 
-		initLua := fmt.Sprintf(`
+		initLua := strings.Replace(`
 			box.cfg{
 				snap_dir = "{root}/snap/",
+				memtx_dir = "{root}/snap/", -- 1.10
 				wal_dir = "{root}/wal/",
-				logger = %s,
+				logger = {log},
+				log = {log}, -- 1.10
 			}
-		`, logPath)
+		`, "{log}", logPath, -1)
 
 		initLua += `
 			sendstatus("STARTING")
 
 			box.once('guest:read_universe', function()
-				box.schema.user.grant('guest', 'read', 'universe', {if_not_exists = true})
+				box.schema.user.grant('guest', 'read', 'universe')
 			end)
 
 			sendstatus("BINDING")
@@ -139,7 +141,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 			%s
 			end)
 			if status == false then
-				sendstatus("ERROR " .. err)
+				sendstatus("ERROR " .. tostring(err))
 				require("os").exit(-1)
 			end
 		`, initLua)
