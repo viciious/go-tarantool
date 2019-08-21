@@ -8,7 +8,8 @@ local errno = require('errno')
 -- lastsnapfilename will be returned in case of success and nil otherwise.
 local function lastsnapfilename()
     local lastsnapfn = ""
-    for _, fname in ipairs(fio.glob(fio.pathjoin(box.cfg.snap_dir, '*.snap'))) do
+    local snap_dir = box.cfg.memtx_dir or box.cfg.snap_dir
+    for _, fname in ipairs(fio.glob(fio.pathjoin(snap_dir, '*.snap'))) do
         if fname > lastsnapfn then
             lastsnapfn = fname
         end
