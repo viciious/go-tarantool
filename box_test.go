@@ -14,7 +14,9 @@ func TestBox(t *testing.T) {
     `
 
 	box, err := NewBox(config, &BoxOptions{})
-	assert.NoError(err)
+	if !assert.NoError(err) {
+		return
+	}
 	defer box.Close()
 
 }

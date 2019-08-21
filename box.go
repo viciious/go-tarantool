@@ -1,6 +1,8 @@
 package tarantool
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -25,6 +27,7 @@ type Box struct {
 	stopped    chan bool
 	initLua    string
 	notifySock string
+	version    string
 }
 
 type BoxOptions struct {
@@ -91,11 +94,9 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 
 		initLua := strings.Replace(`
 			box.cfg{
-				snap_dir = "{root}/snap/",
-				memtx_dir = "{root}/snap/", -- 1.10
+				memtx_dir = "{root}/snap/",
 				wal_dir = "{root}/wal/",
-				logger = {log},
-				log = {log}, -- 1.10
+				log = {log},
 			}
 		`, "{log}", logPath, -1)
 
@@ -166,6 +167,16 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 			notifySock: notifySock,
 		}
 		close(box.stopped)
+
+		ver, err := box.Version()
+		if err != nil {
+			return nil, err
+		}
+
+		if strings.HasPrefix(ver, "1.6") {
+			box.initLua = strings.Replace(box.initLua, "memtx_dir =", "snap_dir =", -1)
+			box.initLua = strings.Replace(box.initLua, "log =", "logger =", -1)
+		}
 
 		err = box.Start()
 		if err == nil {
@@ -317,4 +328,44 @@ func (box *Box) Addr() string {
 
 func (box *Box) Connect(options *Options) (*Connection, error) {
 	return Connect(box.Addr(), options)
+}
+
+func (box *Box) Version() (string, error) {
+	verPrefix := "Tarantool "
+
+	if box.version != "" {
+		return box.version, nil
+	}
+
+	var out bytes.Buffer
+	cmd := exec.Command("tarantool", "--version")
+	cmd.Stdout = &out
+
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+
+	scanner := bufio.NewScanner(&out)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		t := scanner.Text()
+		if !strings.HasPrefix(t, verPrefix) {
+			continue
+		}
+
+		var major, minor, patch uint32
+		ver := string(t[len(verPrefix):])
+		if n, _ := fmt.Sscanf(ver, "%d.%d.%d", &major, &minor, &patch); n != 3 {
+			continue
+		}
+
+		box.version = fmt.Sprintf("%d.%d.%d", major, minor, patch)
+		break
+	}
+
+	if box.version == "" {
+		return "", errors.New("Unknown Tarantool version")
+	}
+	return box.version, nil
 }
