@@ -30,8 +30,10 @@ matrix:
   include:
     - env: TARANTOOL_VER=1.6
     - env: TARANTOOL_VER=1.7
+    - env: TARANTOOL_VER=1.10
   allow_failures:
     - env: TARANTOOL_VER=1.7
+    - env: TARANTOOL_VER=1.10
 
 notifications:
   email: false
