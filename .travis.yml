@@ -8,10 +8,12 @@ before_script:
 
 script:
 - export UNFORMATTED=`gofmt -l .`
+- export TNT_LOG_DIR=/home/travis/tntlog
 - if [[ ! -z "$UNFORMATTED" ]]; then echo "The following files are not formatted:" && echo "$UNFORMATTED" && exit 1; fi
 - go vet
 - $HOME/gopath/bin/golint
-- go test -v
+- go test -v -timeout 20s
+- go test -bench=. -timeout 20s
 
 before_install:
 - curl "http://download.tarantool.org/tarantool/$TARANTOOL_VER/gpgkey" | sudo apt-key add -
@@ -25,6 +27,7 @@ install:
 - sudo apt-get update
 - sudo apt-get -y install tarantool
 - go get golang.org/x/lint/golint
+- mkdir -p /home/travis/tntlog
 
 matrix:
   include:
@@ -34,6 +37,9 @@ matrix:
   allow_failures:
     - env: TARANTOOL_VER=1.7
     - env: TARANTOOL_VER=1.10
+
+after_failure:
+- cat /home/travis/tntlog/*
 
 notifications:
   email: false
