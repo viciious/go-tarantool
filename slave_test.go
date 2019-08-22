@@ -164,9 +164,9 @@ func TestSlaveJoinWithSnapSync(t *testing.T) {
 	timeout := time.After(10 * time.Second)
 	select {
 	case success := <-resultChan:
-		require.True(success, "There is nil packet or error has been happened")
+		require.True(success, "Nil packet received or an error occured")
 	case <-timeout:
-		t.Fatal("Timeout: there is no necessary snaplogs.")
+		t.Fatal("Timeout: no snaplogs")
 	}
 	assert.NotZero(s.ReplicaSet.UUID)
 	assert.Len(s.ReplicaSet.Instances, expected.ReplicaSetLen)
@@ -210,9 +210,9 @@ func TestSlaveHasNextOnJoin(t *testing.T) {
 	timeout := time.After(10 * time.Second)
 	select {
 	case success := <-resultChan:
-		require.True(success, "There is nil packet or error has been happened")
+		require.True(success, "Nil packet received or an error occured")
 	case <-timeout:
-		t.Fatal("Timeout: there is no necessary snaplogs.")
+		t.Fatal("Timeout: no snaplogs")
 	}
 	assert.NotZero(s.ReplicaSet.UUID)
 	assert.Len(s.ReplicaSet.Instances, expected.ReplicaSetLen)
@@ -279,9 +279,9 @@ loop:
 			if !open {
 				break loop
 			}
-			require.NotNil(p, "There is nil packet has been received.")
+			require.NotNil(p, "Nil packet received.")
 		case <-timeout:
-			t.Fatal("Timeout: there is no necessary xlog.")
+			t.Fatal("Timeout: no xlogs")
 		}
 	}
 
@@ -396,7 +396,7 @@ func TestSlaveSubscribeSync(t *testing.T) {
 	timeout := time.After(10 * time.Second)
 	select {
 	case success := <-resultChan:
-		assert.True(success, "there is no packet with insert UUID in cluster space")
+		assert.True(success, "no packet with insert UUID in cluster space")
 	case <-timeout:
 		t.Fatal("timeout")
 	}
@@ -448,7 +448,7 @@ func TestSlaveHasNextOnSubscribe(t *testing.T) {
 	timeout := time.After(10 * time.Second)
 	select {
 	case success := <-resultChan:
-		assert.True(success, "there is no packet with insert UUID in cluster space")
+		assert.True(success, "no packet with insert UUID in cluster space")
 	case <-timeout:
 		t.Fatal("timeout")
 	}
@@ -610,7 +610,7 @@ func TestSlaveAttachAsync(t *testing.T) {
 				}
 			}
 		case <-timeout:
-			t.Fatal("Timeout: there is no necessary Insert")
+			t.Fatal("Timeout: no Insert received")
 		}
 	}
 }
