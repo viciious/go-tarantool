@@ -456,7 +456,7 @@ func (s *Slave) nextXlog() (p *Packet, err error) {
 		return nil, ErrBadResult
 	}
 
-	if p.LSN > s.VClock[p.InstanceID] && !s.VClock.Follow(p.InstanceID, p.LSN) {
+	if !s.VClock.Follow(p.InstanceID, p.LSN) {
 		return nil, ErrVectorClock
 	}
 
