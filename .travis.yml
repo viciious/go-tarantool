@@ -1,10 +1,17 @@
 language: go
 
 go:
-- master
+- stable
+- tip
+- '1.12'
 
-before_script:
-- go get -t ./...
+env:
+  global:
+  - GO111MODULE=on
+  matrix:
+  - TARANTOOL_VER=1.6
+  - TARANTOOL_VER=1.7
+  - TARANTOOL_VER=1.10
 
 script:
 - export UNFORMATTED=`gofmt -l .`
@@ -30,13 +37,10 @@ install:
 - mkdir -p /home/travis/tntlog
 
 matrix:
-  include:
-    - env: TARANTOOL_VER=1.6
-    - env: TARANTOOL_VER=1.7
-    - env: TARANTOOL_VER=1.10
   allow_failures:
-    - env: TARANTOOL_VER=1.7
-    - env: TARANTOOL_VER=1.10
+  - env: TARANTOOL_VER=1.7
+  - env: TARANTOOL_VER=1.10
+  - go: tip
 
 after_failure:
 - cat /home/travis/tntlog/*
