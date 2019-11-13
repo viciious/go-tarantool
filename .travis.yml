@@ -34,9 +34,11 @@ matrix:
     - env: TARANTOOL_VER=1.6
     - env: TARANTOOL_VER=1.7
     - env: TARANTOOL_VER=1.10
+    - env: TARANTOOL_VER=2.3
   allow_failures:
     - env: TARANTOOL_VER=1.7
     - env: TARANTOOL_VER=1.10
+    - env: TARANTOOL_VER=2.3
 
 after_failure:
 - cat /home/travis/tntlog/*
