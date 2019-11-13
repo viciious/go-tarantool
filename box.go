@@ -272,6 +272,9 @@ func (box *Box) StartWithLua(luaTransform func(string) string) error {
 			case status = <-statusCh:
 				if status != "READY" {
 					box.Close()
+					if strings.Contains(status, "failed to bind, called on fd -1") {
+						return ErrPortAlreadyInUse
+					}
 					return fmt.Errorf("Box status is '%s', not READY", status)
 				}
 			case <-time.After(time.Millisecond * 50):
