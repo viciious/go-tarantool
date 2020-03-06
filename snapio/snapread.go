@@ -4,48 +4,63 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/tinylib/msgp/msgp"
 	"github.com/viciious/go-tarantool"
 )
 
 func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{})) error {
-	in := bufio.NewReaderSize(rs, 100*1024)
+	var err error
+	var version int
 
-	header := make([]byte, 4)
-	headerLen, err := in.Read(header)
-	if err != nil {
-		return err
-	}
-	if headerLen < 4 {
-		return errors.New("Truncated snapshot")
-	}
+	in := bufio.NewReaderSize(rs, 128*1024)
 
-	if string(header[:4]) != "SNAP" {
-		return errors.New("Missing SNAP header")
-	}
-
-	prevNL := false
-	for headerLen := 0; ; headerLen++ {
-		if headerLen == 1024 {
-			return errors.New("Malformed snapshot")
+	for ln := 0; ; ln++ {
+		if ln > 0 {
+			nl, err := in.Peek(1)
+			if err != nil {
+				return err
+			}
+			if nl[0] == 0xa {
+				in.ReadByte()
+				break
+			}
 		}
 
-		b, err := in.ReadByte()
+		lineb, _, err := in.ReadLine()
 		if err != nil {
 			return err
 		}
 
-		nl := (b == 0xa)
-		if nl && prevNL {
-			break
+		line := string(lineb)
+		switch ln {
+		case 0:
+			if line != "SNAP" {
+				return errors.New("Missing SNAP header")
+			}
+		case 1:
+			if line == "0.12" {
+				version = 12
+			} else if line == "0.13" {
+				version = 13
+			} else {
+				return fmt.Errorf("Unknown snapshot version: %s", line)
+			}
 		}
-		prevNL = nl
 	}
 
 	var fixh [XRowFixedHeaderSize]byte
-	xrow := make([]byte, 0, 1024)
+	var xrow, zrow []byte
+	var zr *zstd.Decoder
+
+	if version != 12 {
+		if zr, err = zstd.NewReader(nil); err != nil {
+			return err
+		}
+	}
 
 	for {
 		var n int
@@ -63,8 +78,13 @@ func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{})) e
 			return err
 		}
 
-		if binary.BigEndian.Uint32(fixh[0:4]) != XRowFixedHeaderMagic {
-			return errors.New("Bad xrow magic")
+		compressed := false
+		if zr != nil {
+			compressed = binary.BigEndian.Uint32(fixh[0:4]) == ZRowFixedHeaderMagic
+		}
+
+		if !compressed && binary.BigEndian.Uint32(fixh[0:4]) != XRowFixedHeaderMagic {
+			return fmt.Errorf("Bad xrow magic %0X", fixh[0:4])
 		}
 
 		buf := fixh[4:]
@@ -72,54 +92,72 @@ func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{})) e
 			return err
 		}
 
-		len := int(ulen)
-		if len > cap(xrow) {
-			xrow = make([]byte, 0, len+1024)
+		rlen := int(ulen)
+		if rlen <= in.Buffered() {
+			if buf, err = in.Peek(rlen); err != nil {
+				return err
+			}
+			if _, err = in.Discard(rlen); err != nil {
+				return err
+			}
+		} else {
+			if rlen > cap(zrow) {
+				zrow = make([]byte, 0, rlen+1024)
+			}
+			if _, err = io.ReadFull(in, zrow[:rlen]); err != nil {
+				return err
+			}
+			buf = zrow[:rlen]
 		}
 
-		if _, err = io.ReadFull(in, xrow[:len]); err != nil {
-			return err
+		if compressed {
+			if xrow, err = zr.DecodeAll(buf, xrow); err != nil {
+				return err
+			}
+			buf = xrow
+			xrow = xrow[:0]
 		}
 
-		var ml uint32
-
-		buf = xrow[:len]
-		if buf, err = msgp.Skip(buf); err != nil {
-			return err
-		}
-
-		if ml, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
-			return err
-		}
-
-		var space uint
-		var tuple []interface{}
-
-		for ; ml > 0; ml-- {
-			var cd uint
-			if cd, buf, err = msgp.ReadUintBytes(buf); err != nil {
+		for len(buf) > 0 {
+			// meta map: timestamp, lsn, etc
+			if buf, err = msgp.Skip(buf); err != nil {
 				return err
 			}
 
-			switch cd {
-			case tarantool.KeySpaceNo:
-				if space, buf, err = msgp.ReadUintBytes(buf); err != nil {
-					return err
-				}
-			case tarantool.KeyTuple:
-				var tinf interface{}
-				if tinf, buf, err = msgp.ReadIntfBytes(buf); err != nil {
-					return err
-				}
-				tuple = tinf.([]interface{})
+			var ml uint32
+			if ml, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
+				return err
 			}
-		}
 
-		if space == 0 || tuple == nil {
-			continue
-		}
+			var space uint
+			var tuple []interface{}
 
-		tuplecb(space, tuple)
+			for ; ml > 0; ml-- {
+				var cd uint
+				if cd, buf, err = msgp.ReadUintBytes(buf); err != nil {
+					return err
+				}
+
+				switch cd {
+				case tarantool.KeySpaceNo:
+					if space, buf, err = msgp.ReadUintBytes(buf); err != nil {
+						return err
+					}
+				case tarantool.KeyTuple:
+					var tinf interface{}
+					if tinf, buf, err = msgp.ReadIntfBytes(buf); err != nil {
+						return err
+					}
+					tuple = tinf.([]interface{})
+				}
+			}
+
+			if space == 0 || tuple == nil {
+				continue
+			}
+
+			tuplecb(space, tuple)
+		}
 	}
 
 	return nil
