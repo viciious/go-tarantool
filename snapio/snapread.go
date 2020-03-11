@@ -12,7 +12,7 @@ import (
 	"github.com/viciious/go-tarantool"
 )
 
-func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{}) error) error {
+func ReadSnapshotPacked(rs io.Reader, tuplecb func(space uint, tuple []byte) error) error {
 	var err error
 	var version int
 
@@ -130,7 +130,7 @@ func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{}) er
 			}
 
 			var space uint
-			var tuple []interface{}
+			var tuple []byte
 
 			for ; ml > 0; ml-- {
 				var cd uint
@@ -144,11 +144,11 @@ func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{}) er
 						return err
 					}
 				case tarantool.KeyTuple:
-					var tinf interface{}
-					if tinf, buf, err = msgp.ReadIntfBytes(buf); err != nil {
+					var curbuf = buf
+					if buf, err = msgp.Skip(buf); err != nil {
 						return err
 					}
-					tuple = tinf.([]interface{})
+					tuple = curbuf[:len(curbuf)-len(buf)]
 				}
 			}
 
@@ -163,4 +163,15 @@ func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{}) er
 	}
 
 	return nil
+}
+
+func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{}) error) error {
+	return ReadSnapshotPacked(rs, func(space uint, buf []byte) error {
+		var err error
+		var tinf interface{}
+		if tinf, _, err = msgp.ReadIntfBytes(buf); err != nil {
+			return err
+		}
+		return tuplecb(space, tinf.([]interface{}))
+	})
 }
