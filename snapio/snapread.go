@@ -12,7 +12,7 @@ import (
 	"github.com/viciious/go-tarantool"
 )
 
-func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{})) error {
+func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{}) error) error {
 	var err error
 	var version int
 
@@ -156,7 +156,9 @@ func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{})) e
 				continue
 			}
 
-			tuplecb(space, tuple)
+			if err = tuplecb(space, tuple); err != nil {
+				return err
+			}
 		}
 	}
 

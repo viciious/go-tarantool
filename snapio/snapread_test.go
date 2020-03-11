@@ -16,8 +16,9 @@ func checkSnapshotCnt(v, fn string, expected int, t *testing.T) {
 	defer f.Close()
 
 	cnt := 0
-	e = ReadSnapshot(f, func(space uint, tuple []interface{}) {
+	e = ReadSnapshot(f, func(space uint, tuple []interface{}) error {
 		cnt++
+		return nil
 	})
 
 	if e != nil {
