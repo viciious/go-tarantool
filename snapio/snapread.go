@@ -149,6 +149,10 @@ func ReadSnapshotPacked(rs io.Reader, tuplecb func(space uint, tuple []byte) err
 						return err
 					}
 					tuple = curbuf[:len(curbuf)-len(buf)]
+				default:
+					if buf, err = msgp.Skip(buf); err != nil {
+						return err
+					}
 				}
 			}
 
