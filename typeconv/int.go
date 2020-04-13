@@ -54,6 +54,20 @@ func IntfToUint(number interface{}) (uint, bool) {
 	}
 }
 
+func IntfToInt32(number interface{}) (int32, bool) {
+	if conv, ok := IntfToInt(number); ok {
+		return int32(conv), true
+	}
+	return 0, false
+}
+
+func IntfToUint32(number interface{}) (uint32, bool) {
+	if conv, ok := IntfToUint(number); ok {
+		return uint32(conv), true
+	}
+	return 0, false
+}
+
 func IntfToInt64(number interface{}) (int64, bool) {
 	switch value := number.(type) {
 	default:
