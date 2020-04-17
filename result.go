@@ -2,7 +2,6 @@ package tarantool
 
 import (
 	"fmt"
-
 	"github.com/tinylib/msgp/msgp"
 )
 
@@ -49,7 +48,14 @@ func (r *Result) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var val interface{}
 
 	buf = data
-	if l, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
+
+	// Tarantool >= 1.7.7 sends periodic heartbeat messages without body
+	if len(buf) == 0 && r.ErrorCode == OKCommand {
+		return buf, nil
+	}
+	l, buf, err = msgp.ReadMapHeaderBytes(buf)
+
+	if err != nil {
 		return
 	}
 

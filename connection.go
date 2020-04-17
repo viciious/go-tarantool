@@ -2,7 +2,9 @@ package tarantool
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/url"
@@ -14,8 +16,11 @@ import (
 )
 
 var (
+	ErrInvalidGreeting   = errors.New("invalid greeting")
 	ErrEmptyDefaultSpace = errors.New("zero-length default space or unnecessary slash in dsn.path")
 	ErrSyncFailed        = errors.New("SYNC failed")
+
+	versionPrefix = []byte("Tarantool ")
 )
 
 type Options struct {
@@ -35,7 +40,7 @@ type Options struct {
 }
 
 type Greeting struct {
-	Version []byte
+	Version uint32
 	Auth    []byte
 }
 
@@ -142,21 +147,13 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		conn.ccw = conn.tcpConn
 	}
 
-	greeting := make([]byte, 128)
-
 	connectDeadline := time.Now().Add(opts.ConnectTimeout)
 	conn.tcpConn.SetDeadline(connectDeadline)
 	// removing deadline deferred
 	defer conn.tcpConn.SetDeadline(time.Time{})
 
-	_, err = io.ReadFull(conn.ccr, greeting)
-	if err != nil {
+	if conn.greeting, err = parseGreeting(conn.ccr); err != nil {
 		return
-	}
-
-	conn.greeting = &Greeting{
-		Version: greeting[:64],
-		Auth:    greeting[64:108],
 	}
 
 	// try to authenticate if user have been provided
@@ -250,6 +247,43 @@ func parseOptions(dsnString string, opts Options) (*url.URL, Options, error) {
 	}
 
 	return dsn, opts, nil
+}
+
+func parseGreeting(r io.Reader) (*Greeting, error) {
+	greeting := make([]byte, 128)
+
+	_, err := io.ReadFull(r, greeting)
+	if err != nil {
+		return nil, err
+	}
+
+	version, err := parseVersion(greeting[:64])
+	if err != nil {
+		return nil, err
+	}
+
+	return &Greeting{
+		Version: version,
+		Auth:    greeting[64:108],
+	}, nil
+}
+
+func parseVersion(version []byte) (uint32, error) {
+	if !bytes.HasPrefix(version, versionPrefix) {
+		return 0, ErrInvalidGreeting
+	}
+
+	var major, minor, patch uint32
+	str := string(version[len(versionPrefix):])
+	if n, _ := fmt.Sscanf(str, "%d.%d.%d", &major, &minor, &patch); n != 3 {
+		return 0, ErrInvalidGreeting
+	}
+
+	return VersionID(major, minor, patch), nil
+}
+
+func VersionID(major, minor, patch uint32) uint32 {
+	return (((major << 8) | minor) << 8) | patch
 }
 
 func (conn *Connection) pullSchema() (err error) {

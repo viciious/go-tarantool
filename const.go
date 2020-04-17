@@ -18,6 +18,7 @@ const (
 	PingCommand      = uint(64)
 	JoinCommand      = uint(65)
 	SubscribeCommand = uint(66)
+	VoteCommand      = uint(68) // Tarantool >= 1.9.0
 	ErrorFlag        = uint(0x8000)
 )
 
@@ -42,6 +43,7 @@ const (
 	KeyVClock         = uint(0x26)
 	KeyExpression     = uint(0x27)
 	KeyDefTuple       = uint(0x28)
+	KeyBallot         = uint(0x29) // Tarantool >= 1.9.0
 	KeyData           = uint(0x30)
 	KeyError          = uint(0x31)
 )
@@ -201,4 +203,10 @@ const (
 
 const (
 	ServerIdent = "Tarantool 1.6.8 (Binary)"
+)
+
+// Consts for Tarantool features which require version check
+const (
+	version1_7_0 = uint32(67328) // VersionID(1, 7, 0)
+	version1_7_7 = uint32(67335) // VersionID(1, 7, 7)
 )
