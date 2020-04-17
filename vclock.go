@@ -14,10 +14,35 @@ type VClock struct {
 	VClock     VectorClock
 }
 
+var _ Query = (*VClock)(nil)
+
 // String implements Stringer interface.
 func (p *VClock) String() string {
 	return fmt.Sprintf("VClock ReqID:%v Replica:%v, VClock:%#v",
 		p.RequestID, p.InstanceID, p.VClock)
+}
+
+func (p *VClock) GetCommandID() uint {
+	return OKCommand
+}
+
+func (p *VClock) packMsg(data *packData, b []byte) (o []byte, err error) {
+	o = b
+	o = msgp.AppendMapHeader(o, 1)
+	o = msgp.AppendUint(o, KeyVClock)
+	o = msgp.AppendMapHeader(o, uint32(len(p.VClock[1:])))
+
+	for i, lsn := range p.VClock[1:] {
+		o = msgp.AppendUint32(o, uint32(i))
+		o = msgp.AppendUint64(o, lsn)
+	}
+
+	return o, nil
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (p *VClock) MarshalMsg(b []byte) ([]byte, error) {
+	return p.packMsg(defaultPackData, b)
 }
 
 // UnmarshalMsg implements msgp.Unmarshaller
@@ -50,6 +75,10 @@ func (p *VClock) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
 		switch key {
 		case KeySync:
 			if p.RequestID, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
+				return
+			}
+		case KeySchemaID:
+			if _, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 				return
 			}
 		case KeyInstanceID:
