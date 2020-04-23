@@ -219,7 +219,7 @@ func (s *Slave) Subscribe(lsns ...int64) (it PacketIterator, err error) {
 	s.next = s.nextXlog
 
 	// Tarantool >= 1.7.7 sends periodic heartbeat messages
-	if s.Version() < version1_7_7 {
+	if s.Version() < version1_7_0 {
 		return s, nil
 	}
 
@@ -578,7 +578,7 @@ func (s *Slave) nextEOF() (*Packet, error) {
 
 // for Tarantool >= 1.7.7 heartbeat sends encoded vclock to master every second
 func (s *Slave) heartbeat() {
-	if s.Version() < version1_7_7 {
+	if s.Version() < version1_7_0 {
 		return
 	}
 
