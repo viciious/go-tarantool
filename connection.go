@@ -68,9 +68,9 @@ type Connection struct {
 	poolMaxPacketSize int
 }
 
-// Connect to tarantool instance with options.
-// Returned Connection could be used to execute queries.
-func Connect(dsnString string, options *Options) (conn *Connection, err error) {
+// Connect to tarantool instance with options using the provided context.
+// Returned Connection can be used to execute queries.
+func ConnectContext(ctx context.Context, dsnString string, options *Options) (conn *Connection, err error) {
 	var opts Options
 	if options != nil {
 		opts = *options
@@ -79,7 +79,12 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return connect(dsn.Scheme, dsn.Host, opts)
+	return connect(ctx, dsn.Scheme, dsn.Host, opts)
+}
+
+// Connect to tarantool instance with options
+func Connect(dsnString string, options *Options) (conn *Connection, err error) {
+	return ConnectContext(context.Background(), dsnString, options)
 }
 
 func connect(ctx context.Context, scheme, addr string, opts Options) (conn *Connection, err error) {
@@ -108,7 +113,6 @@ func connect(ctx context.Context, scheme, addr string, opts Options) (conn *Conn
 }
 
 func newConn(ctx context.Context, scheme, addr string, opts Options) (conn *Connection, err error) {
-
 	defer func() { // close opened connection if error
 		if err != nil && conn != nil {
 			if conn.tcpConn != nil {
@@ -131,7 +135,7 @@ func newConn(ctx context.Context, scheme, addr string, opts Options) (conn *Conn
 		poolMaxPacketSize: opts.PoolMaxPacketSize,
 	}
 
-	d := net.Dialer{
+	d := &net.Dialer{
 		Timeout: opts.ConnectTimeout,
 	}
 

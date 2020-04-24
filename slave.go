@@ -2,11 +2,12 @@ package tarantool
 
 import (
 	"bufio"
-	"github.com/viciious/go-tarantool/typeconv"
+	"context"
 	"io"
 	"time"
 
 	"github.com/satori/go.uuid"
+	"github.com/viciious/go-tarantool/typeconv"
 )
 
 const (
@@ -575,7 +576,7 @@ func (s *Slave) connect(uri string, options Options) (err error) {
 	if err != nil {
 		return
 	}
-	conn, err := newConn(dsn.Scheme, dsn.Host, opts)
+	conn, err := newConn(context.Background(), dsn.Scheme, dsn.Host, opts)
 	if err != nil {
 		return
 	}
