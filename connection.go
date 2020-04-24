@@ -3,6 +3,7 @@ package tarantool
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -81,8 +82,8 @@ func Connect(dsnString string, options *Options) (conn *Connection, err error) {
 	return connect(dsn.Scheme, dsn.Host, opts)
 }
 
-func connect(scheme, addr string, opts Options) (conn *Connection, err error) {
-	conn, err = newConn(scheme, addr, opts)
+func connect(ctx context.Context, scheme, addr string, opts Options) (conn *Connection, err error) {
+	conn, err = newConn(ctx, scheme, addr, opts)
 	if err != nil {
 		return
 	}
@@ -106,7 +107,7 @@ func connect(scheme, addr string, opts Options) (conn *Connection, err error) {
 	return
 }
 
-func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
+func newConn(ctx context.Context, scheme, addr string, opts Options) (conn *Connection, err error) {
 
 	defer func() { // close opened connection if error
 		if err != nil && conn != nil {
@@ -130,7 +131,11 @@ func newConn(scheme, addr string, opts Options) (conn *Connection, err error) {
 		poolMaxPacketSize: opts.PoolMaxPacketSize,
 	}
 
-	conn.tcpConn, err = net.DialTimeout(scheme, conn.remoteAddr, opts.ConnectTimeout)
+	d := net.Dialer{
+		Timeout: opts.ConnectTimeout,
+	}
+
+	conn.tcpConn, err = d.DialContext(ctx, scheme, conn.remoteAddr)
 	if err != nil {
 		return nil, err
 	}

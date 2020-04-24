@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"context"
 	"net/url"
 	"sync"
 )
@@ -20,8 +21,8 @@ func New(dsnString string, options *Options) *Connector {
 	return &Connector{RemoteAddr: dsnString}
 }
 
-// Connect returns existing connection or will establish another one.
-func (c *Connector) Connect() (conn *Connection, err error) {
+// Connect returns existing connection or will establish another one using the provided context.
+func (c *Connector) ConnectContext(ctx context.Context) (conn *Connection, err error) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -33,11 +34,16 @@ func (c *Connector) Connect() (conn *Connection, err error) {
 		}
 		// clear possible user:pass in order to log c.RemoteAddr securely
 		c.RemoteAddr = dsn.Host
-		c.conn, err = connect(dsn.Scheme, dsn.Host, c.options)
+		c.conn, err = connect(ctx, dsn.Scheme, dsn.Host, c.options)
 	}
 	conn = c.conn
 
 	return conn, err
+}
+
+// Connect returns existing connection or will establish another one.
+func (c *Connector) Connect() (conn *Connection, err error) {
+	return c.ConnectContext(context.Background())
 }
 
 // Close underlying connection.
