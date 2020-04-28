@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"bufio"
+	"github.com/viciious/go-tarantool/typeconv"
 	"io"
 	"time"
 
@@ -421,8 +422,9 @@ func (s *Slave) nextFinalData() (p *Packet, err error) {
 			// {0x2, "7c025e42-2394-11e7-aacf-0242ac110002"}
 
 			// in reality _cluster key field is decoded to uint64
-			// but we know exactly that it can be cast to uint8 without losing data
-			instanceID := uint32(q.Tuple[0].(int64))
+			// but we know exactly that it can be cast to uint32 without losing data
+			instanceIDu64, _ := typeconv.IntfToUint64(q.Tuple[0])
+			instanceID, _ := typeconv.IntfToUint32(instanceIDu64)
 			// uuid
 			s.ReplicaSet.SetInstance(instanceID, q.Tuple[1].(string))
 		}
@@ -501,8 +503,8 @@ func (s *Slave) nextSnap() (p *Packet, err error) {
 
 			// in reality _cluster key field is decoded to int64
 			// but we know exactly that it can be casted to uint32 without data loss
-			instanceIDu64, _ := numberToUint64(q.Tuple[0])
-			instanceID := uint32(instanceIDu64)
+			instanceIDu64, _ := typeconv.IntfToUint64(q.Tuple[0])
+			instanceID, _ := typeconv.IntfToUint32(instanceIDu64)
 			// uuid
 			s.ReplicaSet.SetInstance(instanceID, q.Tuple[1].(string))
 		}

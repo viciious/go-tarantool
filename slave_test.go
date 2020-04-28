@@ -128,16 +128,29 @@ func TestSlaveJoinWithSnapSync(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
-	expected := struct {
+	var expected struct {
 		UUID          string
 		ReplicaSetLen int
-	}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
+	}
+
 	// setup
 	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
-		UUID:     expected.UUID})
+		UUID:     tnt16UUID})
 	defer s.Close()
+
+	if s.Version() < version1_7_0 {
+		expected = struct {
+			UUID          string
+			ReplicaSetLen int
+		}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
+	} else {
+		expected = struct {
+			UUID          string
+			ReplicaSetLen int
+		}{tnt16UUID, 1 + 2} // one element and one reserved zero index element
+	}
 
 	it, err := s.JoinWithSnap()
 	require.NoError(err)
@@ -180,16 +193,28 @@ func TestSlaveHasNextOnJoin(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
-	expected := struct {
+	var expected struct {
 		UUID          string
 		ReplicaSetLen int
-	}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
+	}
 	// setup
 	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
-		UUID:     expected.UUID})
+		UUID:     tnt16UUID})
 	defer s.Close()
+
+	if s.Version() < version1_7_0 {
+		expected = struct {
+			UUID          string
+			ReplicaSetLen int
+		}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
+	} else {
+		expected = struct {
+			UUID          string
+			ReplicaSetLen int
+		}{tnt16UUID, 1 + 2} // one element and one reserved zero index element
+	}
 
 	_, err = s.JoinWithSnap()
 	require.NoError(err)
@@ -251,18 +276,29 @@ func TestSlaveJoinWithSnapAsync(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
-	expected := struct {
+	var expected struct {
 		UUID          string
 		ReplicaSetLen int
-	}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
+	}
 
 	// setup
 	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
-		UUID:     expected.UUID})
+		UUID:     tnt16UUID})
 	defer s.Close()
 
+	if s.Version() < version1_7_0 {
+		expected = struct {
+			UUID          string
+			ReplicaSetLen int
+		}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
+	} else {
+		expected = struct {
+			UUID          string
+			ReplicaSetLen int
+		}{tnt16UUID, 1 + 2} // one element and one reserved zero index element
+	}
 	respc := make(chan *Packet, 1)
 
 	var it PacketIterator
@@ -299,15 +335,27 @@ func TestSlaveJoin(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
-	expected := struct {
+	var expected struct {
 		UUID          string
 		ReplicaSetLen int
-	}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
+	}
 
 	s, _ := NewSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
-		UUID:     expected.UUID})
+		UUID:     tnt16UUID})
+
+	if s.Version() < version1_7_0 {
+		expected = struct {
+			UUID          string
+			ReplicaSetLen int
+		}{tnt16UUID, 1 + 1} // one element and one reserved zero index element
+	} else {
+		expected = struct {
+			UUID          string
+			ReplicaSetLen int
+		}{tnt16UUID, 1 + 2} // one element and one reserved zero index element
+	}
 	err = s.Join()
 	require.NoError(err)
 	err = s.Close()
@@ -505,15 +553,30 @@ func TestSlaveVClock(t *testing.T) {
 
 	_, err = s.JoinWithSnap()
 	require.NoError(err)
-	count := 0
+	var (
+		count          int
+		finalDataCount int
+	)
+
+	// Tarantools above 1.7.0 send final data after sending data from snapshot
+	hasFinalDataStage := s.Version() > version1_7_0
 	for s.HasNext() {
 		// add new items to tnt concurrently while snap is downloading
-		field := fmt.Sprintf("Inserted tuple #%v", count+2)
+		field := fmt.Sprintf("Inserted tuple #%v", count+finalDataCount+2)
 		_, err = tnt.Execute(&Insert{
 			Space: "tester",
-			Tuple: []interface{}{count + 2, field},
+			Tuple: []interface{}{uint(count) + uint(finalDataCount) + 2, field},
 		})
 		require.NoError(err)
+		if hasFinalDataStage && s.Packet().Cmd == InsertCommand {
+			request := s.Packet().Request.(*Insert)
+			space := request.Space.(uint)
+			// Space ids for user spaces begin from 512
+			if space > SpaceSystemMax {
+				finalDataCount++
+				continue
+			}
+		}
 		count++
 	}
 	require.NoError(s.Err())
@@ -667,6 +730,9 @@ func TestSlaveLastSnapVClock(t *testing.T) {
 	s, err := NewSlave(box.Listen, Options{User: tnt16User, Password: tnt16Pass})
 	require.NoError(err)
 	defer s.Close()
+	if s.Version() > version1_7_0 {
+		t.Skip("LastSnapVClock is depricated for tarantools above 1.7.0")
+	}
 	err = s.Join()
 	require.NoError(err)
 
