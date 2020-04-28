@@ -33,6 +33,9 @@ func TestLastSnapVClock(t *testing.T) {
 	s, err := NewSlave(box.Listen, Options{User: tnt16User, Password: tnt16Pass})
 	require.NoError(err)
 	defer s.Close()
+	if s.Version() > version1_7_0 {
+		t.Skip("LastSnapVClock is depricated for tarantools above 1.7.0")
+	}
 	err = s.Join()
 	require.NoError(err)
 
