@@ -122,56 +122,10 @@ func (s *Slave) Join() (err error) {
 	return s.Err()
 }
 
-func (s *Slave) vote() error {
-	pp, err := s.newPacket(&Vote{})
-	if err != nil {
-		return err
-	}
-
-	if err = s.send(pp); err != nil {
-		return err
-	}
-	pp.Release()
-
-	pp, err = s.receive()
-	if err != nil {
-		return err
-	}
-	defer pp.Release()
-
-	p, err := decodePacket(pp)
-	if err != nil {
-		return err
-	}
-
-	if p.code != OKRequest {
-		s.p = p
-		if p.Result == nil {
-			return ErrBadResult
-		}
-
-		s.err = p.Result.Error
-		return s.err
-	}
-
-	ballot := new(Ballot)
-	if err := ballot.UnmarshalBinary(pp.body); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // JoinWithSnap the Replica Set using Master instance.
 // Snapshot logs is available through the given out channel or returned PacketIterator.
 // (In truth, Slave itself is returned in PacketIterator wrapper)
 func (s *Slave) JoinWithSnap(out ...chan *Packet) (it PacketIterator, err error) {
-	// Send VoteRequest before Join for Tarantool >= 1.9.0
-	if s.Version() >= version1_9_0 {
-		if err = s.vote(); err != nil {
-			return nil, err
-		}
-	}
 
 	if err = s.join(); err != nil {
 		return nil, err
