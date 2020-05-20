@@ -138,13 +138,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 				end
 			end
 
-			local status, err = pcall(function()
 			%s
-			end)
-			if status == false then
-				sendstatus("ERROR " .. tostring(err))
-				require("os").exit(-1)
-			end
 		`, initLua)
 
 		initLua = strings.Replace(initLua, "{notify_sock_path}", notifySock, -1)
@@ -262,10 +256,6 @@ func (box *Box) StartWithLua(luaTransform func(string) string) error {
 	for status := range statusCh {
 		if status == "RUNNING" {
 			return nil
-		}
-		if strings.HasPrefix(status, "ERROR") {
-			box.Close()
-			return fmt.Errorf("Box error: %s", strings.Split(status, "ERROR ")[1])
 		}
 		if status == "BINDING" {
 			select {
