@@ -10,7 +10,7 @@ func TestPing(t *testing.T) {
 	assert := assert.New(t)
 
 	tarantoolConfig := `
-    s = box.schema.space.create('tester')
+    local s = box.schema.space.create('tester')
     `
 
 	box, err := NewBox(tarantoolConfig, nil)

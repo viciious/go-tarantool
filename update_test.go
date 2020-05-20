@@ -10,12 +10,12 @@ func TestUpdate(t *testing.T) {
 	assert := assert.New(t)
 
 	tarantoolConfig := `
-    s = box.schema.space.create('tester')
+    local s = box.schema.space.create('tester')
     s:create_index('primary', {
         type = 'hash',
         parts = {1, 'NUM'}
     })
-    t = s:insert({1, 'First record', 15})
+    local t = s:insert({1, 'First record', 15})
 
     box.schema.user.create('writer', {password = 'writer'})
 	box.schema.user.grant('writer', 'write', 'space', 'tester')

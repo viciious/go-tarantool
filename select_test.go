@@ -10,7 +10,7 @@ func TestSelect(t *testing.T) {
 	assert := assert.New(t)
 
 	tarantoolConfig := `
-    s = box.schema.space.create('tester', {id = 42})
+    local s = box.schema.space.create('tester', {id = 42})
     s:create_index('tester_id', {
         type = 'hash',
         parts = {1, 'NUM'}
@@ -24,7 +24,7 @@ func TestSelect(t *testing.T) {
         parts = {1, 'NUM', 2, 'STR'},
         unique = true
     })
-    t = s:insert({1, 'First record'})
+    local t = s:insert({1, 'First record'})
     t = s:insert({2, 'Music'})
     t = s:insert({3, 'Length', 93})
     `

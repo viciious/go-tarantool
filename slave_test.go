@@ -47,8 +47,8 @@ func schemeGrantRoleFunc(role, fn string) string {
 func schemeSpaceTester() string {
 	return `
 	box.once('space:tester', function()
-		s = box.schema.space.create('tester')
-		i = s:create_index('primary', {})
+		local s = box.schema.space.create('tester')
+		local i = s:create_index('primary', {})
 		s:insert{1, 'Initial tuple #1'}
 		end)
 	box.once('guest:write_tester', function()

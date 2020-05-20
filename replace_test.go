@@ -10,7 +10,7 @@ func TestReplace(t *testing.T) {
 	assert := assert.New(t)
 
 	tarantoolConfig := `
-    s = box.schema.space.create('tester', {id = 42})
+    local s = box.schema.space.create('tester', {id = 42})
     s:create_index('primary', {
         type = 'hash',
         parts = {1, 'NUM'}

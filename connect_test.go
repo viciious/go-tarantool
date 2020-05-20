@@ -26,12 +26,12 @@ func TestDefaultSpace(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 	config := `
-	s = box.schema.space.create('tester', {id = 42})
+	local s = box.schema.space.create('tester', {id = 42})
 	s:create_index('tester_id', {
 		type = 'hash',
 		parts = {1, 'NUM'}
 	})
-	t = s:insert({1})
+	local t = s:insert({1})
 	`
 	box, err := NewBox(config, nil)
 	require.NoError(err)

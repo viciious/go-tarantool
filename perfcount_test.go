@@ -21,7 +21,7 @@ func TestPerfCount(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 	config := `
-	s = box.schema.space.create('tester', {id = 42})
+	local s = box.schema.space.create('tester', {id = 42})
 	box.schema.user.grant('guest', 'write', 'space', 'tester')
 	s:create_index('tester_id', {
 		type = 'hash',
