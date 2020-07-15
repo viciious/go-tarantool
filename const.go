@@ -15,6 +15,7 @@ const (
 	AuthCommand      = uint(7)
 	EvalCommand      = uint(8)
 	UpsertCommand    = uint(9)
+	Call17Command    = uint(10) // Tarantool >= 1.7.2
 	PingCommand      = uint(64)
 	JoinCommand      = uint(65)
 	SubscribeCommand = uint(66)

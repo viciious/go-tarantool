@@ -22,6 +22,8 @@ func NewQuery(cmd uint) Query {
 		return &Delete{}
 	case CallCommand:
 		return &Call{}
+	case Call17Command:
+		return &Call17{}
 	case UpdateCommand:
 		return &Update{}
 	case UpsertCommand:
