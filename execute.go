@@ -107,7 +107,7 @@ func (conn *Connection) readResult(ctx context.Context, arc chan *AsyncResult) *
 func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption) (result *Result) {
 	var cancel context.CancelFunc = func() {}
 
-	if _, ok := ctx.Deadline(); !ok && conn.queryTimeout != 0 {
+	if conn.queryTimeout != 0 {
 		ctx, cancel = context.WithTimeout(ctx, conn.queryTimeout)
 	}
 
