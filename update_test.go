@@ -36,10 +36,50 @@ func TestUpdate(t *testing.T) {
 
 	defer conn.Close()
 
-	data, err := conn.Execute(&Update{
+	do := func(conn *Connection, query *Update, expected [][]interface{}) {
+		var err error
+		var buf []byte
+
+		buf, err = query.packMsg(conn.packData, buf)
+
+		if assert.NoError(err) {
+			var query2 = &Update{}
+			_, err = query2.UnmarshalMsg(buf)
+			if assert.NoError(err) {
+				assert.Equal(uint(512), query2.Space)
+				if query.Key != nil {
+					switch query.Key.(type) {
+					case int:
+						assert.Equal(query.Key, query2.Key)
+					default:
+						assert.Equal(query.Key, query2.Key)
+					}
+				}
+				if query.KeyTuple != nil {
+					assert.Equal(query.KeyTuple, query2.KeyTuple)
+				}
+				if query.Index != nil {
+					switch query.Index.(type) {
+					case string:
+						assert.Equal(conn.packData.indexMap[512][query.Index.(string)], uint64(query2.Index.(uint)))
+					default:
+						assert.Equal(query.Index, query2.Index)
+					}
+				}
+				assert.Equal(query.Set, query2.Set)
+			}
+		}
+
+		data, err := conn.Execute(query)
+		if assert.NoError(err) {
+			assert.Equal(expected, data)
+		}
+	}
+
+	do(conn, &Update{
 		Space: "tester",
 		Index: "primary",
-		Key:   1,
+		Key:   int64(1),
 		Set: []Operator{
 			&OpAdd{
 				Field:    2,
@@ -49,15 +89,10 @@ func TestUpdate(t *testing.T) {
 				Field:    1,
 				Argument: "Hello World",
 			},
-		},
-	})
-
-	if assert.NoError(err) {
-		assert.Equal([][]interface{}{
+		}},
+		[][]interface{}{
 			{int64(1), "Hello World", int64(32)},
-		}, data)
-	}
-
+		})
 }
 
 func BenchmarkUpdatePack(b *testing.B) {

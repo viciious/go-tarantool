@@ -1,6 +1,8 @@
 package tarantool
 
 import (
+	"errors"
+
 	"github.com/tinylib/msgp/msgp"
 )
 
@@ -45,7 +47,7 @@ func (q *Update) packMsg(data *packData, b []byte) (o []byte, err error) {
 	o = msgp.AppendUint(o, KeyTuple)
 	o = msgp.AppendArrayHeader(o, uint32(len(q.Set)))
 	for _, op := range q.Set {
-		if o, err = msgp.AppendIntf(o, op.AsTuple()); err != nil {
+		if o, err = marshalOperator(op, o); err != nil {
 			return o, err
 		}
 	}
@@ -59,6 +61,65 @@ func (q *Update) MarshalMsg(b []byte) ([]byte, error) {
 }
 
 // UnmarshalMsg implements msgp.Unmarshaler
-func (q *Update) UnmarshalMsg(data []byte) ([]byte, error) {
-	return msgp.Skip(data)
+func (q *Update) UnmarshalMsg(data []byte) (buf []byte, err error) {
+	var i uint32
+	var k uint
+	var t interface{}
+
+	q.Space = nil
+	q.Index = 0
+
+	buf = data
+	if i, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
+		return
+	}
+
+	for ; i > 0; i-- {
+		if k, buf, err = msgp.ReadUintBytes(buf); err != nil {
+			return
+		}
+
+		switch k {
+		case KeySpaceNo:
+			if q.Space, buf, err = msgp.ReadUintBytes(buf); err != nil {
+				return
+			}
+		case KeyIndexNo:
+			if q.Index, buf, err = msgp.ReadUintBytes(buf); err != nil {
+				return
+			}
+		case KeyKey:
+			t, buf, err = msgp.ReadIntfBytes(buf)
+			if err != nil {
+				return
+			}
+
+			if q.KeyTuple = t.([]interface{}); q.KeyTuple == nil {
+				return buf, errors.New("Interface type is not []interface{}")
+			}
+
+			if len(q.KeyTuple) == 1 {
+				q.Key = q.KeyTuple[0]
+				q.KeyTuple = nil
+			}
+		case KeyTuple:
+			var len uint32
+			if len, buf, err = msgp.ReadArrayHeaderBytes(buf); err != nil {
+				return
+			}
+
+			q.Set = make([]Operator, len)
+			for j := uint32(0); j < len; j++ {
+				if q.Set[j], buf, err = unmarshalOperator(buf); err != nil {
+					return
+				}
+			}
+		}
+	}
+
+	if q.Space == nil {
+		return buf, errors.New("upate.Unpack: no space specified")
+	}
+
+	return
 }
