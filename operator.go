@@ -129,7 +129,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		if n != 3 {
 			return nil, buf, fmt.Errorf("Unexpected number of arguments in OpSub: %d", n)
 		}
-		opSub := &OpAdd{Field: field0}
+		opSub := &OpSub{Field: field0}
 		if opSub.Argument, buf, err = msgp.ReadInt64Bytes(buf); err != nil {
 			return
 		}

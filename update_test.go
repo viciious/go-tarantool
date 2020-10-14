@@ -15,7 +15,12 @@ func TestUpdate(t *testing.T) {
         type = 'hash',
         parts = {1, 'NUM'}
     })
+    s:create_index('secondary', {
+        type = 'hash',
+        parts = {1, 'NUM', 2, 'STR'}
+    })
     local t = s:insert({1, 'First record', 15})
+    s:insert({2, 'Test', 15})
 
     box.schema.user.create('writer', {password = 'writer'})
 	box.schema.user.grant('writer', 'write', 'space', 'tester')
@@ -92,6 +97,24 @@ func TestUpdate(t *testing.T) {
 		}},
 		[][]interface{}{
 			{int64(1), "Hello World", int64(32)},
+		})
+
+	do(conn, &Update{
+		Space:    "tester",
+		Index:    "secondary",
+		KeyTuple: []interface{}{int64(2), "Test"},
+		Set: []Operator{
+			&OpInsert{
+				Before:   2,
+				Argument: "Hello World",
+			},
+			&OpSub{
+				Field:    3,
+				Argument: 57,
+			},
+		}},
+		[][]interface{}{
+			{int64(2), "Test", "Hello World", int64(-42)},
 		})
 }
 
