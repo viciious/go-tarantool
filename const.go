@@ -5,22 +5,24 @@ Forked from https://github.com/tarantool/go-tarantool/blob/master/const.go
 */
 
 const (
-	OKCommand        = uint(0)
-	SelectCommand    = uint(1)
-	InsertCommand    = uint(2)
-	ReplaceCommand   = uint(3)
-	UpdateCommand    = uint(4)
-	DeleteCommand    = uint(5)
-	CallCommand      = uint(6)
-	AuthCommand      = uint(7)
-	EvalCommand      = uint(8)
-	UpsertCommand    = uint(9)
-	Call17Command    = uint(10) // Tarantool >= 1.7.2
-	PingCommand      = uint(64)
-	JoinCommand      = uint(65)
-	SubscribeCommand = uint(66)
-	VoteCommand      = uint(68) // Tarantool >= 1.9.0
-	ErrorFlag        = uint(0x8000)
+	OKCommand            = uint(0)
+	SelectCommand        = uint(1)
+	InsertCommand        = uint(2)
+	ReplaceCommand       = uint(3)
+	UpdateCommand        = uint(4)
+	DeleteCommand        = uint(5)
+	CallCommand          = uint(6)
+	AuthCommand          = uint(7)
+	EvalCommand          = uint(8)
+	UpsertCommand        = uint(9)
+	Call17Command        = uint(10) // Tarantool >= 1.7.2
+	PingCommand          = uint(64)
+	JoinCommand          = uint(65)
+	SubscribeCommand     = uint(66)
+	VoteCommand          = uint(68) // Tarantool >= 1.9.0
+	FetchSnapshotCommand = uint(69) // for starting anonymous replication. Tarantool >= 2.3.1
+	RegisterCommand      = uint(70) // for leaving anonymous replication (anon => normal replica). Tarantool >= 2.3.1
+	ErrorFlag            = uint(0x8000)
 )
 
 const (
@@ -47,6 +49,7 @@ const (
 	KeyBallot         = uint(0x29) // Tarantool >= 1.9.0
 	KeyData           = uint(0x30)
 	KeyError          = uint(0x31)
+	KeyReplicaAnon    = uint(0x50) // Tarantool >= 2.3.1
 )
 
 const (
@@ -210,4 +213,6 @@ const (
 const (
 	version1_7_0 = uint32(67328) // VersionID(1, 7, 0)
 	version1_7_7 = uint32(67335) // VersionID(1, 7, 7)
+	// 2.3.1 is min version for anonymous replication
+	version2_3_1 = uint32(131841) // VersionID(2, 3, 1)
 )

@@ -90,7 +90,7 @@ type QueryError struct {
 	Code uint
 }
 
-// NewQueryError returns ContextError with message and Code.
+// NewQueryError returns QueryError with message and Code.
 func NewQueryError(code uint, message string) *QueryError {
 	return &QueryError{
 		Code:  code,
@@ -108,6 +108,34 @@ func (e *QueryError) Timeout() bool {
 	return false
 }
 
+// UnexpectedReplicaSetUUIDError is returned when ReplicaSetUUID set in Options.ReplicaSetUUID is not equal to ReplicaSetUUID
+// received during Join or JoinWithSnap. It is only an AnonSlave2 error!
+type UnexpectedReplicaSetUUIDError struct {
+	error
+	Expected string
+	Got      string
+}
+
+// NewUnexpectedReplicaSetUUIDError returns UnexpectedReplicaSetUUIDError.
+func NewUnexpectedReplicaSetUUIDError(expected string, got string) *UnexpectedReplicaSetUUIDError {
+	return &UnexpectedReplicaSetUUIDError{
+		error:    errors.New(fmt.Sprintf("unexpected ReplicaSetUUID. Expected: %v. Got: %v", expected, got)),
+		Expected: expected,
+		Got:      got,
+	}
+}
+
+// Temporary implements Error interface.
+func (e *UnexpectedReplicaSetUUIDError) Temporary() bool {
+	return false
+}
+
+// Timeout implements net.Error interface.
+func (e *UnexpectedReplicaSetUUIDError) Timeout() bool {
+	return false
+}
+
 var _ Error = (*ConnectionError)(nil)
 var _ Error = (*QueryError)(nil)
 var _ Error = (*ContextError)(nil)
+var _ Error = (*UnexpectedReplicaSetUUIDError)(nil)
