@@ -83,6 +83,11 @@ func TestAnonSlaveJoinExpectedReplicaSetUUIDFail(t *testing.T) {
 
 	err = s.Join()
 	require.Error(err)
+
+	expectedErr := &UnexpectedReplicaSetUUIDError{}
+	require.EqualValues(true, errors.Is(err, expectedErr),
+		fmt.Sprintf("Expect errors type: %T, Got: %T", expectedErr, err))
+
 }
 
 func TestAnonSlaveSubscribeExpectedReplicaSetUUID(t *testing.T) {
@@ -117,16 +122,14 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUID(t *testing.T) {
 	_, err = s.Subscribe(0)
 	require.NoError(err)
 
-	expected := struct {
-		AnonReplicaAmount int
-	}{1}
+	expectedAnonReplicaAmount := 1
 
 	assert.EqualValues(ReplicaSetUUID, s.ReplicaSet.UUID)
 
 	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
 	require.NoError(err)
 
-	require.EqualValues(expected.AnonReplicaAmount, anonReplicaAmount)
+	require.EqualValues(expectedAnonReplicaAmount, anonReplicaAmount)
 }
 
 func TestAnonSlaveSubscribeExpectedReplicaSetUUIDFail(t *testing.T) {
@@ -145,6 +148,10 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUIDFail(t *testing.T) {
 
 	_, err = s.Subscribe(0)
 	require.Error(err)
+
+	expectedErr := &UnexpectedReplicaSetUUIDError{}
+	require.EqualValues(true, errors.Is(err, expectedErr),
+		fmt.Sprintf("Expect errors type: %T, Got: %T", expectedErr, err))
 }
 
 func TestAnonSlaveJoinWithSnapSync(t *testing.T) {
@@ -155,11 +162,6 @@ func TestAnonSlaveJoinWithSnapSync(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
-	var expected struct {
-		UUID              string
-		AnonReplicaAmount int
-	}
-
 	// setup
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:     tnt16User,
@@ -168,7 +170,7 @@ func TestAnonSlaveJoinWithSnapSync(t *testing.T) {
 	})
 	defer s.Close()
 
-	expected = struct {
+	expected := struct {
 		UUID              string
 		AnonReplicaAmount int
 	}{tnt16UUID, 0} // Join doesn't add anon replica to anon replica list but Attach and Subscribe do
@@ -218,10 +220,6 @@ func TestAnonSlaveHasNextOnJoin(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
-	var expected struct {
-		UUID              string
-		AnonReplicaAmount int
-	}
 	// setup
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:     tnt16User,
@@ -229,7 +227,7 @@ func TestAnonSlaveHasNextOnJoin(t *testing.T) {
 		UUID:     tnt16UUID})
 	defer s.Close()
 
-	expected = struct {
+	expected := struct {
 		UUID              string
 		AnonReplicaAmount int
 	}{tnt16UUID, 0} // Join doesn't add anon replica to anon replica list but Attach and Subscribe do
@@ -298,11 +296,6 @@ func TestAnonSlaveJoinWithSnapAsync(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
-	var expected struct {
-		UUID              string
-		AnonReplicaAmount int
-	}
-
 	// setup
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:     tnt16User,
@@ -310,7 +303,7 @@ func TestAnonSlaveJoinWithSnapAsync(t *testing.T) {
 		UUID:     tnt16UUID})
 	defer s.Close()
 
-	expected = struct {
+	expected := struct {
 		UUID              string
 		AnonReplicaAmount int
 	}{tnt16UUID, 0} // Join doesn't add anon replica to anon replica list but Attach and Subscribe do
@@ -355,17 +348,12 @@ func TestAnonSlaveJoin(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
-	var expected struct {
-		UUID              string
-		AnonReplicaAmount int
-	}
-
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
 		UUID:     tnt16UUID})
 
-	expected = struct {
+	expected := struct {
 		UUID              string
 		AnonReplicaAmount int
 	}{tnt16UUID, 0} // Join doesn't add anon replica to anon replica list but Attach and Subscribe do
@@ -616,14 +604,12 @@ func TestAnonSlaveAttach(t *testing.T) {
 	require.NoError(err)
 	assert.NotNil(t, it)
 
-	expected := struct {
-		AnonReplicaAmount int
-	}{1}
+	expectedAnonReplicaAmount := 1
 
 	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
 	require.NoError(err)
 
-	require.EqualValues(expected.AnonReplicaAmount, anonReplicaAmount)
+	require.EqualValues(expectedAnonReplicaAmount, anonReplicaAmount)
 
 	// shutdown
 	err = s.Close()
