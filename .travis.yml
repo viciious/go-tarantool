@@ -1,7 +1,7 @@
 language: go
 
 go:
-- master
+- 1.15
 
 before_script:
 - go get -t ./...
