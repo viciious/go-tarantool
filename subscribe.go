@@ -56,43 +56,14 @@ type SubscribeResponse struct {
 	VClock         VectorClock
 }
 
-func (sr *SubscribeResponse) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
-	var i uint32
+// UnmarshalMsg implements msgp.Unmarshaller
+func (sr *SubscribeResponse) UnmarshalMsg(data []byte) (buf []byte, err error) {
+	// skip binary header
+	buf, err = msgp.Skip(data)
 
-	buf = data
-	if i, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
-		return
-	}
-
-	for ; i > 0; i-- {
-		var key uint
-
-		if key, buf, err = msgp.ReadUintBytes(buf); err != nil {
-			return
-		}
-
-		switch key {
-		case KeySync:
-			if _, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
-				return
-			}
-		case KeyCode:
-			if _, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
-				return
-			}
-		default:
-			if buf, err = msgp.Skip(buf); err != nil {
-				return
-			}
-		}
-	}
-	return
-}
-
-func (sr *SubscribeResponse) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
+	// unmarshal body
 	var count uint32
 
-	buf = data
 	if count, buf, err = msgp.ReadMapHeaderBytes(buf); err != nil {
 		return
 	}
@@ -138,16 +109,4 @@ func (sr *SubscribeResponse) UnmarshalBinaryBody(data []byte) (buf []byte, err e
 		}
 	}
 	return
-}
-
-// UnmarshalMsg implements msgp.Unmarshaller
-func (sr *SubscribeResponse) UnmarshalMsg(data []byte) (buf []byte, err error) {
-	buf = data
-	if buf, err = sr.UnmarshalBinaryHeader(buf); err != nil {
-		return buf, err
-	}
-	if len(buf) == 0 {
-		return buf, nil
-	}
-	return sr.UnmarshalBinaryBody(buf)
 }

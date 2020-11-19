@@ -109,7 +109,7 @@ func (e *QueryError) Timeout() bool {
 }
 
 // UnexpectedReplicaSetUUIDError is returned when ReplicaSetUUID set in Options.ReplicaSetUUID is not equal to ReplicaSetUUID
-// received during Join or JoinWithSnap. It is only an AnonSlave2 error!
+// received during Join or JoinWithSnap. It is only an AnonSlave error!
 type UnexpectedReplicaSetUUIDError struct {
 	error
 	Expected string
@@ -123,6 +123,12 @@ func NewUnexpectedReplicaSetUUIDError(expected string, got string) *UnexpectedRe
 		Expected: expected,
 		Got:      got,
 	}
+}
+
+// Is for errors comparison
+func (e *UnexpectedReplicaSetUUIDError) Is(target error) bool {
+	_, ok := target.(*UnexpectedReplicaSetUUIDError)
+	return ok
 }
 
 // Temporary implements Error interface.
