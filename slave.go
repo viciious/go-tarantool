@@ -456,6 +456,11 @@ func (s *Slave) nextXlog() (p *Packet, err error) {
 		return nil, ErrBadResult
 	}
 
+	// skip heartbeat message
+	if p.Request == nil && p.Result.ErrorCode == OKCommand {
+		return p, nil
+	}
+
 	if !s.VClock.Follow(p.InstanceID, p.LSN) {
 		return nil, ErrVectorClock
 	}

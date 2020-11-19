@@ -32,7 +32,7 @@ faster than other packages according to public benchmarks.
    - replication support: you can implement a service which would mimic a Tarantool
      replication slave and get on-the-fly data updates from the Tarantool master,
      an example is provided
-     [here](https://godoc.org/github.com/viciious/go-tarantool#ex-Slave-Attach-Async).
+     [here](https://godoc.org/github.com/viciious/go-tarantool#example-Slave-Attach-Async).
 * The interface for sending and packing queries is different from other
   go-tarantool implementations, which you may find more aesthetically pleasant
   to work with: all queries are represented with different types that follow the
