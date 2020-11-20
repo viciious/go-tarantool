@@ -4,10 +4,15 @@ import (
 	"io"
 )
 
+// AnonSlave connects to Tarantool >= 2.3.1 instance and subscribes for changes as anonymous replica.
+// Tarantool instance acting as a master sees AnonSlave like anonymous replica.
+// AnonSlave can't be used concurrently, route responses from returned channel instead.
 type AnonSlave struct {
 	Slave
 }
 
+// NewAnonSlave returns new AnonSlave instance.
+// URI is parsed by url package and therefore should contains any scheme supported by net.Dial.
 func NewAnonSlave(uri string, opts ...Options) (as *AnonSlave, err error) {
 	s, err := NewSlave(uri, opts...)
 	if err != nil {
