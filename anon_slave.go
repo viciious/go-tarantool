@@ -16,7 +16,7 @@ func NewAnonSlave(uri string, opts ...Options) (as *AnonSlave, err error) {
 
 	// check tarantool version. Anonymous replica support was added in Tarantool 2.3.1
 	if s.Version() < version2_3_1 {
-		return nil, errOldVersionAnon
+		return nil, ErrOldVersionAnon
 	}
 
 	return &AnonSlave{*s}, nil
