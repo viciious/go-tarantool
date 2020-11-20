@@ -13,7 +13,7 @@ import (
 
 var (
 	nullUUID                  = "00000000-0000-0000-0000-000000000000"
-	getAnonReplicasExpression = "anon_count=0; for _, _ in pairs(box.info.replication_anon()) do anon_count=anon_count+1 end; return anon_count;"
+	getAnonReplicasExpression = "return box.info.replication_anon;"
 )
 
 func TestAnonSlaveConnect(t *testing.T) {
@@ -129,7 +129,7 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUID(t *testing.T) {
 	_, err = s.Subscribe(0)
 	require.NoError(err)
 
-	expectedAnonReplicaAmount := 1
+	expectedAnonReplicaCount := 1
 
 	assert.EqualValues(ReplicaSetUUID, s.ReplicaSet.UUID)
 
@@ -138,10 +138,10 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUID(t *testing.T) {
 		return
 	}
 
-	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
+	anonReplicaCount, err := getAnonReplicasCount(box.Listen)
 	require.NoError(err)
 
-	require.EqualValues(expectedAnonReplicaAmount, anonReplicaAmount)
+	require.EqualValues(expectedAnonReplicaCount, anonReplicaCount)
 }
 
 func TestAnonSlaveSubscribeExpectedReplicaSetUUIDFail(t *testing.T) {
@@ -186,8 +186,8 @@ func TestAnonSlaveJoinWithSnapSync(t *testing.T) {
 	defer s.Close()
 
 	expected := struct {
-		UUID              string
-		AnonReplicaAmount int
+		UUID             string
+		AnonReplicaCount int
 	}{tnt16UUID, 0} // Join doesn't add anon replica to anon replica list but Attach and Subscribe do
 
 	it, err := s.JoinWithSnap()
@@ -226,10 +226,10 @@ func TestAnonSlaveJoinWithSnapSync(t *testing.T) {
 		return
 	}
 
-	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
+	anonReplicaCount, err := getAnonReplicasCount(box.Listen)
 	require.NoError(err)
 
-	require.EqualValues(expected.AnonReplicaAmount, anonReplicaAmount)
+	require.EqualValues(expected.AnonReplicaCount, anonReplicaCount)
 }
 
 func TestAnonSlaveHasNextOnJoin(t *testing.T) {
@@ -250,8 +250,8 @@ func TestAnonSlaveHasNextOnJoin(t *testing.T) {
 	defer s.Close()
 
 	expected := struct {
-		UUID              string
-		AnonReplicaAmount int
+		UUID             string
+		AnonReplicaCount int
 	}{tnt16UUID, 0} // Join doesn't add anon replica to anon replica list but Attach and Subscribe do
 
 	_, err = s.JoinWithSnap()
@@ -284,10 +284,10 @@ func TestAnonSlaveHasNextOnJoin(t *testing.T) {
 		return
 	}
 
-	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
+	anonReplicaCount, err := getAnonReplicasCount(box.Listen)
 	require.NoError(err)
 
-	require.EqualValues(expected.AnonReplicaAmount, anonReplicaAmount)
+	require.EqualValues(expected.AnonReplicaCount, anonReplicaCount)
 }
 
 func TestAnonSlaveIsEmptyChan(t *testing.T) {
@@ -333,8 +333,8 @@ func TestAnonSlaveJoinWithSnapAsync(t *testing.T) {
 	defer s.Close()
 
 	expected := struct {
-		UUID              string
-		AnonReplicaAmount int
+		UUID             string
+		AnonReplicaCount int
 	}{tnt16UUID, 0} // Join doesn't add anon replica to anon replica list but Attach and Subscribe do
 
 	respc := make(chan *Packet, 1)
@@ -369,10 +369,10 @@ loop:
 		return
 	}
 
-	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
+	anonReplicaCount, err := getAnonReplicasCount(box.Listen)
 	require.NoError(err)
 
-	require.EqualValues(expected.AnonReplicaAmount, anonReplicaAmount)
+	require.EqualValues(expected.AnonReplicaCount, anonReplicaCount)
 }
 
 func TestAnonSlaveJoin(t *testing.T) {
@@ -390,8 +390,8 @@ func TestAnonSlaveJoin(t *testing.T) {
 		UUID:     tnt16UUID})
 
 	expected := struct {
-		UUID              string
-		AnonReplicaAmount int
+		UUID             string
+		AnonReplicaCount int
 	}{tnt16UUID, 0} // Join doesn't add anon replica to anon replica list but Attach and Subscribe do
 
 	err = s.Join()
@@ -407,10 +407,10 @@ func TestAnonSlaveJoin(t *testing.T) {
 		return
 	}
 
-	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
+	anonReplicaCount, err := getAnonReplicasCount(box.Listen)
 	require.NoError(err)
 
-	require.EqualValues(expected.AnonReplicaAmount, anonReplicaAmount)
+	require.EqualValues(expected.AnonReplicaCount, anonReplicaCount)
 }
 
 func TestAnonSlaveDoubleClose(t *testing.T) {
@@ -651,17 +651,17 @@ func TestAnonSlaveAttach(t *testing.T) {
 	require.NoError(err)
 	assert.NotNil(t, it)
 
-	expectedAnonReplicaAmount := 1
+	expectedAnonReplicaCount := 1
 
 	// return if tarantool version doesn't have box.info.replication_anon
 	if s.Version() < version2_5_1 {
 		return
 	}
 
-	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
+	anonReplicaCount, err := getAnonReplicasCount(box.Listen)
 	require.NoError(err)
 
-	require.EqualValues(expectedAnonReplicaAmount, anonReplicaAmount)
+	require.EqualValues(expectedAnonReplicaCount, anonReplicaCount)
 }
 
 func TestAnonSlaveAttachAsync(t *testing.T) {
@@ -757,7 +757,7 @@ func TestAnonSlaveParseOptionsRSParams(t *testing.T) {
 	}
 }
 
-func getAnonReplicasAmount(listen string) (count int, err error) {
+func getAnonReplicasCount(listen string) (count int, err error) {
 	tnt, err := Connect(listen, &Options{})
 	if err != nil {
 		return 0, err
@@ -780,11 +780,21 @@ func getAnonReplicasAmount(listen string) (count int, err error) {
 	}
 
 	var (
-		count64 int64
-		ok      bool
+		m              map[string]interface{}
+		count64        int64
+		countInterface interface{}
+		ok             bool
 	)
-	if count64, ok = innerData[0].(int64); !ok {
+	if m, ok = innerData[0].(map[string]interface{}); !ok {
 		return 0, fmt.Errorf("unexpected dataType: %T", innerData[0])
+	}
+
+	if countInterface, ok = m["count"]; !ok {
+		return 0, fmt.Errorf("count is not found inside %v", m)
+	}
+
+	if count64, ok = countInterface.(int64); !ok {
+		return 0, fmt.Errorf("unexpected dataType of count: %T", countInterface)
 	}
 
 	return int(count64), nil
