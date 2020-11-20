@@ -1,7 +1,7 @@
 language: go
 
 go:
-- master
+- 1.15
 
 before_script:
 - go get -t ./...
@@ -35,6 +35,8 @@ matrix:
     - env: TARANTOOL_VER=1.7
     - env: TARANTOOL_VER=1.10
     - env: TARANTOOL_VER=2.3
+    - env: TARANTOOL_VER=2.5
+    - env: TARANTOOL_VER=2.6
 
 after_failure:
 - cat /home/travis/tntlog/*
