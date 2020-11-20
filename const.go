@@ -215,4 +215,6 @@ const (
 	version1_7_7 = uint32(67335) // VersionID(1, 7, 7)
 	// 2.3.1 is min version for anonymous replication
 	version2_3_1 = uint32(131841) // VersionID(2, 3, 1)
+	// Add box.info.replication_anon
+	version2_5_1 = uint32(132353) // VersionID(2, 5, 1)
 )

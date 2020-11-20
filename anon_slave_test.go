@@ -133,6 +133,11 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUID(t *testing.T) {
 
 	assert.EqualValues(ReplicaSetUUID, s.ReplicaSet.UUID)
 
+	// return if tarantool version doesn't have box.info.replication_anon
+	if s.Version() < version2_5_1 {
+		return
+	}
+
 	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
 	require.NoError(err)
 
@@ -216,6 +221,11 @@ func TestAnonSlaveJoinWithSnapSync(t *testing.T) {
 	}
 	assert.NotZero(s.ReplicaSet.UUID)
 
+	// return if tarantool version doesn't have box.info.replication_anon
+	if s.Version() < version2_5_1 {
+		return
+	}
+
 	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
 	require.NoError(err)
 
@@ -268,6 +278,11 @@ func TestAnonSlaveHasNextOnJoin(t *testing.T) {
 		t.Fatal("Timeout: there is no necessary snaplogs.")
 	}
 	assert.NotZero(s.ReplicaSet.UUID)
+
+	// return if tarantool version doesn't have box.info.replication_anon
+	if s.Version() < version2_5_1 {
+		return
+	}
 
 	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
 	require.NoError(err)
@@ -349,6 +364,11 @@ loop:
 	assert.NoError(err)
 	assert.NotZero(s.ReplicaSet.UUID)
 
+	// return if tarantool version doesn't have box.info.replication_anon
+	if s.Version() < version2_5_1 {
+		return
+	}
+
 	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
 	require.NoError(err)
 
@@ -381,6 +401,11 @@ func TestAnonSlaveJoin(t *testing.T) {
 
 	// check
 	require.NotZero(s.ReplicaSet.UUID)
+
+	// return if tarantool version doesn't have box.info.replication_anon
+	if s.Version() < version2_5_1 {
+		return
+	}
 
 	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
 	require.NoError(err)
@@ -619,6 +644,8 @@ func TestAnonSlaveAttach(t *testing.T) {
 		Password: tnt16Pass,
 		UUID:     tnt16UUID})
 
+	defer s.Close()
+
 	// check
 	it, err := s.Attach()
 	require.NoError(err)
@@ -626,14 +653,15 @@ func TestAnonSlaveAttach(t *testing.T) {
 
 	expectedAnonReplicaAmount := 1
 
+	// return if tarantool version doesn't have box.info.replication_anon
+	if s.Version() < version2_5_1 {
+		return
+	}
+
 	anonReplicaAmount, err := getAnonReplicasAmount(box.Listen)
 	require.NoError(err)
 
 	require.EqualValues(expectedAnonReplicaAmount, anonReplicaAmount)
-
-	// shutdown
-	err = s.Close()
-	require.NoError(err)
 }
 
 func TestAnonSlaveAttachAsync(t *testing.T) {
