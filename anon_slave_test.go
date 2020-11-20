@@ -93,9 +93,7 @@ func TestAnonSlaveJoinExpectedReplicaSetUUIDFail(t *testing.T) {
 	require.Error(err)
 
 	expectedErr := &UnexpectedReplicaSetUUIDError{}
-	require.EqualValues(true, errors.Is(err, expectedErr),
-		fmt.Sprintf("Expect errors type: %T, Got: %T", expectedErr, err))
-
+	require.ErrorIsf(err, expectedErr, "Expect errors type: %T, Got: %T", expectedErr, err)
 }
 
 func TestAnonSlaveSubscribeExpectedReplicaSetUUID(t *testing.T) {
@@ -162,8 +160,7 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUIDFail(t *testing.T) {
 	require.Error(err)
 
 	expectedErr := &UnexpectedReplicaSetUUIDError{}
-	require.EqualValues(true, errors.Is(err, expectedErr),
-		fmt.Sprintf("Expect errors type: %T, Got: %T", expectedErr, err))
+	require.ErrorIsf(err, expectedErr, "Expect errors type: %T, Got: %T", expectedErr, err)
 }
 
 func TestAnonSlaveJoinWithSnapSync(t *testing.T) {
