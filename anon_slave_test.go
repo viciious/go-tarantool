@@ -1,7 +1,6 @@
 package tarantool
 
 import (
-	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -277,7 +276,7 @@ func TestAnonSlaveHasNextOnJoin(t *testing.T) {
 }
 
 func TestAnonSlaveIsEmptyChan(t *testing.T) {
-	s := &AnonSlave2{}
+	s := &AnonSlave{}
 
 	ch := make(chan *Packet)
 	assert.True(t, s.isEmptyChan(), "case empty params")
@@ -757,7 +756,7 @@ func getAnonReplicasAmount(listen string) (count int, err error) {
 		ok      bool
 	)
 	if count64, ok = innerData[0].(int64); !ok {
-		return 0, errors.New(fmt.Sprintf("unexpected dataType: %T", innerData[0]))
+		return 0, fmt.Errorf("unexpected dataType: %T", innerData[0])
 	}
 
 	return int(count64), nil
