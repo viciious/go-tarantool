@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -20,6 +22,8 @@ func TestAnonSlaveConnect(t *testing.T) {
 	box, err := newTntBox()
 	require.NoError(err)
 	defer box.Close()
+
+	skipUnsupportedVersion(t, box)
 
 	// setup
 	opts := Options{User: tnt16User, Password: tnt16Pass}
@@ -39,6 +43,8 @@ func TestAnonSlaveJoinExpectedReplicaSetUUID(t *testing.T) {
 	box, err := newTntBox()
 	require.NoError(err)
 	defer box.Close()
+
+	skipUnsupportedVersion(t, box)
 
 	// setup
 	s, _ := NewAnonSlave(box.Listen, Options{
@@ -74,6 +80,8 @@ func TestAnonSlaveJoinExpectedReplicaSetUUIDFail(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
+	skipUnsupportedVersion(t, box)
+
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:           tnt16User,
 		Password:       tnt16Pass,
@@ -97,6 +105,8 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUID(t *testing.T) {
 	box, err := newTntBoxWithEval()
 	require.NoError(err)
 	defer box.Close()
+
+	skipUnsupportedVersion(t, box)
 
 	// setup
 	s, _ := NewAnonSlave(box.Listen, Options{
@@ -139,6 +149,8 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUIDFail(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
+	skipUnsupportedVersion(t, box)
+
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:           tnt16User,
 		Password:       tnt16Pass,
@@ -161,6 +173,8 @@ func TestAnonSlaveJoinWithSnapSync(t *testing.T) {
 	box, err := newTntBoxWithEval()
 	require.NoError(err)
 	defer box.Close()
+
+	skipUnsupportedVersion(t, box)
 
 	// setup
 	s, _ := NewAnonSlave(box.Listen, Options{
@@ -219,6 +233,8 @@ func TestAnonSlaveHasNextOnJoin(t *testing.T) {
 	box, err := newTntBoxWithEval()
 	require.NoError(err)
 	defer box.Close()
+
+	skipUnsupportedVersion(t, box)
 
 	// setup
 	s, _ := NewAnonSlave(box.Listen, Options{
@@ -296,6 +312,8 @@ func TestAnonSlaveJoinWithSnapAsync(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
+	skipUnsupportedVersion(t, box)
+
 	// setup
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:     tnt16User,
@@ -348,6 +366,8 @@ func TestAnonSlaveJoin(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
+	skipUnsupportedVersion(t, box)
+
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
@@ -378,6 +398,8 @@ func TestAnonSlaveDoubleClose(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
+	skipUnsupportedVersion(t, box)
+
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
@@ -402,6 +424,8 @@ func TestAnonSlaveSubscribeSync(t *testing.T) {
 	box, err := newTntBox()
 	require.NoError(err)
 	defer box.Close()
+
+	skipUnsupportedVersion(t, box)
 
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:     tnt16User,
@@ -461,6 +485,8 @@ func TestAnonSlaveHasNextOnSubscribe(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
+	skipUnsupportedVersion(t, box)
+
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:     tnt16User,
 		Password: tnt16Pass,
@@ -505,15 +531,11 @@ func TestAnonSlaveVClock(t *testing.T) {
 	require := require.New(t)
 
 	// setup
-	guest := "guest"
-	config := schemeNewReplicator(tnt16User, tnt16Pass)
-	config += schemeSpaceTester()
-	// for making snapshot
-	config += schemeGrantUserEval(guest)
-
-	box, err := NewBox(config, &BoxOptions{})
+	box, err := newTntBoxWithEval()
 	require.NoError(err)
 	defer box.Close()
+
+	skipUnsupportedVersion(t, box)
 
 	tnt, err := Connect(box.Listen, &Options{})
 	require.NoError(err)
@@ -593,6 +615,8 @@ func TestAnonSlaveAttach(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
+	skipUnsupportedVersion(t, box)
+
 	// setup
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:     tnt16User,
@@ -623,6 +647,8 @@ func TestAnonSlaveAttachAsync(t *testing.T) {
 	box, err := newTntBox()
 	require.NoError(err)
 	defer box.Close()
+
+	skipUnsupportedVersion(t, box)
 
 	// setup Slave
 	s, _ := NewAnonSlave(box.Listen, Options{
@@ -681,6 +707,8 @@ func TestAnonSlaveParseOptionsRSParams(t *testing.T) {
 	require.NoError(err)
 	defer box.Close()
 
+	skipUnsupportedVersion(t, box)
+
 	uri := fmt.Sprintf("%v:%v@%v", tnt16User, tnt16Pass, box.Listen)
 	tt := []struct {
 		opts       Options
@@ -736,6 +764,21 @@ func getAnonReplicasAmount(listen string) (count int, err error) {
 	}
 
 	return int(count64), nil
+}
+
+func skipUnsupportedVersion(t *testing.T, box *Box) {
+	ver, err := box.Version()
+	require.NoError(t, err)
+
+	version := strings.Split(ver, ".")
+	major, _ := strconv.Atoi(version[0])
+	minor, _ := strconv.Atoi(version[1])
+	patch, _ := strconv.Atoi(version[2])
+
+	tarantoolVersion := VersionID(uint32(major), uint32(minor), uint32(patch))
+	if tarantoolVersion < version2_3_1 {
+		t.Skip("old tarantool version. Min Tarantool version for this test is 2.3.1")
+	}
 }
 
 func newTntBoxWithEval() (*Box, error) {

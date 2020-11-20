@@ -17,6 +17,8 @@ var (
 	ErrVectorClock = NewQueryError(0, "vclock manipulation")
 	// ErrUnknownError is returns when ErrorCode isn't OK but Error is nil in Result.
 	ErrUnknownError = NewQueryError(ErrUnknown, "unknown error")
+	// ErrOldVersionAnon is returns when tarantool version doesn't support anonymous replication.
+	ErrOldVersionAnon = errors.New("tarantool version is too old for anonymous replication. Min version is 2.3.1")
 )
 
 // Error has Temporary method which returns true if error is temporary.
