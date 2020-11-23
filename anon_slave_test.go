@@ -13,7 +13,7 @@ import (
 
 var (
 	nullUUID                  = "00000000-0000-0000-0000-000000000000"
-	getAnonReplicasExpression = "return box.info.replication_anon;"
+	getAnonReplicasExpression = "return box.info.replication_anon"
 )
 
 func TestAnonSlaveConnect(t *testing.T) {
