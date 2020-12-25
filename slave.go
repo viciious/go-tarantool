@@ -547,12 +547,15 @@ func (s *Slave) heartbeat() {
 	}
 
 	var (
-		err error
-		pp  *BinaryPacket
+		err          error
+		pp           *BinaryPacket
+		numSeqErrors int
 	)
+	const maxSeqErrors = 5
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+
 loop:
 	for {
 		select {
@@ -565,12 +568,18 @@ loop:
 				break loop
 			}
 
-			if err = s.send(pp); err != nil {
-				pp.Release()
-				break loop
+			err = s.send(pp)
+			pp.Release()
+
+			if err == nil {
+				numSeqErrors = 0
+				continue
 			}
 
-			pp.Release()
+			numSeqErrors++
+			if numSeqErrors == maxSeqErrors {
+				break loop
+			}
 		}
 	}
 
