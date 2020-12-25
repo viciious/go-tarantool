@@ -556,6 +556,8 @@ func (s *Slave) heartbeat() {
 loop:
 	for {
 		select {
+		case <-s.c.exit:
+			return
 		case <-ticker.C:
 			if pp, err = s.newPacket(&VClock{
 				VClock: s.VClock,
