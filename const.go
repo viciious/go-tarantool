@@ -199,6 +199,7 @@ const (
 	ErrWrongIndexOptions             = uint(0x6c) // Wrong index options (field %u): %s
 	ErrWrongSchemaVaersion           = uint(0x6d) // Wrong schema version, current: %d, in request: %u
 	ErrSlabAllocMax                  = uint(0x6e) // Failed to allocate %u bytes for tuple in the slab allocator: tuple is too large. Check 'slab_alloc_maximal' configuration option.
+	ErrXLogGap                       = uint(0xdb) // Missing .xlog file between LSN %lld %s and %lld %s
 )
 
 const (
