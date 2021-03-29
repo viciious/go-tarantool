@@ -16,7 +16,7 @@ func ReadSnapshotPacked(rs io.Reader, tuplecb func(space uint, tuple []byte) err
 	var err error
 	var version int
 
-	in := bufio.NewReaderSize(rs, 128*1024)
+	in := bufio.NewReaderSize(rs, 16*1024*1024)
 
 	for ln := 0; ; ln++ {
 		if ln > 0 {
