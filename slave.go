@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	"github.com/viciious/go-tarantool/typeconv"
 )
 
@@ -61,9 +61,12 @@ func NewSlave(uri string, opts ...Options) (s *Slave, err error) {
 }
 
 func (s *Slave) parseOptions(uri string, options Options) (err error) {
-
 	if len(options.UUID) == 0 {
-		s.UUID = uuid.NewV1().String()
+		uuid, err := uuid.NewV1()
+		if err != nil {
+			return err
+		}
+		s.UUID = uuid.String()
 	} else {
 		s.UUID = options.UUID
 	}
