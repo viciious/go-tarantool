@@ -167,9 +167,10 @@ func (s *AnonSlave) fetchSnapshot() (err error) {
 func (s *AnonSlave) subscribe(lsns ...uint64) error {
 	vc := NewVectorClock(lsns...)
 	pp, err := s.newPacket(&Subscribe{
-		UUID:   s.UUID,
-		VClock: vc,
-		Anon:   true,
+		UUID:           s.UUID,
+		ReplicaSetUUID: s.ReplicaSet.UUID,
+		VClock:         vc,
+		Anon:           true,
 	})
 	if err != nil {
 		return err
