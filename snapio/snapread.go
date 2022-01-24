@@ -38,8 +38,8 @@ func ReadSnapshotPacked(rs io.Reader, tuplecb func(space uint, tuple []byte) err
 		line := string(lineb)
 		switch ln {
 		case 0:
-			if line != "SNAP" {
-				return errors.New("Missing SNAP header")
+			if line != "SNAP" && line != "XLOG" {
+				return errors.New("Missing SNAP/XLOG header")
 			}
 		case 1:
 			if line == "0.12" {
