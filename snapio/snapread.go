@@ -39,7 +39,7 @@ func ReadSnapshotPacked(rs io.Reader, tuplecb func(space uint, tuple []byte) err
 		switch ln {
 		case 0:
 			if line != "SNAP" && line != "XLOG" {
-				return errors.New("Missing SNAP/XLOG header")
+				return errors.New("missing SNAP/XLOG header")
 			}
 		case 1:
 			if line == "0.12" {
@@ -47,7 +47,7 @@ func ReadSnapshotPacked(rs io.Reader, tuplecb func(space uint, tuple []byte) err
 			} else if line == "0.13" {
 				version = 13
 			} else {
-				return fmt.Errorf("Unknown snapshot version: %s", line)
+				return fmt.Errorf("unknown snapshot version: %s", line)
 			}
 		}
 	}
@@ -84,11 +84,11 @@ func ReadSnapshotPacked(rs io.Reader, tuplecb func(space uint, tuple []byte) err
 		}
 
 		if !compressed && binary.BigEndian.Uint32(fixh[0:4]) != XRowFixedHeaderMagic {
-			return fmt.Errorf("Bad xrow magic %0X", fixh[0:4])
+			return fmt.Errorf("bad xrow magic %0X", fixh[0:4])
 		}
 
 		buf := fixh[4:]
-		if ulen, buf, err = msgp.ReadUintBytes(buf); err != nil {
+		if ulen, _, err = msgp.ReadUintBytes(buf); err != nil {
 			return err
 		}
 
@@ -165,8 +165,6 @@ func ReadSnapshotPacked(rs io.Reader, tuplecb func(space uint, tuple []byte) err
 			}
 		}
 	}
-
-	return nil
 }
 
 func ReadSnapshot(rs io.Reader, tuplecb func(space uint, tuple []interface{}) error) error {

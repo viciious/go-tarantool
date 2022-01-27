@@ -59,7 +59,9 @@ type SubscribeResponse struct {
 // UnmarshalMsg implements msgp.Unmarshaller
 func (sr *SubscribeResponse) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	// skip binary header
-	buf, err = msgp.Skip(data)
+	if buf, err = msgp.Skip(data); err != nil {
+		return
+	}
 
 	// unmarshal body
 	var count uint32

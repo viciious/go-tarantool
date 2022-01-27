@@ -323,11 +323,11 @@ func (conn *Connection) pullSchema() (err error) {
 
 		response := &pp.packet
 		if response.requestID != requestID {
-			return nil, errors.New("Bad response requestID")
+			return nil, errors.New("bad response requestID")
 		}
 
 		if response.Result == nil {
-			return nil, errors.New("Nil response result")
+			return nil, errors.New("nil response result")
 		}
 
 		if response.Result.Error != nil {

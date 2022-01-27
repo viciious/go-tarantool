@@ -149,7 +149,7 @@ func (s *IprotoServer) greet() (err error) {
 	s.salt = []byte(base64.StdEncoding.EncodeToString(salt))
 
 	line1 = fmt.Sprintf("%s %s", ServerIdent, s.uuid)
-	line2 = fmt.Sprintf("%s", s.salt)
+	line2 = string(s.salt)
 
 	format = fmt.Sprintf("%%-%ds\n%%-%ds\n", GreetingSize/2-1, GreetingSize/2-1)
 	greeting = fmt.Sprintf(format, line1, line2)

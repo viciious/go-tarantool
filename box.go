@@ -42,7 +42,7 @@ type BoxOptions struct {
 }
 
 var (
-	ErrPortAlreadyInUse = errors.New("Port already in use")
+	ErrPortAlreadyInUse = errors.New("port already in use")
 )
 
 func NewBox(config string, options *BoxOptions) (*Box, error) {
@@ -184,7 +184,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 	}
 
 	if box == nil {
-		return nil, fmt.Errorf("Can't bind any port from %d to %d", options.PortMin, options.PortMax)
+		return nil, fmt.Errorf("can't bind any port from %d to %d", options.PortMin, options.PortMax)
 	}
 
 	return box, nil
@@ -358,7 +358,7 @@ func (box *Box) Version() (string, error) {
 	}
 
 	if box.version == "" {
-		return "", errors.New("Unknown Tarantool version")
+		return "", errors.New("unknown Tarantool version")
 	}
 	return box.version, nil
 }

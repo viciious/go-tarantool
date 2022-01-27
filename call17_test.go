@@ -136,7 +136,7 @@ func TestCall17(t *testing.T) {
 			Name: "sel_all",
 		},
 		[][]interface{}{
-			[]interface{}{
+			{
 				[]interface{}{int64(1), "First record"},
 				[]interface{}{int64(2), "Music"},
 				[]interface{}{int64(3), "Length", int64(93)},
@@ -151,7 +151,7 @@ func TestCall17(t *testing.T) {
 			Tuple: []interface{}{int64(2), "Music"},
 		},
 		[][]interface{}{
-			[]interface{}{
+			{
 				[]interface{}{int64(2), "Music"},
 			},
 		},
@@ -166,7 +166,7 @@ func TestCall17(t *testing.T) {
 			Name: "call_case_1",
 		},
 		[][]interface{}{
-			[]interface{}{int64(1)},
+			{int64(1)},
 		},
 	)
 
@@ -176,7 +176,7 @@ func TestCall17(t *testing.T) {
 			Name: "call_case_2",
 		},
 		[][]interface{}{
-			[]interface{}{int64(1)}, []interface{}{int64(2)}, []interface{}{int64(3)},
+			{int64(1)}, {int64(2)}, {int64(3)},
 		},
 	)
 
@@ -186,7 +186,7 @@ func TestCall17(t *testing.T) {
 			Name: "call_case_3",
 		},
 		[][]interface{}{
-			[]interface{}{true},
+			{true},
 		},
 	)
 
@@ -196,7 +196,7 @@ func TestCall17(t *testing.T) {
 			Name: "call_case_4",
 		},
 		[][]interface{}{
-			[]interface{}{nil},
+			{nil},
 		},
 	)
 
@@ -206,7 +206,7 @@ func TestCall17(t *testing.T) {
 			Name: "call_case_5",
 		},
 		[][]interface{}{
-			[]interface{}{},
+			{},
 		},
 	)
 
@@ -216,7 +216,7 @@ func TestCall17(t *testing.T) {
 			Name: "call_case_6",
 		},
 		[][]interface{}{
-			[]interface{}{int64(1)},
+			{int64(1)},
 		},
 	)
 
@@ -226,7 +226,7 @@ func TestCall17(t *testing.T) {
 			Name: "call_case_7",
 		},
 		[][]interface{}{
-			[]interface{}{int64(1), int64(2), int64(3)},
+			{int64(1), int64(2), int64(3)},
 		},
 	)
 
@@ -236,9 +236,9 @@ func TestCall17(t *testing.T) {
 			Name: "call_case_8",
 		},
 		[][]interface{}{
-			[]interface{}{int64(1), int64(2), int64(3)},
-			[]interface{}{"a", "b", "c"},
-			[]interface{}{true, false},
+			{int64(1), int64(2), int64(3)},
+			{"a", "b", "c"},
+			{true, false},
 		},
 	)
 
@@ -248,7 +248,7 @@ func TestCall17(t *testing.T) {
 			Name: "call_case_9",
 		},
 		[][]interface{}{
-			[]interface{}{map[string]interface{}{"key1": "value1", "key2": "value2"}},
+			{map[string]interface{}{"key1": "value1", "key2": "value2"}},
 		},
 	)
 }

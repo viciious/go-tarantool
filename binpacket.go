@@ -84,7 +84,7 @@ func (pp *BinaryPacket) ReadFrom(r io.Reader) (n int64, err error) {
 	case c == 0xce:
 		headerLength = 5
 	default:
-		return int64(rr), fmt.Errorf("Wrong packet header: %#v", c)
+		return int64(rr), fmt.Errorf("wrong packet header: %#v", c)
 	}
 
 	if headerLength > 1 {
@@ -166,7 +166,7 @@ func (pp *BinaryPacket) readRawPacket(r io.Reader) (requestID uint64, err error)
 			return
 		}
 		if cd == KeySync {
-			requestID, buf, err = msgp.ReadUint64Bytes(buf)
+			requestID, _, err = msgp.ReadUint64Bytes(buf)
 			return
 		}
 		if buf, err = msgp.Skip(buf); err != nil {
@@ -190,7 +190,7 @@ func (pp *BinaryPacket) packMsg(q Query, packdata *packData) (err error) {
 		}
 	} else {
 		pp.packet.Cmd = ErrorFlag
-		return errors.New("The Query struct doesn't implement any known marshalling interface")
+		return errors.New("query struct doesn't implement any known marshalling interface")
 	}
 
 	pp.packet.Cmd = q.GetCommandID()

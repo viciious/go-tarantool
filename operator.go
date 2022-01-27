@@ -118,7 +118,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 	switch str {
 	case "+":
 		if n != 3 {
-			return nil, buf, fmt.Errorf("Unexpected number of arguments in OpAdd: %d", n)
+			return nil, buf, fmt.Errorf("unexpected number of arguments in OpAdd: %d", n)
 		}
 		opAdd := &OpAdd{Field: field0}
 		if opAdd.Argument, buf, err = msgp.ReadInt64Bytes(buf); err != nil {
@@ -127,7 +127,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		op = opAdd
 	case "-":
 		if n != 3 {
-			return nil, buf, fmt.Errorf("Unexpected number of arguments in OpSub: %d", n)
+			return nil, buf, fmt.Errorf("unexpected number of arguments in OpSub: %d", n)
 		}
 		opSub := &OpSub{Field: field0}
 		if opSub.Argument, buf, err = msgp.ReadInt64Bytes(buf); err != nil {
@@ -136,7 +136,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		op = opSub
 	case "&":
 		if n != 3 {
-			return nil, buf, fmt.Errorf("Unexpected number of arguments in OpBitAND: %d", n)
+			return nil, buf, fmt.Errorf("unexpected number of arguments in OpBitAND: %d", n)
 		}
 		opAnd := &OpBitAND{Field: field0}
 		if opAnd.Argument, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
@@ -145,7 +145,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		op = opAnd
 	case "^":
 		if n != 3 {
-			return nil, buf, fmt.Errorf("Unexpected number of arguments in OpBitXOR: %d", n)
+			return nil, buf, fmt.Errorf("unexpected number of arguments in OpBitXOR: %d", n)
 		}
 		opXOR := &OpBitXOR{Field: field0}
 		if opXOR.Argument, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
@@ -154,7 +154,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		op = opXOR
 	case "|":
 		if n != 3 {
-			return nil, buf, fmt.Errorf("Unexpected number of arguments in OpBitOR: %d", n)
+			return nil, buf, fmt.Errorf("unexpected number of arguments in OpBitOR: %d", n)
 		}
 		opOR := &OpBitOR{Field: field0}
 		if opOR.Argument, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
@@ -163,7 +163,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		op = opOR
 	case "#":
 		if n != 3 {
-			return nil, buf, fmt.Errorf("Unexpected number of arguments in OpDelete: %d", n)
+			return nil, buf, fmt.Errorf("unexpected number of arguments in OpDelete: %d", n)
 		}
 		opDel := &OpDelete{From: field0}
 		if opDel.Count, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
@@ -172,7 +172,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		op = opDel
 	case "!":
 		if n != 3 {
-			return nil, buf, fmt.Errorf("Unexpected number of arguments in OpInsert: %d", n)
+			return nil, buf, fmt.Errorf("unexpected number of arguments in OpInsert: %d", n)
 		}
 		opIns := &OpInsert{Before: field0}
 		if opIns.Argument, buf, err = msgp.ReadIntfBytes(buf); err != nil {
@@ -181,7 +181,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		op = opIns
 	case "=":
 		if n != 3 {
-			return nil, buf, fmt.Errorf("Unexpected number of arguments in OpAssign: %d", n)
+			return nil, buf, fmt.Errorf("unexpected number of arguments in OpAssign: %d", n)
 		}
 		opAss := &OpAssign{Field: field0}
 		if opAss.Argument, buf, err = msgp.ReadIntfBytes(buf); err != nil {
@@ -190,7 +190,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		op = opAss
 	case ":":
 		if n != 5 {
-			return nil, buf, fmt.Errorf("Unexpected number of arguments in OpSplice: %d", n)
+			return nil, buf, fmt.Errorf("unexpected number of arguments in OpSplice: %d", n)
 		}
 		opSpl := &OpSplice{Field: field0}
 		if opSpl.Position, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
@@ -204,7 +204,7 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		}
 		op = opSpl
 	default:
-		return nil, buf, fmt.Errorf("Uknown op %s", str)
+		return nil, buf, fmt.Errorf("uknown op %s", str)
 	}
 
 	return
