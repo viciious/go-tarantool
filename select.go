@@ -128,7 +128,7 @@ func (q *Select) UnmarshalMsg(data []byte) (buf []byte, err error) {
 			}
 
 			if q.KeyTuple = t.([]interface{}); q.KeyTuple == nil {
-				return buf, errors.New("Interface type is not []interface{}")
+				return buf, errors.New("interface type is not []interface{}")
 			}
 
 			if len(q.KeyTuple) == 1 {

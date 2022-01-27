@@ -73,7 +73,7 @@ func (q *Call17) UnmarshalMsg(data []byte) (buf []byte, err error) {
 			}
 
 			if q.Tuple = t.([]interface{}); q.Tuple == nil {
-				return buf, errors.New("Interface type is not []interface{}")
+				return buf, errors.New("interface type is not []interface{}")
 			}
 			if len(q.Tuple) == 0 {
 				q.Tuple = nil

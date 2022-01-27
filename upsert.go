@@ -77,7 +77,7 @@ func (q *Upsert) UnmarshalMsg(data []byte) (buf []byte, err error) {
 			}
 
 			if q.Tuple = t.([]interface{}); q.Tuple == nil {
-				return buf, errors.New("Interface type is not []interface{}")
+				return buf, errors.New("interface type is not []interface{}")
 			}
 		case KeyDefTuple:
 			var len uint32

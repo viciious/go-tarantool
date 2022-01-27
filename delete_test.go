@@ -73,14 +73,14 @@ func TestDelete(t *testing.T) {
 		return conn.Execute(query)
 	}
 
-	data, err := conn.Execute(&Replace{
+	_, err = conn.Execute(&Replace{
 		Space: "tester",
 		Tuple: []interface{}{int64(4), "Hello"},
 	})
 
 	assert.NoError(err)
 
-	data, err = do(&Delete{
+	data, err := do(&Delete{
 		Space: "tester",
 		Key:   int64(4),
 	})
@@ -102,7 +102,7 @@ func TestDelete(t *testing.T) {
 		assert.Equal([][]interface{}{}, data)
 	}
 
-	data, err = conn.Execute(&Replace{
+	_, err = conn.Execute(&Replace{
 		Space: "tester2",
 		Tuple: []interface{}{int64(4), "World"},
 	})
@@ -131,7 +131,7 @@ func TestDelete(t *testing.T) {
 		assert.Equal([][]interface{}{}, data)
 	}
 
-	data, err = do(&Delete{
+	_, err = do(&Delete{
 		Space:    "tester2",
 		KeyTuple: []interface{}{int64(4), "World"},
 	})

@@ -121,7 +121,7 @@ type UnexpectedReplicaSetUUIDError struct {
 // NewUnexpectedReplicaSetUUIDError returns UnexpectedReplicaSetUUIDError.
 func NewUnexpectedReplicaSetUUIDError(expected string, got string) *UnexpectedReplicaSetUUIDError {
 	return &UnexpectedReplicaSetUUIDError{
-		error:    errors.New(fmt.Sprintf("unexpected ReplicaSetUUID. Expected: %v. Got: %v", expected, got)),
+		error:    fmt.Errorf("unexpected ReplicaSetUUID. Expected: %v. Got: %v", expected, got),
 		Expected: expected,
 		Got:      got,
 	}

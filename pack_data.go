@@ -64,7 +64,7 @@ func (data *packData) spaceNo(space interface{}) (uint64, error) {
 		if exists {
 			return spaceNo, nil
 		}
-		return 0, fmt.Errorf("Unknown space %#v", space)
+		return 0, fmt.Errorf("unknown space %#v", space)
 	}
 
 	return numberToUint64(space)
@@ -89,7 +89,7 @@ func (data *packData) packSpace(space interface{}, o []byte) ([]byte, error) {
 func numberToUint64(number interface{}) (uint64, error) {
 	switch value := number.(type) {
 	default:
-		return 0, fmt.Errorf("Bad number %#v", number)
+		return 0, fmt.Errorf("bad number %#v", number)
 	case int:
 		return uint64(value), nil
 	case uint:
@@ -130,14 +130,14 @@ func (data *packData) indexNo(space interface{}, index interface{}) (uint64, err
 
 		spaceData, exists := data.indexMap[spaceNo]
 		if !exists {
-			return 0, fmt.Errorf("No indexes defined for space %#v", space)
+			return 0, fmt.Errorf("no indexes defined for space %#v", space)
 		}
 
 		indexNo, exists := spaceData[value]
 		if exists {
 			return indexNo, nil
 		}
-		return 0, fmt.Errorf("Unknown index %#v", index)
+		return 0, fmt.Errorf("unknown index %#v", index)
 	}
 
 	return numberToUint64(index)

@@ -2,13 +2,14 @@ package tarantool
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -476,13 +477,12 @@ func TestAnonSlaveSubscribeSync(t *testing.T) {
 	go func(it PacketIterator, rch chan bool) {
 		var p *Packet
 		var err error
-		for err != io.EOF {
+		for p == nil && err != io.EOF {
 			p, err = it.Next()
 			if err == nil && p != nil {
 				rch <- true
+				return
 			}
-			// if we are here something is going wrong
-			break
 		}
 		rch <- false
 	}(it, resultChan)

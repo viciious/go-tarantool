@@ -91,7 +91,7 @@ func NewVectorClock(lsns ...uint64) VectorClock {
 // Follow the clocks.
 // Update vector clock with given clock part.
 func (vc *VectorClock) Follow(id uint32, lsn uint64) bool {
-	if id >= uint32(cap(*vc)) || lsn < 0 {
+	if id >= uint32(cap(*vc)) {
 		return false
 	}
 	// extend vector by elements needed
