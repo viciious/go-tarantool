@@ -92,7 +92,7 @@ func TestAnonSlaveJoinExpectedReplicaSetUUIDFail(t *testing.T) {
 	err = s.Join()
 	require.Error(err)
 
-	expectedErr := &UnexpectedReplicaSetUUIDError{}
+	expectedErr := NewUnexpectedReplicaSetUUIDError(nullUUID, nullUUID)
 	require.ErrorIsf(err, expectedErr, "Expect errors type: %T, Got: %T", expectedErr, err)
 }
 
@@ -163,8 +163,7 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUIDFail(t *testing.T) {
 
 	_, err = s.Subscribe(0)
 	require.Error(err)
-
-	expectedErr := &UnexpectedReplicaSetUUIDError{}
+	expectedErr := NewUnexpectedReplicaSetUUIDError(nullUUID, nullUUID)
 	require.ErrorIsf(err, expectedErr, "Expect errors type: %T, Got: %T", expectedErr, err)
 }
 
