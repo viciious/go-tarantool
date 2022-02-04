@@ -191,13 +191,6 @@ func (s *AnonSlave) subscribe(lsns ...uint64) error {
 	if err != nil {
 		return err
 	}
-	if p.Cmd != OKCommand {
-		s.p = p
-		if p.Result == nil {
-			return ErrBadResult
-		}
-		return p.Result.Error
-	}
 
 	sub := new(SubscribeResponse)
 	_, err = sub.UnmarshalMsg(pp.body)

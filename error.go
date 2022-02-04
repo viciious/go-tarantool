@@ -113,7 +113,7 @@ func (e *QueryError) Timeout() bool {
 // UnexpectedReplicaSetUUIDError is returned when ReplicaSetUUID set in Options.ReplicaSetUUID is not equal to ReplicaSetUUID
 // received during Join or JoinWithSnap. It is only an AnonSlave error!
 type UnexpectedReplicaSetUUIDError struct {
-	error
+	QueryError
 	Expected string
 	Got      string
 }
@@ -121,9 +121,9 @@ type UnexpectedReplicaSetUUIDError struct {
 // NewUnexpectedReplicaSetUUIDError returns UnexpectedReplicaSetUUIDError.
 func NewUnexpectedReplicaSetUUIDError(expected string, got string) *UnexpectedReplicaSetUUIDError {
 	return &UnexpectedReplicaSetUUIDError{
-		error:    fmt.Errorf("unexpected ReplicaSetUUID. Expected: %v. Got: %v", expected, got),
-		Expected: expected,
-		Got:      got,
+		QueryError: *NewQueryError(ErrClusterIDMismatch, fmt.Sprintf("Replica set UUID mismatch: expected %v, got %v", expected, got)),
+		Expected:   expected,
+		Got:        got,
 	}
 }
 
@@ -131,16 +131,6 @@ func NewUnexpectedReplicaSetUUIDError(expected string, got string) *UnexpectedRe
 func (e *UnexpectedReplicaSetUUIDError) Is(target error) bool {
 	_, ok := target.(*UnexpectedReplicaSetUUIDError)
 	return ok
-}
-
-// Temporary implements Error interface.
-func (e *UnexpectedReplicaSetUUIDError) Temporary() bool {
-	return false
-}
-
-// Timeout implements net.Error interface.
-func (e *UnexpectedReplicaSetUUIDError) Timeout() bool {
-	return false
 }
 
 var _ Error = (*ConnectionError)(nil)
