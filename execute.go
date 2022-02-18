@@ -21,7 +21,7 @@ func OpaqueExecOption(opaque interface{}) ExecOption {
 }
 
 // the Result type is used to return write errors here
-func (conn *Connection) writeRequest(ctx context.Context, request *request, q Query) (*request, *Result) {
+func (conn *Connection) writeRequest(ctx context.Context, request *request, q Query) (*request, *Result, uint64) {
 	var err error
 
 	requestID := conn.nextID()
@@ -32,7 +32,7 @@ func (conn *Connection) writeRequest(ctx context.Context, request *request, q Qu
 		return nil, &Result{
 			Error:     NewQueryError(ErrInvalidMsgpack, err.Error()),
 			ErrorCode: ErrInvalidMsgpack,
-		}
+		}, 0
 	}
 
 	request.packet = pp
@@ -50,10 +50,13 @@ func (conn *Connection) writeRequest(ctx context.Context, request *request, q Qu
 
 	writeChan := conn.writeChan
 	if writeChan == nil {
+		r := conn.requests.Pop(requestID)
+		requestPool.Put(r)
+		conn.releasePacket(pp)
 		return nil, &Result{
 			Error:     ConnectionClosedError(conn),
 			ErrorCode: ErrNoConnection,
-		}
+		}, 0
 	}
 
 	select {
@@ -64,21 +67,22 @@ func (conn *Connection) writeRequest(ctx context.Context, request *request, q Qu
 		}
 		r := conn.requests.Pop(requestID)
 		requestPool.Put(r)
+		conn.releasePacket(pp)
 		return nil, &Result{
 			Error:     NewContextError(ctx, conn, "Send error"),
 			ErrorCode: ErrTimeout,
-		}
+		}, 0
 	case <-conn.exit:
 		return nil, &Result{
 			Error:     ConnectionClosedError(conn),
 			ErrorCode: ErrNoConnection,
-		}
+		}, 0
 	}
 
-	return request, nil
+	return request, nil, requestID
 }
 
-func (conn *Connection) readResult(ctx context.Context, arc chan *AsyncResult) *AsyncResult {
+func (conn *Connection) readResult(ctx context.Context, arc chan *AsyncResult, requestID uint64) *AsyncResult {
 	select {
 	case ar := <-arc:
 		if ar == nil {
@@ -92,6 +96,8 @@ func (conn *Connection) readResult(ctx context.Context, arc chan *AsyncResult) *
 		if conn.perf.QueryTimeouts != nil && ctx.Err() == context.DeadlineExceeded {
 			conn.perf.QueryTimeouts.Add(1)
 		}
+		r := conn.requests.Pop(requestID)
+		requestPool.Put(r)
 		return &AsyncResult{
 			Error:     NewContextError(ctx, conn, "Recv error"),
 			ErrorCode: ErrTimeout,
@@ -106,6 +112,8 @@ func (conn *Connection) readResult(ctx context.Context, arc chan *AsyncResult) *
 
 func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption) (result *Result) {
 	var cancel context.CancelFunc = func() {}
+	var requestID uint64
+	var rerr *Result
 
 	if conn.queryTimeout != 0 {
 		ctx, cancel = context.WithTimeout(ctx, conn.queryTimeout)
@@ -119,12 +127,12 @@ func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption
 		options[i].apply(request)
 	}
 
-	if _, rerr := conn.writeRequest(ctx, request, q); rerr != nil {
+	if _, rerr, requestID = conn.writeRequest(ctx, request, q); rerr != nil {
 		cancel()
 		return rerr
 	}
 
-	ar := conn.readResult(ctx, replyChan)
+	ar := conn.readResult(ctx, replyChan, requestID)
 	cancel()
 
 	if rerr := ar.Error; rerr != nil {
@@ -159,11 +167,13 @@ func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption
 }
 
 func (conn *Connection) ExecAsync(ctx context.Context, q Query, opaque interface{}, replyChan chan *AsyncResult) error {
+	var rerr *Result
+
 	request := requestPool.Get()
 	request.opaque = opaque
 	request.replyChan = replyChan
 
-	if _, rerr := conn.writeRequest(ctx, request, q); rerr != nil {
+	if _, rerr, _ = conn.writeRequest(ctx, request, q); rerr != nil {
 		return rerr.Error
 	}
 	return nil
