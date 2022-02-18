@@ -32,6 +32,10 @@ func (p *cappedRequestPool) Put(r *request) {
 		return
 	}
 
+	if r == nil {
+		return
+	}
+
 	select {
 	case p.queue <- r:
 	default:
