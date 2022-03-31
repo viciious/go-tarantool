@@ -11,47 +11,47 @@ type Operator interface {
 }
 
 type OpAdd struct {
-	Field    uint64
+	Field    int64
 	Argument int64
 }
 
 type OpSub struct {
-	Field    uint64
+	Field    int64
 	Argument int64
 }
 
 type OpBitAND struct {
-	Field    uint64
+	Field    int64
 	Argument uint64
 }
 
 type OpBitXOR struct {
-	Field    uint64
+	Field    int64
 	Argument uint64
 }
 
 type OpBitOR struct {
-	Field    uint64
+	Field    int64
 	Argument uint64
 }
 
 type OpDelete struct {
-	From  uint64
+	From  int64
 	Count uint64
 }
 
 type OpInsert struct {
-	Before   uint64
+	Before   int64
 	Argument interface{}
 }
 
 type OpAssign struct {
-	Field    uint64
+	Field    int64
 	Argument interface{}
 }
 
 type OpSplice struct {
-	Field    uint64
+	Field    int64
 	Offset   uint64
 	Position uint64
 	Argument string
@@ -110,8 +110,8 @@ func unmarshalOperator(data []byte) (op Operator, buf []byte, err error) {
 		return
 	}
 
-	var field0 uint64
-	if field0, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
+	var field0 int64
+	if field0, buf, err = msgp.ReadInt64Bytes(buf); err != nil {
 		return
 	}
 
