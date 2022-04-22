@@ -19,6 +19,9 @@ var (
 	ErrUnknownError = NewQueryError(ErrUnknown, "unknown error")
 	// ErrOldVersionAnon is returns when tarantool version doesn't support anonymous replication.
 	ErrOldVersionAnon = errors.New("tarantool version is too old for anonymous replication. Min version is 2.3.1")
+
+	// ErrConnectionClosed returns when connection is no longer alive.
+	ErrConnectionClosed = errors.New("connection closed")
 )
 
 // Error has Temporary method which returns true if error is temporary.
@@ -33,26 +36,26 @@ type ConnectionError struct {
 	error
 }
 
-// NewConnectionError returns ConnectionError with message and remoteAddr in error text.
-func NewConnectionError(con *Connection, message string) *ConnectionError {
+// NewConnectionError returns ConnectionError, which contains wrapped with remoteAddr error.
+func NewConnectionError(con *Connection, err error) *ConnectionError {
 	return &ConnectionError{
-		error: fmt.Errorf("%s, remote: %s", message, con.remoteAddr),
+		error: fmt.Errorf("%w, remote: %s", err, con.remoteAddr),
 	}
 }
 
 // ConnectionClosedError returns ConnectionError with message about closed connection
 // or error depending on the connection state. It is also has remoteAddr in error text.
 func ConnectionClosedError(con *Connection) *ConnectionError {
-	var message = "Connection closed"
-	if err := con.getError(); err != nil {
-		message = "Connection error: " + err.Error()
+	var err = ErrConnectionClosed
+	if connErr := con.getError(); connErr != nil {
+		err = fmt.Errorf("%w: %v", err, connErr.Error())
 	}
-	return NewConnectionError(con, message)
+	return NewConnectionError(con, err)
 }
 
 // Temporary implements Error interface.
 func (e *ConnectionError) Temporary() bool {
-	return true
+	return !errors.Is(e.error, ErrConnectionClosed)
 }
 
 // Timeout implements net.Error interface.
