@@ -26,11 +26,19 @@ func (pp *BinaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 	h := h32[5:5]
 	body := pp.body
 
-	h = msgp.AppendMapHeader(h, 2)
+	var ne uint32 = 2
+	if pp.packet.SchemaID != 0 {
+		ne++
+	}
+	h = msgp.AppendMapHeader(h, ne)
 	h = msgp.AppendUint(h, KeyCode)
 	h = msgp.AppendUint(h, pp.packet.Cmd)
 	h = msgp.AppendUint(h, KeySync)
 	h = msgp.AppendUint64(h, pp.packet.requestID)
+	if pp.packet.SchemaID != 0 {
+		h = msgp.AppendUint(h, KeySchemaID)
+		h = msgp.AppendUint32(h, pp.packet.SchemaID)
+	}
 
 	l := len(h) + len(body)
 	h = h32[:5+len(h)]
@@ -51,6 +59,7 @@ func (pp *BinaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 
 func (pp *BinaryPacket) Reset() {
 	pp.packet.Cmd = OKCommand
+	pp.packet.SchemaID = 0
 	pp.packet.requestID = 0
 	pp.packet.Result = nil
 	pp.body = pp.body[:0]

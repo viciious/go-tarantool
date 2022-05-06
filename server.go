@@ -193,6 +193,12 @@ READER_LOOP:
 
 			go func(pp *BinaryPacket) {
 				packet := &pp.packet
+
+				// more recent tarantool versions expecta valid schemaID value
+				if packet.SchemaID == 0 {
+					packet.SchemaID = 1
+				}
+
 				err := packet.UnmarshalBinary(pp.body)
 
 				if err != nil {

@@ -11,6 +11,7 @@ type Packet struct {
 	Cmd        uint
 	LSN        uint64
 	requestID  uint64
+	SchemaID   uint32
 	InstanceID uint32
 	Timestamp  time.Time
 	Request    Query
@@ -61,7 +62,7 @@ func (pack *Packet) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
 				return
 			}
 		case KeySchemaID:
-			if _, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
+			if pack.SchemaID, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
 				return
 			}
 		case KeyLSN:
