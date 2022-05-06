@@ -639,5 +639,8 @@ func (s *Slave) newPacket(q Query) (pp *BinaryPacket, err error) {
 }
 
 func (s *Slave) Version() uint32 {
+	if s.c.greeting == nil {
+		return 0
+	}
 	return s.c.greeting.Version
 }
