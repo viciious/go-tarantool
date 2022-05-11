@@ -31,6 +31,7 @@ type IprotoServer struct {
 	closeOnce  sync.Once
 	firstError error
 	perf       PerfCount
+	schemaID   uint32
 }
 
 type IprotoServerOptions struct {
@@ -45,6 +46,7 @@ func NewIprotoServer(uuid string, handler QueryHandler, onShutdown OnShutdownCal
 		handler:    handler,
 		onShutdown: onShutdown,
 		uuid:       uuid,
+		schemaID:   1,
 	}
 }
 
@@ -194,11 +196,6 @@ READER_LOOP:
 			go func(pp *BinaryPacket) {
 				packet := &pp.packet
 
-				// more recent tarantool versions expecta valid schemaID value
-				if packet.SchemaID == 0 {
-					packet.SchemaID = 1
-				}
-
 				err := packet.UnmarshalBinary(pp.body)
 
 				if err != nil {
@@ -209,8 +206,11 @@ READER_LOOP:
 
 				code := packet.Cmd
 				if code == PingCommand {
+					pr := packetPool.GetWithID(packet.requestID)
+					pr.packet.SchemaID = packet.SchemaID
+
 					select {
-					case s.output <- packetPool.GetWithID(packet.requestID):
+					case s.output <- pr:
 						break
 					case <-s.ctx.Done():
 						break
@@ -228,6 +228,7 @@ READER_LOOP:
 						return
 					}
 
+					pp.packet.SchemaID = s.schemaID
 					select {
 					case s.output <- pp:
 						return
