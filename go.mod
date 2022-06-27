@@ -3,7 +3,7 @@ module github.com/viciious/go-tarantool
 go 1.16
 
 require (
-	github.com/gofrs/uuid v4.2.0+incompatible // indirect
+	github.com/google/uuid v1.3.0
 	github.com/klauspost/compress v1.11.3
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/stretchr/testify v1.6.2-0.20201103103935-92707c0b2d50
