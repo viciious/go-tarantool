@@ -61,6 +61,7 @@ func ReadSnapshotPacked(rs io.Reader, tuplecb func(space uint, tuple []byte) err
 			return err
 		}
 	}
+	defer zr.Close()
 
 	for {
 		var n int
