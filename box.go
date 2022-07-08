@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -289,7 +290,8 @@ func (box *Box) Stop() {
 			return
 		default:
 			if box.cmd != nil {
-				box.cmd.Process.Kill()
+				box.cmd.Process.Signal(syscall.SIGTERM)
+				//box.cmd.Process.Kill()
 				box.cmd.Process.Wait()
 				box.cmd = nil
 			}
