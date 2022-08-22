@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -74,7 +73,7 @@ func NewBox(config string, options *BoxOptions) (*Box, error) {
 	var box *Box
 
 	for port := options.PortMin; port <= options.PortMax; port++ {
-		tmpDir, err := ioutil.TempDir("", options.LogNamePrefix)
+		tmpDir, err := os.MkdirTemp("", options.LogNamePrefix)
 		if err != nil {
 			return nil, err
 		}
@@ -204,7 +203,7 @@ func (box *Box) StartWithLua(luaTransform func(string) string) error {
 	}
 
 	initLuaFile := path.Join(box.Root, "init.lua")
-	err := ioutil.WriteFile(initLuaFile, []byte(initLua), 0644)
+	err := os.WriteFile(initLuaFile, []byte(initLua), 0644)
 	if err != nil {
 		return err
 	}

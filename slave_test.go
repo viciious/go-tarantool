@@ -3,7 +3,7 @@ package tarantool
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -714,7 +714,7 @@ func TestSlaveLastSnapVClock(t *testing.T) {
 
 	// setup
 	user, role, luaDir := "guest", "replication", "lua"
-	luaInit, err := ioutil.ReadFile(filepath.Join("testdata", "init.lua"))
+	luaInit, err := os.ReadFile(filepath.Join("testdata", "init.lua"))
 	require.NoError(err)
 	config := string(luaInit)
 	config += schemeNewReplicator(tnt16User, tnt16Pass)
