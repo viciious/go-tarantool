@@ -60,8 +60,8 @@ func ReadSnapshotPacked(rs io.Reader, tuplecb func(space uint, tuple []byte) err
 		if zr, err = zstd.NewReader(nil); err != nil {
 			return err
 		}
+		defer zr.Close()
 	}
-	defer zr.Close()
 
 	for {
 		var n int
