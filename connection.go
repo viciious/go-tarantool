@@ -379,9 +379,16 @@ func (conn *Connection) pullSchema() (err error) {
 			if unique, ok := indexAttr["unique"]; ok && unique.(bool) {
 				pk := make([]int, len(indexFields))
 				for i := range indexFields {
-					descr := indexFields[i].([]interface{})
-					f, _ := conn.packData.fieldNo(descr[0])
-					pk[i] = int(f)
+					switch descr := indexFields[i].(type) {
+					case []interface{}:
+						f, _ := conn.packData.fieldNo(descr[0])
+						pk[i] = int(f)
+					case map[string]interface{}:
+						f, _ := conn.packData.fieldNo(descr["field"])
+						pk[i] = int(f)
+					default:
+						panic("invalid index field format")
+					}
 				}
 				conn.packData.primaryKeyMap[spaceID] = pk
 			}
