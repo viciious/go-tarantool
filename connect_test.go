@@ -22,6 +22,31 @@ func TestConnect(t *testing.T) {
 	assert.NotEqual(conn.greeting.Version, 0)
 }
 
+func TestMapIndexDescription(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+	config := `
+	local s = box.schema.space.create('tester', {id = 42})
+	s:create_index('tester_id', {
+		parts = {
+        	{field = 1, type = 'number', is_nullable = false},
+    	},
+	})
+	local t = s:insert({1})
+	`
+	box, err := NewBox(config, nil)
+	require.NoError(err)
+	defer box.Close()
+
+	conn, err := Connect(box.Addr(), nil)
+	require.NoError(err)
+	defer conn.Close()
+
+	pkFields, ok := conn.GetPrimaryKeyFields("tester")
+	require.True(ok)
+	assert.ElementsMatch(pkFields, []int{0})
+}
+
 func TestDefaultSpace(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
