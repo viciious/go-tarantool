@@ -198,11 +198,14 @@ func (s *AnonSlave) subscribe(lsns ...uint64) error {
 		return err
 	}
 
-	if s.ReplicaSet.UUID != "" && s.ReplicaSet.UUID != sub.ReplicaSetUUID {
+	// validate the response replica set UUID only if it is not empty
+	if s.ReplicaSet.UUID != "" && sub.ReplicaSetUUID != "" && s.ReplicaSet.UUID != sub.ReplicaSetUUID {
 		return NewUnexpectedReplicaSetUUIDError(s.ReplicaSet.UUID, sub.ReplicaSetUUID)
 	}
 
-	s.ReplicaSet.UUID = sub.ReplicaSetUUID
+	if sub.ReplicaSetUUID != "" {
+		s.ReplicaSet.UUID = sub.ReplicaSetUUID
+	}
 	s.VClock = sub.VClock
 
 	return nil
