@@ -154,6 +154,12 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUIDFail(t *testing.T) {
 
 	skipUnsupportedVersion(t, box)
 
+	ver, err := tntBoxVersion(box)
+	require.NoError(err)
+	if ver >= version2_8_0 && ver < version2_9_0 {
+		t.Skip("Tarantool 2.8 returns an empty replicaset UUID, skip check")
+	}
+
 	s, _ := NewAnonSlave(box.Listen, Options{
 		User:           tnt16User,
 		Password:       tnt16Pass,
@@ -165,6 +171,32 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUIDFail(t *testing.T) {
 	require.Error(err)
 	expectedErr := NewUnexpectedReplicaSetUUIDError(nullUUID, nullUUID)
 	require.ErrorIsf(err, expectedErr, "Expect errors type: %T, Got: %T", expectedErr, err)
+}
+
+func TestAnonSlaveSubscribeReplicaSetUUIDEmpty28(t *testing.T) {
+	require := require.New(t)
+
+	box, err := newTntBox()
+	require.NoError(err)
+	defer box.Close()
+
+	skipUnsupportedVersion(t, box)
+
+	ver, err := tntBoxVersion(box)
+	require.NoError(err)
+	if !(ver >= version2_8_0 && ver < version2_9_0) {
+		t.Skip("Tarantool version isn't 2.8.x, skipping")
+	}
+
+	s, _ := NewAnonSlave(box.Listen, Options{
+		User:           tnt16User,
+		Password:       tnt16Pass,
+		UUID:           tnt16UUID,
+		ReplicaSetUUID: nullUUID})
+	defer s.Close()
+
+	_, err = s.Subscribe(0)
+	require.NoError(err)
 }
 
 func TestAnonSlaveJoinWithSnapSync(t *testing.T) {
@@ -799,16 +831,23 @@ func getAnonReplicasCount(listen string) (count int, err error) {
 	return int(count64), nil
 }
 
-func skipUnsupportedVersion(t *testing.T, box *Box) {
+func tntBoxVersion(box *Box) (uint32, error) {
 	ver, err := box.Version()
-	require.NoError(t, err)
+	if err != nil {
+		return 0, err
+	}
 
 	version := strings.Split(ver, ".")
 	major, _ := strconv.Atoi(version[0])
 	minor, _ := strconv.Atoi(version[1])
 	patch, _ := strconv.Atoi(version[2])
 
-	tarantoolVersion := VersionID(uint32(major), uint32(minor), uint32(patch))
+	return VersionID(uint32(major), uint32(minor), uint32(patch)), nil
+}
+
+func skipUnsupportedVersion(t *testing.T, box *Box) {
+	tarantoolVersion, err := tntBoxVersion(box)
+	require.NoError(t, err)
 	if tarantoolVersion < version2_3_1 {
 		t.Skip("old tarantool version. Min Tarantool version for this test is 2.3.1")
 	}
