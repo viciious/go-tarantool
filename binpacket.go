@@ -37,7 +37,7 @@ func (pp *BinaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 	h = msgp.AppendUint64(h, pp.packet.requestID)
 	if pp.packet.SchemaID != 0 {
 		h = msgp.AppendUint(h, KeySchemaID)
-		h = msgp.AppendUint32(h, pp.packet.SchemaID)
+		h = msgp.AppendUint64(h, pp.packet.SchemaID)
 	}
 
 	l := len(h) + len(body)

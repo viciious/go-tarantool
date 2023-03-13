@@ -31,7 +31,7 @@ type IprotoServer struct {
 	closeOnce  sync.Once
 	firstError error
 	perf       PerfCount
-	schemaID   uint32
+	schemaID   uint64
 }
 
 type IprotoServerOptions struct {
