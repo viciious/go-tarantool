@@ -78,7 +78,7 @@ func (p *VClock) UnmarshalBinaryHeader(data []byte) (buf []byte, err error) {
 				return
 			}
 		case KeySchemaID:
-			if _, buf, err = msgp.ReadUint32Bytes(buf); err != nil {
+			if _, buf, err = msgp.ReadUint64Bytes(buf); err != nil {
 				return
 			}
 		case KeyInstanceID:
