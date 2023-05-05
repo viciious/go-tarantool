@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"expvar"
+	"sync/atomic"
 	"time"
 )
 
@@ -98,8 +99,16 @@ func (vc *VectorClock) Follow(id uint32, lsn uint64) bool {
 	if id >= uint32(len(*vc)) {
 		*vc = (*vc)[:id+1]
 	}
-	(*vc)[id] = lsn
+	atomic.StoreUint64(&(*vc)[id], lsn)
 	return true
+}
+
+func (vc VectorClock) Clone() VectorClock {
+	clone := make([]uint64, len(vc), cap(vc))
+	for i := 0; i < len(vc); i++ {
+		clone[i] = atomic.LoadUint64(&vc[i])
+	}
+	return clone
 }
 
 // LSN is the sum of the Clocks.
