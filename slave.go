@@ -566,7 +566,7 @@ loop:
 			return
 		case <-ticker.C:
 			if pp, err = s.newPacket(&VClock{
-				VClock: s.VClock,
+				VClock: s.VClock.Clone(),
 			}); err != nil {
 				break loop
 			}
