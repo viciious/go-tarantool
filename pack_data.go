@@ -2,6 +2,7 @@ package tarantool
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/tinylib/msgp/msgp"
 )
@@ -19,6 +20,13 @@ type packData struct {
 	indexMap            map[uint64]map[string]uint64
 	primaryKeyMap       map[uint64][]int
 }
+
+type packDataPool struct {
+	sync.Mutex
+	pool map[string]*packData
+}
+
+var globalPackDataPool packDataPool
 
 func encodeValues2(v1, v2 interface{}) []byte {
 	o := make([]byte, 0)
@@ -157,4 +165,24 @@ func (data *packData) packIndex(space interface{}, index interface{}, o []byte) 
 	o = msgp.AppendUint(o, KeyIndexNo)
 	o = msgp.AppendUint64(o, indexNo)
 	return o, nil
+}
+
+func (pool *packDataPool) Put(data *packData) *packData {
+	if data == nil {
+		return nil
+	}
+
+	key := fmt.Sprintf("%+v", data)
+
+	pool.Lock()
+	defer pool.Unlock()
+
+	if pool.pool == nil {
+		pool.pool = make(map[string]*packData)
+	}
+	if odata, ok := pool.pool[key]; ok {
+		return odata
+	}
+	pool.pool[key] = data
+	return data
 }

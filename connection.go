@@ -104,6 +104,9 @@ func connect(ctx context.Context, scheme, addr string, opts Options) (conn *Conn
 		return
 	}
 
+	// store or fetch uniq instance of packdata in the global pool
+	conn.packData = globalPackDataPool.Put(conn.packData)
+
 	// remove deadline
 	conn.tcpConn.SetDeadline(time.Time{})
 
