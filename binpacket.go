@@ -66,7 +66,7 @@ func (pp *BinaryPacket) Reset() {
 }
 
 func (pp *BinaryPacket) Release() {
-	if pp.pool != nil {
+	if pp.pool != nil && cap(pp.body) <= DefaultMaxPoolPacketSize {
 		pp.pool.Put(pp)
 	}
 }
