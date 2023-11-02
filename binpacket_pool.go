@@ -6,7 +6,7 @@ type BinaryPacketPool struct {
 
 func newBinaryPacketPool() *BinaryPacketPool {
 	return &BinaryPacketPool{
-		queue: make(chan *BinaryPacket, 1024),
+		queue: make(chan *BinaryPacket, 4096),
 	}
 }
 
