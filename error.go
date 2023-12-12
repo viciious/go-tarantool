@@ -63,6 +63,10 @@ func (e *ConnectionError) Timeout() bool {
 	return false
 }
 
+func (e *ConnectionError) Unwrap() error {
+	return e.error
+}
+
 // ContextError is returned when request has been ended with context timeout or cancel.
 type ContextError struct {
 	error
@@ -86,6 +90,10 @@ func (e *ContextError) Temporary() bool {
 // Timeout implements net.Error interface.
 func (e *ContextError) Timeout() bool {
 	return e.CtxErr == context.DeadlineExceeded
+}
+
+func (e *ContextError) Unwrap() error {
+	return e.CtxErr
 }
 
 // QueryError is returned when query error has been happened.
@@ -113,6 +121,10 @@ func (e *QueryError) Timeout() bool {
 	return false
 }
 
+func (e *QueryError) Unwrap() error {
+	return e.error
+}
+
 // UnexpectedReplicaSetUUIDError is returned when ReplicaSetUUID set in Options.ReplicaSetUUID is not equal to ReplicaSetUUID
 // received during Join or JoinWithSnap. It is only an AnonSlave error!
 type UnexpectedReplicaSetUUIDError struct {
@@ -134,6 +146,10 @@ func NewUnexpectedReplicaSetUUIDError(expected string, got string) *UnexpectedRe
 func (e *UnexpectedReplicaSetUUIDError) Is(target error) bool {
 	_, ok := target.(*UnexpectedReplicaSetUUIDError)
 	return ok
+}
+
+func (e *UnexpectedReplicaSetUUIDError) Unwrap() error {
+	return e.QueryError
 }
 
 var _ Error = (*ConnectionError)(nil)
