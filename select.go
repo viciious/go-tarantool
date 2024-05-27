@@ -42,7 +42,8 @@ func (q *Select) packMsg(data *packData, b []byte) (o []byte, err error) {
 	}
 
 	if q.Limit == 0 {
-		o = append(o, data.packedDefaultLimit...)
+		o = msgp.AppendUint(o, KeyLimit)
+		o = msgp.AppendUint(o, uint(DefaultLimit))
 	} else {
 		o = msgp.AppendUint(o, KeyLimit)
 		o = msgp.AppendUint(o, uint(q.Limit))
