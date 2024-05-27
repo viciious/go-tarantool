@@ -13,7 +13,6 @@ type packData struct {
 	packedDefaultSpace  []byte
 	packedDefaultIndex  []byte
 	packedIterEq        []byte
-	packedDefaultLimit  []byte
 	packedDefaultOffset []byte
 	packedSingleKey     []byte
 	spaceMap            map[string]uint64
@@ -52,7 +51,6 @@ func newPackData(defaultSpace interface{}) *packData {
 		packedDefaultSpace:  packedDefaultSpace,
 		packedDefaultIndex:  encodeValues2(KeyIndexNo, uint32(0)),
 		packedIterEq:        encodeValues2(KeyIterator, IterEq),
-		packedDefaultLimit:  encodeValues2(KeyLimit, DefaultLimit),
 		packedDefaultOffset: encodeValues2(KeyOffset, 0),
 		packedSingleKey:     packSelectSingleKey(),
 		spaceMap:            make(map[string]uint64),
