@@ -18,25 +18,27 @@ type OnShutdownCallback func(err error)
 
 type IprotoServer struct {
 	sync.Mutex
-	conn       net.Conn
-	reader     *bufio.Reader
-	writer     *bufio.Writer
-	uuid       string
-	salt       []byte // base64-encoded salt
-	ctx        context.Context
-	cancel     context.CancelFunc
-	handler    QueryHandler
-	onShutdown OnShutdownCallback
-	output     chan *BinaryPacket
-	closeOnce  sync.Once
-	firstError error
-	perf       PerfCount
-	schemaID   uint64
-	wg         sync.WaitGroup
+	conn          net.Conn
+	reader        *bufio.Reader
+	writer        *bufio.Writer
+	uuid          string
+	salt          []byte // base64-encoded salt
+	ctx           context.Context
+	cancel        context.CancelFunc
+	handler       QueryHandler
+	onShutdown    OnShutdownCallback
+	output        chan *BinaryPacket
+	closeOnce     sync.Once
+	firstError    error
+	perf          PerfCount
+	schemaID      uint64
+	wg            sync.WaitGroup
+	getPingStatus func(*IprotoServer) uint
 }
 
 type IprotoServerOptions struct {
-	Perf PerfCount
+	Perf          PerfCount
+	GetPingStatus func(*IprotoServer) uint
 }
 
 func NewIprotoServer(uuid string, handler QueryHandler, onShutdown OnShutdownCallback) *IprotoServer {
@@ -56,6 +58,10 @@ func (s *IprotoServer) WithOptions(opts *IprotoServerOptions) *IprotoServer {
 		opts = &IprotoServerOptions{}
 	}
 	s.perf = opts.Perf
+	s.getPingStatus = opts.GetPingStatus
+	if s.getPingStatus == nil {
+		s.getPingStatus = func(*IprotoServer) uint { return 0 }
+	}
 	return s
 }
 
@@ -223,6 +229,7 @@ READER_LOOP:
 				code := packet.Cmd
 				if code == PingCommand {
 					pr := packetPool.GetWithID(packet.requestID)
+					pr.packet.Cmd = s.getPingStatus(s)
 					pr.packet.SchemaID = packet.SchemaID
 
 					select {
