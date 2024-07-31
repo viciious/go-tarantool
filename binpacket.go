@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 
 	"github.com/tinylib/msgp/msgp"
 )
@@ -21,28 +22,23 @@ type UnmarshalBinaryBodyFunc func(*Packet, []byte) error
 // WriteTo implements the io.WriterTo interface
 func (pp *BinaryPacket) WriteTo(w io.Writer) (n int64, err error) {
 	h32 := pp.header[:32]
-	h32[0], h32[1], h32[2], h32[3], h32[4] = 0xce, 0, 0, 0, 0
-
-	h := h32[5:5]
 	body := pp.body
 
-	var ne uint32 = 2
-	if pp.packet.SchemaID != 0 {
-		ne++
-	}
-	h = msgp.AppendMapHeader(h, ne)
+	h := msgp.AppendUint(h32[:0], math.MaxUint32)
+	mappos := len(h)
+	h = msgp.AppendMapHeader(h, 3)
 	h = msgp.AppendUint(h, KeyCode)
-	h = msgp.AppendUint(h, pp.packet.Cmd)
+	h = msgp.AppendUint(h, math.MaxUint32)
+	syncpos := len(h)
 	h = msgp.AppendUint(h, KeySync)
 	h = msgp.AppendUint64(h, pp.packet.requestID)
-	if pp.packet.SchemaID != 0 {
-		h = msgp.AppendUint(h, KeySchemaID)
-		h = msgp.AppendUint64(h, pp.packet.SchemaID)
-	}
+	h = msgp.AppendUint(h, KeySchemaID)
+	h = msgp.AppendUint64(h, pp.packet.SchemaID)
 
-	l := len(h) + len(body)
-	h = h32[:5+len(h)]
-	binary.BigEndian.PutUint32(h[1:], uint32(l))
+	binary.BigEndian.PutUint32(h[syncpos-4:], uint32(pp.packet.Cmd))
+
+	l := len(h) + len(body) - mappos
+	binary.BigEndian.PutUint32(h32[mappos-4:], uint32(l))
 
 	m, err := w.Write(h)
 	n += int64(m)
