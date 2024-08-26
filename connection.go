@@ -410,7 +410,6 @@ func (conn *Connection) stop() {
 		// debug.PrintStack()
 		close(conn.exit)
 		conn.tcpConn.Close()
-		runtime.GC()
 	})
 }
 
