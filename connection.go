@@ -9,7 +9,6 @@ import (
 	"io"
 	"net"
 	"net/url"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
