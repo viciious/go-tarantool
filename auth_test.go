@@ -25,8 +25,14 @@ func TestAuth(t *testing.T) {
 		User:     "user_not_found",
 		Password: "qwerty",
 	})
+	ver, _ := tntBoxVersion(box)
+
 	if assert.Error(err) && assert.Nil(conn) {
-		assert.Contains(err.Error(), "is not found")
+		if ver >= version2_11_0 {
+			assert.Exactly(err.Error(), "User not found or supplied credentials are invalid")
+		} else {
+			assert.Contains(err.Error(), "is not found")
+		}
 	}
 
 	// bad password
@@ -34,8 +40,14 @@ func TestAuth(t *testing.T) {
 		User:     "tester",
 		Password: "qwerty",
 	})
+	ver, _ = tntBoxVersion(box)
+
 	if assert.Error(err) && assert.Nil(conn) {
-		assert.Contains(err.Error(), "Incorrect password supplied for user")
+		if ver >= version2_11_0 {
+			assert.Exactly(err.Error(), "User not found or supplied credentials are invalid")
+		} else {
+			assert.Contains(err.Error(), "Incorrect password supplied for user")
+		}
 	}
 
 	// ok user password

@@ -136,7 +136,7 @@ const (
 	ErrDropUser                      = uint(0x2c)  // Failed to drop user '%s': %s
 	ErrNoSuchUser                    = uint(0x2d)  // User '%s' is not found
 	ErrUserExists                    = uint(0x2e)  // User '%s' already exists
-	ErrPasswordMismatch              = uint(0x2f)  // Incorrect password supplied for user '%s'
+	ErrCredsMismatch                 = uint(0x2f)  // User not found or supplied credentials are invalid
 	ErrUnknownRequestType            = uint(0x30)  // Unknown request type %u
 	ErrUnknownSchemaObject           = uint(0x31)  // Unknown object type '%s'
 	ErrCreateFunction                = uint(0x32)  // Failed to create function '%s': %s
