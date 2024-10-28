@@ -32,6 +32,7 @@ const (
 	KeyLSN            = uint(0x03)
 	KeyTimestamp      = uint(0x04)
 	KeySchemaID       = uint(0x05)
+	KeyVersionID      = uint(0x06)
 	KeySpaceNo        = uint(0x10)
 	KeyIndexNo        = uint(0x11)
 	KeyLimit          = uint(0x12)
@@ -378,7 +379,8 @@ const (
 	// 2.3.1 is min version for anonymous replication
 	version2_3_1 = uint32(131841) // VersionID(2, 3, 1)
 	// Add box.info.replication_anon
-	version2_5_1 = uint32(132353) // VersionID(2, 5, 1)
-	version2_8_0 = uint32(133120) // VersionID(2, 8, 0)
-	version2_9_0 = uint32(133376) // VersionID(2, 9, 0)
+	version2_5_1  = uint32(132353) // VersionID(2, 5, 1)
+	version2_8_0  = uint32(133120) // VersionID(2, 8, 0)
+	version2_9_0  = uint32(133376) // VersionID(2, 9, 0)
+	version2_11_0 = uint32(133888) // VersionID(2, 11, 0)
 )

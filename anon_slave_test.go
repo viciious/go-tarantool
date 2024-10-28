@@ -156,8 +156,8 @@ func TestAnonSlaveSubscribeExpectedReplicaSetUUIDFail(t *testing.T) {
 
 	ver, err := tntBoxVersion(box)
 	require.NoError(err)
-	if ver >= version2_8_0 && ver < version2_9_0 {
-		t.Skip("Tarantool 2.8 returns an empty replicaset UUID, skip check")
+	if ver >= version2_8_0 && ver < version2_9_0 || ver >= version2_11_0 {
+		t.Skip("Tarantool 2.8/2.11 returns an empty replicaset UUID, skip check")
 	}
 
 	s, _ := NewAnonSlave(box.Listen, Options{
