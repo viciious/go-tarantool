@@ -609,8 +609,11 @@ READER_LOOP:
 			conn.perf.QueryComplete(req.opaque, time.Since(req.startedAt))
 		}
 
+		pp.packet.ResultUnmarshalMode = req.resultMode
+		res := AsyncResult{0, nil, pp, conn, req.opaque}
+
 		select {
-		case req.replyChan <- &AsyncResult{0, nil, pp, conn, req.opaque}:
+		case req.replyChan <- &res:
 			pp = nil
 		default:
 		}

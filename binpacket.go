@@ -58,6 +58,7 @@ func (pp *BinaryPacket) Reset() {
 	pp.packet.SchemaID = 0
 	pp.packet.requestID = 0
 	pp.packet.Result = nil
+	pp.packet.ResultUnmarshalMode = ResultDefaultMode
 	pp.body = pp.body[:0]
 }
 

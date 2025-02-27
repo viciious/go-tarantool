@@ -1,14 +1,35 @@
 package tarantool
 
 import (
+	"errors"
 	"fmt"
+
 	"github.com/tinylib/msgp/msgp"
+)
+
+type resultUnmarshalMode int
+
+const (
+	ResultDefaultMode resultUnmarshalMode = iota
+	ResultAsRawData
+	ResultAsDataWithFallback
+
+	ResultAsData = ResultDefaultMode
 )
 
 type Result struct {
 	ErrorCode uint
 	Error     error
-	Data      [][]interface{}
+
+	// Data is a parsed array of tuples.
+	// Keep in mind that by default if original data structure it's unmarhsalled from
+	// has a different type it's forcefully wrapped to become array of tuples. This might be
+	// the case for call17 or eval commands. You may overwrite this behavior by specifying
+	// desired unmarshal mode.
+	Data    [][]interface{}
+	RawData interface{}
+
+	unmarshalMode resultUnmarshalMode
 }
 
 func (r *Result) GetCommandID() uint {
@@ -28,11 +49,16 @@ func (r *Result) MarshalMsg(b []byte) (o []byte, err error) {
 	} else {
 		o = msgp.AppendMapHeader(o, 1)
 		o = msgp.AppendUint(o, KeyData)
-		if r.Data != nil {
+		switch {
+		case r.Data != nil:
 			if o, err = msgp.AppendIntf(o, r.Data); err != nil {
 				return nil, err
 			}
-		} else {
+		case r.RawData != nil:
+			if o, err = msgp.AppendIntf(o, r.RawData); err != nil {
+				return nil, err
+			}
+		default:
 			o = msgp.AppendArrayHeader(o, 0)
 		}
 	}
@@ -43,9 +69,7 @@ func (r *Result) MarshalMsg(b []byte) (o []byte, err error) {
 // UnmarshalMsg implements msgp.Unmarshaler
 func (r *Result) UnmarshalMsg(data []byte) (buf []byte, err error) {
 	var l uint32
-	var dl, tl uint32
 	var errorMessage string
-	var val interface{}
 
 	buf = data
 
@@ -68,33 +92,21 @@ func (r *Result) UnmarshalMsg(data []byte) (buf []byte, err error) {
 
 		switch cd {
 		case KeyData:
-			var i, j uint32
-
-			if dl, buf, err = msgp.ReadArrayHeaderBytes(buf); err != nil {
-				return
+			switch r.unmarshalMode {
+			case ResultAsDataWithFallback:
+				obuf := buf
+				r.Data, buf, err = r.UnmarshalTuplesArray(buf, false)
+				if err != nil && errors.As(err, &msgp.TypeError{}) {
+					r.RawData, buf, err = msgp.ReadIntfBytes(obuf)
+				}
+			case ResultAsRawData:
+				r.RawData, buf, err = msgp.ReadIntfBytes(buf)
+			default:
+				r.Data, buf, err = r.UnmarshalTuplesArray(buf, true)
 			}
 
-			r.Data = make([][]interface{}, dl)
-			for i = 0; i < dl; i++ {
-				obuf := buf
-				if tl, buf, err = msgp.ReadArrayHeaderBytes(buf); err != nil {
-					buf = obuf
-					if _, ok := err.(msgp.TypeError); ok {
-						if val, buf, err = msgp.ReadIntfBytes(buf); err != nil {
-							return
-						}
-						r.Data[i] = []interface{}{val}
-						continue
-					}
-					return
-				}
-
-				r.Data[i] = make([]interface{}, tl)
-				for j = 0; j < tl; j++ {
-					if r.Data[i][j], buf, err = msgp.ReadIntfBytes(buf); err != nil {
-						return
-					}
-				}
+			if err != nil {
+				return
 			}
 		case KeyError:
 			errorMessage, buf, err = msgp.ReadStringBytes(buf)
@@ -108,7 +120,46 @@ func (r *Result) UnmarshalMsg(data []byte) (buf []byte, err error) {
 			}
 		}
 	}
+
 	return
+}
+
+func (*Result) UnmarshalTuplesArray(buf []byte, force bool) ([][]interface{}, []byte, error) {
+	var (
+		dl, tl uint32
+		i, j   uint32
+		val    interface{}
+		err    error
+	)
+
+	if dl, buf, err = msgp.ReadArrayHeaderBytes(buf); err != nil {
+		return nil, nil, err
+	}
+
+	data := make([][]interface{}, dl)
+	for i = 0; i < dl; i++ {
+		obuf := buf
+		if tl, buf, err = msgp.ReadArrayHeaderBytes(buf); err != nil {
+			buf = obuf
+			if _, ok := err.(msgp.TypeError); ok && force {
+				if val, buf, err = msgp.ReadIntfBytes(buf); err != nil {
+					return nil, nil, err
+				}
+				data[i] = []interface{}{val}
+				continue
+			}
+			return nil, nil, err
+		}
+
+		data[i] = make([]interface{}, tl)
+		for j = 0; j < tl; j++ {
+			if data[i][j], buf, err = msgp.ReadIntfBytes(buf); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+
+	return data, buf, nil
 }
 
 func (r *Result) String() string {
@@ -119,6 +170,8 @@ func (r *Result) String() string {
 		return fmt.Sprintf("Result ErrCode:%v, Err: %v", r.ErrorCode, r.Error)
 	case r.Data != nil:
 		return fmt.Sprintf("Result Data:%#v", r.Data)
+	case r.RawData != nil:
+		return fmt.Sprintf("Result RawData:%#v", r.RawData)
 	default:
 		return ""
 	}

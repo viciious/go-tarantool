@@ -16,6 +16,8 @@ type Packet struct {
 	Timestamp  time.Time
 	Request    Query
 	Result     *Result
+
+	ResultUnmarshalMode resultUnmarshalMode
 }
 
 func (pack *Packet) String() string {
@@ -101,7 +103,7 @@ func (pack *Packet) UnmarshalBinaryBody(data []byte) (buf []byte, err error) {
 
 	unpackr := func(errorCode uint, data []byte) (buf []byte, err error) {
 		buf = data
-		res := &Result{ErrorCode: errorCode}
+		res := &Result{ErrorCode: errorCode, unmarshalMode: pack.ResultUnmarshalMode}
 		if buf, err = res.UnmarshalMsg(buf); err != nil {
 			return
 		}
@@ -128,7 +130,7 @@ func (pack *Packet) UnmarshalBinary(data []byte) error {
 
 // UnmarshalMsg implements msgp.Unmarshaler
 func (pack *Packet) UnmarshalMsg(data []byte) (buf []byte, err error) {
-	*pack = Packet{}
+	*pack = Packet{ResultUnmarshalMode: pack.ResultUnmarshalMode}
 
 	buf = data
 

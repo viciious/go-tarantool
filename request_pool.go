@@ -21,6 +21,7 @@ func (p *cappedRequestPool) Get() (r *request) {
 	case r = <-p.queue:
 		r.opaque = nil
 		r.replyChan = nil
+		r.resultMode = ResultDefaultMode
 	default:
 		r = &request{}
 	}
