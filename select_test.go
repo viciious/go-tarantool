@@ -12,11 +12,11 @@ func TestSelect(t *testing.T) {
 	tarantoolConfig := `
     local s = box.schema.space.create('tester', {id = 42})
     s:create_index('tester_id', {
-        type = 'hash',
+        type = 'tree',
         parts = {1, 'NUM'}
     })
 	s:create_index('tester_name', {
-        type = 'hash',
+        type = 'tree',
         parts = {2, 'STR'}
     })
 	s:create_index('id_name', {
@@ -158,9 +158,9 @@ func TestSelect(t *testing.T) {
 			Iterator: IterAll,
 		},
 		[][]interface{}{
-			{int64(2), "Music"},
-			{int64(3), "Length", int64(93)},
 			{int64(1), "First record"},
+			{int64(3), "Length", int64(93)},
+			{int64(2), "Music"},
 		},
 	)
 	// iterate Eq using STR index
