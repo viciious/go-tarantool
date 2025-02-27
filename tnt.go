@@ -17,10 +17,11 @@ func init() {
 }
 
 type request struct {
-	opaque    interface{}
-	replyChan chan *AsyncResult
-	packet    *BinaryPacket
-	startedAt time.Time
+	opaque     interface{}
+	replyChan  chan *AsyncResult
+	packet     *BinaryPacket
+	startedAt  time.Time
+	resultMode resultUnmarshalMode
 }
 
 type QueryCompleteFn func(interface{}, time.Duration)

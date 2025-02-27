@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -16,11 +17,11 @@ func TestCall17(t *testing.T) {
         type = 'hash',
         parts = {1, 'NUM'}
     })
-	s:create_index('tester_name', {
+    s:create_index('tester_name', {
         type = 'hash',
         parts = {2, 'STR'}
     })
-	s:create_index('id_name', {
+    s:create_index('id_name', {
         type = 'hash',
         parts = {1, 'NUM', 2, 'STR'},
         unique = true
@@ -37,55 +38,59 @@ func TestCall17(t *testing.T) {
         return box.space.tester.index.id_name:select{tester_id, name}
     end
 
-	function call_case_1()
-		return 1
-	end
+    function call_case_1()
+        return 1
+    end
 
-	function call_case_2()
-		return 1, 2, 3
-	end
+    function call_case_2()
+        return 1, 2, 3
+    end
 
-	function call_case_3()
-		return true
-	end
+    function call_case_3()
+        return true
+    end
 
-	function call_case_4()
-		return nil
-	end
+    function call_case_4()
+        return nil
+    end
 
-	function call_case_5()
-		return {}
-	end
+    function call_case_5()
+        return {}
+    end
 
-	function call_case_6()
-		return {1}
-	end
+    function call_case_6()
+        return {1}
+    end
 
-	function call_case_7()
-		return {1, 2, 3}
-	end
+    function call_case_7()
+        return {1, 2, 3}
+    end
 
-	function call_case_8()
-		return {1, 2, 3}, {'a', 'b', 'c'}, {true, false}
-	end
+    function call_case_8()
+        return {1, 2, 3}, {'a', 'b', 'c'}, {true, false}
+    end
 
-	function call_case_9()
-		return {key1 = 'value1', key2 = 'value2'}
-	end
+    function call_case_9()
+        return {key1 = 'value1', key2 = 'value2'}
+    end
 
-	local number_of_extra_cases = 9
+    function call_case_10()
+        return
+    end
+
+    local number_of_extra_cases = 10
 
     box.schema.func.create('sel_all', {if_not_exists = true})
-	box.schema.func.create('sel_name', {if_not_exists = true})
-	for i = 1, number_of_extra_cases do
-		box.schema.func.create('call_case_'..i, {if_not_exists = true})
-	end
+    box.schema.func.create('sel_name', {if_not_exists = true})
+    for i = 1, number_of_extra_cases do
+        box.schema.func.create('call_case_'..i, {if_not_exists = true})
+    end
 
     box.schema.user.grant('guest', 'execute', 'function', 'sel_all', {if_not_exists = true})
-	box.schema.user.grant('guest', 'execute', 'function', 'sel_name', {if_not_exists = true})
-	for i = 1, number_of_extra_cases do
-		box.schema.user.grant('guest', 'execute', 'function', 'call_case_'..i, {if_not_exists = true})
-	end
+    box.schema.user.grant('guest', 'execute', 'function', 'sel_name', {if_not_exists = true})
+    for i = 1, number_of_extra_cases do
+        box.schema.user.grant('guest', 'execute', 'function', 'call_case_'..i, {if_not_exists = true})
+    end
     `
 
 	box, err := NewBox(tarantoolConfig, nil)
@@ -102,155 +107,397 @@ func TestCall17(t *testing.T) {
 		t.Skip("requires tarantool >= 1.7.2")
 	}
 
-	do := func(connectOptions *Options, query *Call17, expected [][]interface{}) {
+	type testParams struct {
+		query           *Call17
+		execOption      ExecOption
+		expectedData    [][]interface{}
+		expectedRawData interface{}
+	}
+
+	do := func(params *testParams) {
 		var buf []byte
 
-		conn, err := box.Connect(connectOptions)
+		conn, err := box.Connect(nil)
 		assert.NoError(err)
 		assert.NotNil(conn)
 
 		defer conn.Close()
 
-		buf, err = query.MarshalMsg(nil)
+		buf, err = params.query.MarshalMsg(nil)
 
 		if assert.NoError(err) {
 			var query2 = &Call17{}
 			_, err = query2.UnmarshalMsg(buf)
 
 			if assert.NoError(err) {
-				assert.Equal(query.Name, query2.Name)
-				assert.Equal(query.Tuple, query2.Tuple)
+				assert.Equal(params.query.Name, query2.Name)
+				assert.Equal(params.query.Tuple, query2.Tuple)
 			}
 		}
 
-		data, err := conn.Execute(query)
+		var opts []ExecOption
+		if params.execOption != nil {
+			opts = append(opts, params.execOption)
+		}
+		res := conn.Exec(context.Background(), params.query, opts...)
 
 		if assert.NoError(err) {
-			assert.Equal(expected, data)
+			assert.Equal(params.expectedData, res.Data)
+			assert.Equal(params.expectedRawData, res.RawData)
 		}
 	}
 
 	// call sel_all without params
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name: "sel_all",
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{
 				[]interface{}{int64(1), "First record"},
 				[]interface{}{int64(2), "Music"},
 				[]interface{}{int64(3), "Length", int64(93)},
 			},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "sel_all",
+		},
+		execOption: ExecResultAsDataWithFallback,
+		expectedData: [][]interface{}{
+			{
+				[]interface{}{int64(1), "First record"},
+				[]interface{}{int64(2), "Music"},
+				[]interface{}{int64(3), "Length", int64(93)},
+			},
+		},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "sel_all",
+		},
+		execOption: ExecResultAsRawData,
+		expectedRawData: []interface{}{
+			[]interface{}{
+				[]interface{}{int64(1), "First record"},
+				[]interface{}{int64(2), "Music"},
+				[]interface{}{int64(3), "Length", int64(93)},
+			},
+		},
+	})
 
 	// call sel_name with params
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name:  "sel_name",
 			Tuple: []interface{}{int64(2), "Music"},
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{
 				[]interface{}{int64(2), "Music"},
 			},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name:  "sel_name",
+			Tuple: []interface{}{int64(2), "Music"},
+		},
+		execOption: ExecResultAsDataWithFallback,
+		expectedData: [][]interface{}{
+			{
+				[]interface{}{int64(2), "Music"},
+			},
+		},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name:  "sel_name",
+			Tuple: []interface{}{int64(2), "Music"},
+		},
+		execOption: ExecResultAsRawData,
+		expectedRawData: []interface{}{
+			[]interface{}{
+				[]interface{}{int64(2), "Music"},
+			},
+		},
+	})
 
 	// For stored procedures the result is returned in the same way as eval (in certain cases).
 	// Note that returning arrays (also an empty table) is a special case.
 
 	// scalar 1
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name: "call_case_1",
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{int64(1)},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_1",
+		},
+		execOption:      ExecResultAsDataWithFallback,
+		expectedRawData: []interface{}{int64(1)},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_1",
+		},
+		execOption:      ExecResultAsRawData,
+		expectedRawData: []interface{}{int64(1)},
+	})
 
 	// multiple scalars
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name: "call_case_2",
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{int64(1)}, {int64(2)}, {int64(3)},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_2",
+		},
+		execOption: ExecResultAsDataWithFallback,
+		expectedRawData: []interface{}{
+			int64(1), int64(2), int64(3),
+		},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_2",
+		},
+		execOption: ExecResultAsRawData,
+		expectedRawData: []interface{}{
+			int64(1), int64(2), int64(3),
+		},
+	})
 
 	// scalar true
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name: "call_case_3",
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{true},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_3",
+		},
+		execOption:      ExecResultAsDataWithFallback,
+		expectedRawData: []interface{}{true},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_3",
+		},
+		execOption:      ExecResultAsRawData,
+		expectedRawData: []interface{}{true},
+	})
 
 	// scalar nil
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name: "call_case_4",
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{nil},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_4",
+		},
+		execOption: ExecResultAsDataWithFallback,
+		expectedRawData: []interface{}{
+			interface{}(nil),
+		},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_4",
+		},
+		execOption: ExecResultAsRawData,
+		expectedRawData: []interface{}{
+			interface{}(nil),
+		},
+	})
 
 	// empty table
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name: "call_case_5",
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_5",
+		},
+		execOption: ExecResultAsDataWithFallback,
+		expectedData: [][]interface{}{
+			{},
+		},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_5",
+		},
+		execOption: ExecResultAsRawData,
+		expectedRawData: []interface{}{
+			[]interface{}{},
+		},
+	})
 
 	// array with len 1 (similar to case 1)
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name: "call_case_6",
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{int64(1)},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_6",
+		},
+		execOption: ExecResultAsDataWithFallback,
+		expectedData: [][]interface{}{
+			{int64(1)},
+		},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_6",
+		},
+		execOption: ExecResultAsRawData,
+		expectedRawData: []interface{}{
+			[]interface{}{int64(1)},
+		},
+	})
 
 	// single array with len 3
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name: "call_case_7",
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{int64(1), int64(2), int64(3)},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_7",
+		},
+		execOption: ExecResultAsDataWithFallback,
+		expectedData: [][]interface{}{
+			{int64(1), int64(2), int64(3)},
+		},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_7",
+		},
+		execOption: ExecResultAsRawData,
+		expectedRawData: []interface{}{
+			[]interface{}{int64(1), int64(2), int64(3)},
+		},
+	})
 
 	// multiple arrays
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name: "call_case_8",
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{int64(1), int64(2), int64(3)},
 			{"a", "b", "c"},
 			{true, false},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_8",
+		},
+		execOption: ExecResultAsDataWithFallback,
+		expectedData: [][]interface{}{
+			{int64(1), int64(2), int64(3)},
+			{"a", "b", "c"},
+			{true, false},
+		},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_8",
+		},
+		execOption: ExecResultAsRawData,
+		expectedRawData: []interface{}{
+			[]interface{}{int64(1), int64(2), int64(3)},
+			[]interface{}{"a", "b", "c"},
+			[]interface{}{true, false},
+		},
+	})
 
 	// map with string keys
-	do(nil,
-		&Call17{
+	do(&testParams{
+		query: &Call17{
 			Name: "call_case_9",
 		},
-		[][]interface{}{
+		expectedData: [][]interface{}{
 			{map[string]interface{}{"key1": "value1", "key2": "value2"}},
 		},
-	)
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_9",
+		},
+		execOption: ExecResultAsDataWithFallback,
+		expectedRawData: []interface{}{
+			map[string]interface{}{"key1": "value1", "key2": "value2"},
+		},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_9",
+		},
+		execOption: ExecResultAsRawData,
+		expectedRawData: []interface{}{
+			map[string]interface{}{"key1": "value1", "key2": "value2"},
+		},
+	})
+
+	// empty result
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_10",
+		},
+		expectedData: [][]interface{}{},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_10",
+		},
+		execOption:   ExecResultAsDataWithFallback,
+		expectedData: [][]interface{}{},
+	})
+	do(&testParams{
+		query: &Call17{
+			Name: "call_case_10",
+		},
+		execOption:      ExecResultAsRawData,
+		expectedRawData: []interface{}{},
+	})
 }
 
 func BenchmarkCall17Pack(b *testing.B) {

@@ -20,6 +20,23 @@ func OpaqueExecOption(opaque interface{}) ExecOption {
 	return &opaqueOption{opaque: opaque}
 }
 
+type resultModeOption struct {
+	resultMode resultUnmarshalMode
+}
+
+func (o *resultModeOption) apply(r *request) {
+	r.resultMode = o.resultMode
+}
+
+func ResultModeExecOption(mode resultUnmarshalMode) ExecOption {
+	return &resultModeOption{mode}
+}
+
+var (
+	ExecResultAsRawData          = ResultModeExecOption(ResultAsRawData)
+	ExecResultAsDataWithFallback = ResultModeExecOption(ResultAsDataWithFallback)
+)
+
 // the Result type is used to return write errors here
 func (conn *Connection) writeRequest(ctx context.Context, request *request, q Query) (*request, *Result, uint64) {
 	var err error
@@ -166,12 +183,21 @@ func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption
 	return result
 }
 
-func (conn *Connection) ExecAsync(ctx context.Context, q Query, opaque interface{}, replyChan chan *AsyncResult) error {
+func (conn *Connection) ExecAsync(
+	ctx context.Context,
+	q Query,
+	opaque interface{},
+	replyChan chan *AsyncResult,
+	options ...ExecOption,
+) error {
 	var rerr *Result
 
 	request := requestPool.Get()
 	request.opaque = opaque
 	request.replyChan = replyChan
+	for i := 0; i < len(options); i++ {
+		options[i].apply(request)
+	}
 
 	if _, rerr, _ = conn.writeRequest(ctx, request, q); rerr != nil {
 		return rerr.Error
