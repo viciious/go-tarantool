@@ -14,7 +14,7 @@ func TestCall17(t *testing.T) {
 	tarantoolConfig := `
     local s = box.schema.space.create('tester', {id = 42})
     s:create_index('tester_id', {
-        type = 'hash',
+        type = 'tree',
         parts = {1, 'NUM'}
     })
     s:create_index('tester_name', {
@@ -31,7 +31,7 @@ func TestCall17(t *testing.T) {
     t = s:insert({3, 'Length', 93})
     
     function sel_all()
-        return box.space.tester:select{}
+        return box.space.tester:select({}, {iterator = "ALL"})
     end
 
     function sel_name(tester_id, name)
