@@ -1,6 +1,7 @@
 package tarantool
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -117,4 +118,52 @@ func TestConnectOptionsDSN(t *testing.T) {
 		assert.Equal(item.space, opts.DefaultSpace, "case %v (space)", tc+1)
 	}
 
+}
+
+// TestConnectionWithDefaultResultUnmarshalMode tests that
+// overwriting the result' unmarshal mode doesn't interferer with internal queries
+// like auth and schema pulling.
+func TestConnectionWithDefaultResultUnmarshalMode(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	config := `
+	local s = box.schema.space.create('tester', {id = 42})
+	s:create_index('tester_id', {
+		type = 'hash',
+		parts = {1, 'NUM'}
+	})
+	local t = s:insert({33, 45})
+
+	box.schema.user.create("tester", {password = "12345678"})
+	box.schema.user.grant('tester', 'read', 'space', 'tester')
+	`
+
+	box, err := NewBox(config, nil)
+	require.NoError(err)
+	defer box.Close()
+
+	conn, err := Connect(box.Addr(), &Options{
+		DefaultSpace:        "tester",
+		User:                "tester",
+		Password:            "12345678",
+		ResultUnmarshalMode: ResultAsRawData,
+	})
+	require.NoError(err)
+	defer conn.Close()
+
+	res := conn.Exec(context.Background(), &Select{
+		Key:   33,
+		Index: "tester_id",
+	})
+	require.NoError(res.Error)
+	assert.Nil(res.Data)
+	assert.Equal([]interface{}{[]interface{}{int64(33), int64(45)}}, res.RawData)
+
+	tuples, err := conn.Execute(&Select{
+		Key:   33,
+		Index: "tester_id",
+	})
+	require.NoError(err)
+	assert.Equal([][]interface{}{{int64(33), int64(45)}}, tuples)
 }

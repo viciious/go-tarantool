@@ -141,7 +141,7 @@ func TestCall17(t *testing.T) {
 		}
 		res := conn.Exec(context.Background(), params.query, opts...)
 
-		if assert.NoError(err) {
+		if assert.NoError(res.Error) {
 			assert.Equal(params.expectedData, res.Data)
 			assert.Equal(params.expectedRawData, res.RawData)
 		}

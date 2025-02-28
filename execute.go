@@ -140,6 +140,7 @@ func (conn *Connection) Exec(ctx context.Context, q Query, options ...ExecOption
 
 	request := requestPool.Get()
 	request.replyChan = replyChan
+	request.resultMode = conn.resultUnmarshalMode // could also by overwritten by options
 	for i := 0; i < len(options); i++ {
 		options[i].apply(request)
 	}
@@ -195,6 +196,7 @@ func (conn *Connection) ExecAsync(
 	request := requestPool.Get()
 	request.opaque = opaque
 	request.replyChan = replyChan
+	request.resultMode = conn.resultUnmarshalMode // could also by overwritten by options
 	for i := 0; i < len(options); i++ {
 		options[i].apply(request)
 	}
@@ -206,6 +208,6 @@ func (conn *Connection) ExecAsync(
 }
 
 func (conn *Connection) Execute(q Query) ([][]interface{}, error) {
-	res := conn.Exec(context.Background(), q)
+	res := conn.Exec(context.Background(), q, ResultModeExecOption(ResultDefaultMode))
 	return res.Data, res.Error
 }
