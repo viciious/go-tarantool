@@ -37,6 +37,8 @@ type Options struct {
 	// that can be added to packet pool.
 	// If the packet size is 0, option is ignored.
 	PoolMaxPacketSize int
+
+	ResultUnmarshalMode resultUnmarshalMode // Result unmarshal mode for user made requests
 }
 
 type Greeting struct {
@@ -57,14 +59,15 @@ type Connection struct {
 	ccw io.Writer
 
 	// options
-	queryTimeout      time.Duration
-	greeting          *Greeting
-	packData          *packData
-	remoteAddr        string
-	firstError        error
-	firstErrorLock    *sync.Mutex
-	perf              PerfCount
-	poolMaxPacketSize int
+	queryTimeout        time.Duration
+	greeting            *Greeting
+	packData            *packData
+	remoteAddr          string
+	firstError          error
+	firstErrorLock      *sync.Mutex
+	perf                PerfCount
+	poolMaxPacketSize   int
+	resultUnmarshalMode resultUnmarshalMode
 }
 
 // Connect to tarantool instance with options using the provided context.
@@ -125,16 +128,17 @@ func newConn(ctx context.Context, scheme, addr string, opts Options) (conn *Conn
 	}()
 
 	conn = &Connection{
-		remoteAddr:        addr,
-		requests:          newRequestMap(),
-		writeChan:         make(chan *request, 256),
-		exit:              make(chan bool),
-		closed:            make(chan bool),
-		firstErrorLock:    &sync.Mutex{},
-		packData:          newPackData(opts.DefaultSpace),
-		queryTimeout:      opts.QueryTimeout,
-		perf:              opts.Perf,
-		poolMaxPacketSize: opts.PoolMaxPacketSize,
+		remoteAddr:          addr,
+		requests:            newRequestMap(),
+		writeChan:           make(chan *request, 256),
+		exit:                make(chan bool),
+		closed:              make(chan bool),
+		firstErrorLock:      &sync.Mutex{},
+		packData:            newPackData(opts.DefaultSpace),
+		queryTimeout:        opts.QueryTimeout,
+		perf:                opts.Perf,
+		poolMaxPacketSize:   opts.PoolMaxPacketSize,
+		resultUnmarshalMode: opts.ResultUnmarshalMode,
 	}
 
 	d := &net.Dialer{
