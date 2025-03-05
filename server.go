@@ -16,6 +16,8 @@ const saltSize = 32
 type QueryHandler func(queryContext context.Context, query Query) *Result
 type OnShutdownCallback func(err error)
 
+func defaultPingStatus(*IprotoServer) uint { return OKCommand }
+
 type IprotoServer struct {
 	sync.Mutex
 	conn          net.Conn
@@ -43,13 +45,14 @@ type IprotoServerOptions struct {
 
 func NewIprotoServer(uuid string, handler QueryHandler, onShutdown OnShutdownCallback) *IprotoServer {
 	return &IprotoServer{
-		conn:       nil,
-		reader:     nil,
-		writer:     nil,
-		handler:    handler,
-		onShutdown: onShutdown,
-		uuid:       uuid,
-		schemaID:   1,
+		conn:          nil,
+		reader:        nil,
+		writer:        nil,
+		handler:       handler,
+		onShutdown:    onShutdown,
+		uuid:          uuid,
+		schemaID:      1,
+		getPingStatus: defaultPingStatus,
 	}
 }
 
@@ -58,9 +61,8 @@ func (s *IprotoServer) WithOptions(opts *IprotoServerOptions) *IprotoServer {
 		opts = &IprotoServerOptions{}
 	}
 	s.perf = opts.Perf
-	s.getPingStatus = opts.GetPingStatus
-	if s.getPingStatus == nil {
-		s.getPingStatus = func(*IprotoServer) uint { return 0 }
+	if opts.GetPingStatus != nil {
+		s.getPingStatus = opts.GetPingStatus
 	}
 	return s
 }
