@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,6 +22,8 @@ var (
 	ErrSyncFailed        = errors.New("SYNC failed")
 
 	versionPrefix = []byte("Tarantool ")
+
+	greetingRegexp = regexp.MustCompile("^Tarantool ([0-9.]+) [(]([^ ]+)[)] ([a-f0-9-]+)")
 )
 
 type Options struct {
@@ -42,8 +45,9 @@ type Options struct {
 }
 
 type Greeting struct {
-	Version uint32
-	Auth    []byte
+	Version      uint32
+	InstanceUUID string
+	Auth         []byte
 }
 
 type Connection struct {
@@ -277,9 +281,16 @@ func parseGreeting(r io.Reader) (*Greeting, error) {
 		return nil, err
 	}
 
+	uuid := ""
+	m := greetingRegexp.FindAllSubmatch(greeting[:64], -1)
+	if len(m) > 0 && len(m[0]) > 3 {
+		uuid = string(m[0][3])
+	}
+
 	return &Greeting{
-		Version: version,
-		Auth:    greeting[64:108],
+		Version:      version,
+		Auth:         greeting[64:108],
+		InstanceUUID: uuid,
 	}, nil
 }
 
@@ -451,6 +462,10 @@ func (conn *Connection) IsClosed() bool {
 	default:
 		return false
 	}
+}
+
+func (conn *Connection) InstanceUUID() string {
+	return conn.greeting.InstanceUUID
 }
 
 func (conn *Connection) releasePacket(pp *BinaryPacket) {
