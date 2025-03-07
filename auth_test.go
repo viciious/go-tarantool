@@ -56,6 +56,7 @@ func TestAuth(t *testing.T) {
 		Password: "12345678",
 	})
 	if assert.NoError(err) && assert.NotNil(conn) {
+		assert.NotEmpty(conn.InstanceUUID(), "instance UUID is empty")
 		conn.Close()
 	}
 
