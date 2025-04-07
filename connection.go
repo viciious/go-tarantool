@@ -116,7 +116,9 @@ func connect(ctx context.Context, scheme, addr string, opts Options) (conn *Conn
 	// remove deadline
 	conn.tcpConn.SetDeadline(time.Time{})
 
-	go conn.worker()
+	go conn.writer()
+
+	go conn.reader()
 
 	return
 }
@@ -490,64 +492,34 @@ func (conn *Connection) setError(err error) {
 	}
 }
 
-func (conn *Connection) worker() {
-	var wg sync.WaitGroup
+func (conn *Connection) writer() {
+	var err error
 
-	wg.Add(2)
-
-	go func() {
-		err := conn.writer()
-		conn.setError(err)
-		conn.stop()
-		wg.Done()
-	}()
-
-	go func() {
-		err := conn.reader()
-		conn.setError(err)
-		conn.stop()
-		wg.Done()
-	}()
-
-	wg.Wait()
-
-	// release all pending packets
-	writeChan := conn.writeChan
-
-CLEANUP_LOOP:
-	for {
-		select {
-		case req := <-writeChan:
-			pp := req.packet
-			if pp != nil {
-				req.packet = nil
-				conn.releasePacket(pp)
-			}
-		default:
-			break CLEANUP_LOOP
-		}
-	}
-
-	// send error reply to all pending requests
-	conn.requests.CleanUp(func(req *request) {
-		select {
-		case req.replyChan <- &AsyncResult{
-			Error:     ConnectionClosedError(conn),
-			ErrorCode: ErrNoConnection,
-			Opaque:    req.opaque,
-		}:
-		default:
-		}
-		requestPool.Put(req)
-	})
-
-	close(conn.closed)
-}
-
-func (conn *Connection) writer() (err error) {
 	writeChan := conn.writeChan
 	stopChan := conn.exit
 	w := bufio.NewWriterSize(conn.ccw, DefaultWriterBufSize)
+
+	defer close(conn.closed)
+
+	defer func() {
+	CLEANUP_LOOP:
+		for {
+			select {
+			case req := <-writeChan:
+				pp := req.packet
+				if pp != nil {
+					req.packet = nil
+					conn.releasePacket(pp)
+				}
+			default:
+				break CLEANUP_LOOP
+			}
+		}
+	}()
+
+	defer conn.setError(err)
+
+	defer conn.stop()
 
 	wr := func(w io.Writer, req *request) error {
 		packet := req.packet
@@ -596,13 +568,35 @@ WRITER_LOOP:
 			}
 		}
 	}
-
-	return
 }
 
-func (conn *Connection) reader() (err error) {
+func (conn *Connection) reader() {
 	var pp *BinaryPacket
 	var requestID uint64
+	var err error
+
+	defer func() {
+		<-conn.closed
+	}()
+
+	defer func() {
+		// send error reply to all pending requests
+		conn.requests.CleanUp(func(req *request) {
+			select {
+			case req.replyChan <- &AsyncResult{
+				Error:     ConnectionClosedError(conn),
+				ErrorCode: ErrNoConnection,
+				Opaque:    req.opaque,
+			}:
+			default:
+			}
+			requestPool.Put(req)
+		})
+	}()
+
+	defer conn.setError(err)
+
+	defer conn.stop()
 
 	r := bufio.NewReaderSize(conn.ccr, DefaultReaderBufSize)
 
@@ -643,5 +637,4 @@ READER_LOOP:
 	if pp != nil {
 		conn.releasePacket(pp)
 	}
-	return
 }
